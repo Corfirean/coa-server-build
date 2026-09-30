@@ -31,7 +31,7 @@ if (Test-Path "$Core/LICENSE") { Copy-Item "$Core/LICENSE" "$Out/Licenses/Azerot
 @"
 CoA Server Manager - notice
 
-Server binaries (Core\worldserver.exe, Coreuthserver.exe) were built from:
+Server binaries (Core\worldserver.exe, Core\authserver.exe) were built from:
   core  https://github.com/Corfirean/azerothcore-wotlk-coa   commit $CoreSha
   bots  https://github.com/Corfirean/mod-coa-playerbots       commit $BotsSha
 The core keeps its upstream licences (GPL-2.0-or-later for the MaNGOS-derived parts, AGPL-3.0 for AzerothCore-original
