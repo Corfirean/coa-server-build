@@ -74,6 +74,7 @@ jobs:
             Write-Host "No base release yet: this update will carry every file."
             '{"schema":1,"kind":"base","version":"0.0.0","core":{"commit":null},"builtAt":"none","minManagerVersion":"0.1.0","files":[]}' | Set-Content base-manifest.json -Encoding utf8
           }
+          $global:LASTEXITCODE = 0   # a missing base release is expected; do not let gh's exit code fail the step
       - name: Pack, sign, verify
         shell: pwsh
         env:
