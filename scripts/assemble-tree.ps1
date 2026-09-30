@@ -21,6 +21,14 @@ Get-ChildItem "$Core/modules" -Directory | ForEach-Object {
     Get-ChildItem "$($_.FullName)/conf/*.dist" -ErrorAction SilentlyContinue | Copy-Item -Destination "$Out/Core/configs/modules/" -Force
 }
 Copy-Item "$Bots/module/conf/mod_coa_playerbots.conf.dist" "$Out/Core/configs/modules/" -Force
+# The CoA compatibility settings live in the core, not in a module folder. They must be active: without CoA.Enable = 1
+# the world server rejects the Ascension client's extension packets and drops the connection after login.
+Copy-Item "$Core/src/server/coa/conf/coa.conf.dist" "$Out/Core/configs/modules/" -Force
+# Every module reads configs/modules/<name>.conf. Ship an active copy of each .dist (created only when missing on
+# install/update, never overwritten) so a fresh server runs with the documented defaults instead of warnings.
+Get-ChildItem "$Out/Core/configs/modules/*.conf.dist" | ForEach-Object {
+    Copy-Item $_.FullName ($_.FullName -replace '\.dist$', '') -Force
+}
 Copy-Item "$Bots/dist/reference/*" "$Out/Core/reference/" -Recurse -Force
 Copy-Item "$Bots/addon/CoABotUI" "$Out/Extras/CoABotUI" -Recurse -Force
 
