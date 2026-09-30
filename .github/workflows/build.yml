@@ -1,0 +1,101 @@
+name: build
+# Nightly (and on demand): compile the fork + bots module, assemble a signed cumulative update package
+# and publish it to the moving "edge" release. Promote a good build with the "promote" workflow.
+on:
+  schedule:
+    - cron: '30 1 * * *'
+  workflow_dispatch:
+    inputs:
+      core_ref:
+        description: Fork ref (branch, tag or SHA)
+        default: coa-bots
+      bots_ref:
+        description: mod-coa-playerbots ref (branch, tag or SHA)
+        default: master
+
+concurrency:
+  group: build
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  binaries:
+    uses: Corfirean/azerothcore-wotlk-coa/.github/workflows/coa-bots-build.yml@coa-bots
+    with:
+      core_ref: ${{ inputs.core_ref || 'coa-bots' }}
+      bots_ref: ${{ inputs.bots_ref || 'master' }}
+
+  package:
+    needs: binaries
+    runs-on: windows-latest
+    timeout-minutes: 90
+    env:
+      GH_TOKEN: ${{ github.token }}
+      CORE_SHA: ${{ needs.binaries.outputs.core_sha }}
+      BOTS_SHA: ${{ needs.binaries.outputs.bots_sha }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Manager tools (coa-release)
+        uses: actions/checkout@v7
+        with:
+          repository: Corfirean/coa-server-manager
+          path: _manager
+      - name: Build coa-release
+        shell: pwsh
+        run: cargo build --release -p coa-release --manifest-path _manager/Cargo.toml
+      - name: Core sources at the exact commit (full history, SQL order comes from it)
+        uses: actions/checkout@v7
+        with:
+          repository: Corfirean/azerothcore-wotlk-coa
+          ref: ${{ env.CORE_SHA }}
+          path: _core
+          fetch-depth: 0
+      - name: Bots module at the exact commit
+        uses: actions/checkout@v7
+        with:
+          repository: Corfirean/mod-coa-playerbots
+          ref: ${{ env.BOTS_SHA }}
+          path: _bots
+      - name: Download the compiled binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: coa-server-binaries
+          path: _binaries
+      - name: Assemble the release tree
+        shell: pwsh
+        run: ./scripts/assemble-tree.ps1 -Binaries _binaries -Core _core -Bots _bots -Out _tree
+      - name: Fetch the base manifest
+        shell: pwsh
+        run: |
+          gh release download base --pattern manifest.json --output base-manifest.json --repo $env:GITHUB_REPOSITORY
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "No base release yet: this update will carry every file."
+            '{"schema":1,"kind":"base","version":"0.0.0","core":{"commit":null},"builtAt":"none","minManagerVersion":"0.1.0","files":[]}' | Set-Content base-manifest.json -Encoding utf8
+          }
+      - name: Pack, sign, verify
+        shell: pwsh
+        env:
+          COA_SIGNING_KEY: ${{ secrets.COA_SIGNING_KEY }}
+        run: |
+          if (-not $env:COA_SIGNING_KEY) { throw "Add the COA_SIGNING_KEY secret (see README) - unsigned packages are never published." }
+          $version = "0.$((Get-Date).ToString('yyMMdd')).${{ github.run_number }}"
+          "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          $tool = "_manager/target/release/coa-release.exe"
+          & $tool pack-update --tree _tree --base-manifest base-manifest.json --core _core --bots _bots --out _out `
+            --version $version --core-commit $env:CORE_SHA --bots-commit $env:BOTS_SHA
+          if ($LASTEXITCODE) { throw "pack-update failed" }
+          & $tool sign --dir _out;   if ($LASTEXITCODE) { throw "sign failed" }
+          & $tool verify --dir _out; if ($LASTEXITCODE) { throw "verify failed" }
+      - name: Publish to the edge release
+        shell: pwsh
+        run: |
+          gh release view edge --repo $env:GITHUB_REPOSITORY 2>$null
+          if ($LASTEXITCODE -ne 0) { gh release create edge --prerelease --title "Edge builds" --notes "Latest nightly build. Not promoted to stable yet." --repo $env:GITHUB_REPOSITORY }
+          $old = gh release view edge --json assets --jq '.assets[].name' --repo $env:GITHUB_REPOSITORY
+          $files = Get-ChildItem _out -File
+          $files | ForEach-Object { gh release upload edge $_.FullName --clobber --repo $env:GITHUB_REPOSITORY }
+          $keep = $files.Name
+          foreach ($n in $old) { if ($keep -notcontains $n) { gh release delete-asset edge $n --yes --repo $env:GITHUB_REPOSITORY } }
+          gh release edit edge --notes "Version $env:VERSION`ncore $env:CORE_SHA`nbots $env:BOTS_SHA" --repo $env:GITHUB_REPOSITORY

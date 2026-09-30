@@ -1,0 +1,51 @@
+name: sync-fork
+# Keep Corfirean/azerothcore-wotlk-coa close to the maintainer's repository.
+#   main      = exact mirror of upstream (fast-forward only)
+#   coa-bots  = upstream main + our small patch series (upstream merged in; a conflict opens an issue and stops)
+# Needs FORK_PUSH_TOKEN: a fine-grained token with Contents + Workflows write access to the fork.
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the token exists
+        env:
+          T: ${{ secrets.FORK_PUSH_TOKEN }}
+        run: test -n "$T" || { echo "::error::Add the FORK_PUSH_TOKEN secret (see README)."; exit 1; }
+      - uses: actions/checkout@v7
+        with:
+          repository: Corfirean/azerothcore-wotlk-coa
+          ref: coa-bots
+          fetch-depth: 0
+          token: ${{ secrets.FORK_PUSH_TOKEN }}
+      - name: Mirror main and merge it into coa-bots
+        id: merge
+        run: |
+          git config user.name "coa-sync"
+          git config user.email "coa-sync@users.noreply.github.com"
+          git remote add upstream https://github.com/jealous-sound/azerothcore-wotlk-coa.git
+          git fetch --quiet upstream main
+          git push origin upstream/main:refs/heads/main
+          if git merge-base --is-ancestor upstream/main HEAD; then echo "up to date"; exit 0; fi
+          if git merge --no-edit upstream/main; then
+            git push origin HEAD:coa-bots
+          else
+            git merge --abort
+            echo "conflict=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Report a conflict
+        if: steps.merge.outputs.conflict == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "sync conflict in:title" --json number --jq length | grep -qx 0 || exit 0
+          gh issue create --repo "$GITHUB_REPOSITORY" --title "sync conflict: upstream/main does not merge into coa-bots" \
+            --body "The hourly sync could not merge upstream into coa-bots. Resolve it in the fork (git merge upstream/main), push, and the automation resumes. Nightly builds keep using the last good coa-bots."

@@ -1,0 +1,27 @@
+name: promote
+# Copy the current edge build to the "stable" release that players' Managers follow.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Download edge
+        run: gh release download edge --dir edge --repo "$GITHUB_REPOSITORY"
+      - name: Verify it is signed and intact
+        run: |
+          test -f edge/manifest.json && test -f edge/manifest.json.sig
+          ls edge/*.tar.zst.* >/dev/null
+      - name: Publish to stable
+        run: |
+          gh release view stable --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || gh release create stable --title "Stable" --notes "Promoted builds" --latest --repo "$GITHUB_REPOSITORY"
+          old=$(gh release view stable --json assets --jq '.assets[].name' --repo "$GITHUB_REPOSITORY")
+          gh release upload stable edge/* --clobber --repo "$GITHUB_REPOSITORY"
+          for n in $old; do [ -f "edge/$n" ] || gh release delete-asset stable "$n" --yes --repo "$GITHUB_REPOSITORY"; done
+          gh release edit stable --notes "$(gh release view edge --json body --jq .body)" --repo "$GITHUB_REPOSITORY"
