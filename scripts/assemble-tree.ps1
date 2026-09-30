@@ -31,6 +31,9 @@ Get-ChildItem "$Out/Core/configs/modules/*.conf.dist" | ForEach-Object {
 }
 Copy-Item "$Bots/dist/reference/*" "$Out/Core/reference/" -Recurse -Force
 Copy-Item "$Bots/addon/CoABotUI" "$Out/Extras/CoABotUI" -Recurse -Force
+# The offline bot factory: creates fully equipped bots straight in the database while the server is stopped.
+New-Item -ItemType Directory -Force -Path "$Out/Extras/CoABotTools" | Out-Null
+Copy-Item "$Bots/tools/offline_bot_factory.py" "$Out/Extras/CoABotTools/" -Force
 
 # Licences and the pointer to the exact sources of what was compiled (AGPL/GPL source availability).
 if ($Manager -and (Test-Path "$Manager/LICENSE")) { Copy-Item "$Manager/LICENSE" "$Out/Licenses/CoA-Server-Manager-AGPL-3.0.txt" -Force }
