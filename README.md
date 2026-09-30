@@ -19,11 +19,19 @@ and the archive parts (`*.tar.zst.NNN`, below GitHub's 2 GiB asset limit).
 * **sync-fork** - hourly. Mirrors upstream `main` into the fork and merges it into `coa-bots`; a conflict opens an issue.
 
 ## Secrets (set by the repository owner)
+Run these in PowerShell on the machine where `gh` is logged in.
+
+```powershell
+# signing key: piped from the key file, never typed or printed
+Get-Content "$env:USERPROFILE\.coa-manager\signing\manifest-signing.key" -Raw | gh secret set COA_SIGNING_KEY -R Corfirean/coa-server-build
+
+# fork sync token: gh asks you to paste it
+gh secret set FORK_PUSH_TOKEN -R Corfirean/coa-server-build
 ```
-gh secret set COA_SIGNING_KEY -R Corfirean/coa-server-build < "%USERPROFILE%\.coa-manager\signing\manifest-signing.key"
-gh secret set FORK_PUSH_TOKEN -R Corfirean/coa-server-build     # fine-grained token: Contents + Workflows write on the fork
-```
-Without `COA_SIGNING_KEY` nothing is published (unsigned packages are refused by every Manager anyway).
+`FORK_PUSH_TOKEN` is a fine-grained personal access token (GitHub > Settings > Developer settings) with access to
+**only** `Corfirean/azerothcore-wotlk-coa` and the permissions *Contents: read and write* and *Workflows: read and write*.
+It is only needed by the hourly `sync-fork` workflow. Without `COA_SIGNING_KEY` nothing is published (unsigned packages
+are refused by every Manager anyway).
 
 ## Base package
 The base contains game data and a database built from the maintainer's repack, so it is produced on the maintainer's
