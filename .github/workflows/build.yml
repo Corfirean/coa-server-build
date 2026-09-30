@@ -65,7 +65,7 @@ jobs:
           path: _binaries
       - name: Assemble the release tree
         shell: pwsh
-        run: ./scripts/assemble-tree.ps1 -Binaries _binaries -Core _core -Bots _bots -Out _tree
+        run: ./scripts/assemble-tree.ps1 -Binaries _binaries -Core _core -Bots _bots -Out _tree -Manager _manager -CoreSha $env:CORE_SHA -BotsSha $env:BOTS_SHA
       - name: Fetch the base manifest
         shell: pwsh
         run: |

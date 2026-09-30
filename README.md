@@ -36,3 +36,9 @@ are refused by every Manager anyway).
 ## Base package
 The base contains game data and a database built from the maintainer's repack, so it is produced on the maintainer's
 machine (`coa-release clean-base` + `pack-base`, see the manager repository) and uploaded to the `base` release.
+
+## License
+The scripts and workflows in this repository are under the [GNU Affero General Public License v3.0](LICENSE).
+The packages published from it contain a `Licenses` folder with the licences of everything shipped (the server fork,
+the bots module, MySQL) and a `NOTICE.txt` naming the exact source commits. The game data in the base package is not
+covered by this licence.
