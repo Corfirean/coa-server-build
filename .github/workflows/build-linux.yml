@@ -58,10 +58,11 @@ jobs:
       - uses: docker/setup-buildx-action@v3
       - name: Compile in Docker
         run: docker buildx build -f docker/Dockerfile.linux --target binaries --output type=local,dest=_binaries _core
-      - name: Smoke test the binaries
+      - name: Smoke test the binaries (in a clean Ubuntu 26.04 with only the runtime libraries)
         run: |
           file _binaries/worldserver _binaries/authserver
-          _binaries/worldserver --version
+          docker run --rm -v "$PWD/_binaries:/b:ro" ubuntu:26.04 sh -c \
+            'apt-get update -qq && apt-get install -y -qq --no-install-recommends libmysqlclient24 libreadline8 libicu78 libncurses-dev >/dev/null && /b/worldserver --version'
       - name: Build coa-release
         run: cargo build --release -p coa-release --manifest-path _manager/Cargo.toml
       - name: Assemble the release tree
