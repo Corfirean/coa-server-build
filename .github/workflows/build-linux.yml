@@ -67,6 +67,8 @@ jobs:
         run: cargo build --release -p coa-release --manifest-path _manager/Cargo.toml
       - name: Assemble the release tree
         run: ./scripts/assemble-tree.sh --binaries _binaries --core _core --bots _bots --out _tree --manager _manager --core-sha "$CORE_SHA" --bots-sha "$BOTS_SHA"
+      - name: Smoke test, configuration is read from the package layout
+        run: ./scripts/smoke-test-linux.sh _tree
       - name: Pack (every file, there is no Linux base package yet)
         run: |
           version="0.$(date +%y%m%d).${{ github.run_number }}"

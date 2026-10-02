@@ -28,9 +28,8 @@ cp "$bots/module/conf/mod_coa_playerbots.conf.dist" "$out/Core/configs/modules/"
 # The CoA compatibility settings live in the core, not in a module folder. They must be active: without CoA.Enable = 1
 # the world server rejects the Ascension client's extension packets and drops the connection after login.
 cp "$core/src/server/coa/conf/coa.conf.dist" "$out/Core/configs/modules/"
-# Every module reads configs/modules/<name>.conf. Ship an active copy of each .dist (created only when missing on
-# install/update, never overwritten) so a fresh server runs with the documented defaults instead of warnings.
-for f in "$out"/Core/configs/modules/*.conf.dist; do cp "$f" "${f%.dist}"; done
+# Only the .dist files are shipped: coa-release leaves active .conf files out of the package, and the Manager creates
+# them from the .dist ones.
 cp -r "$bots"/dist/reference/. "$out/Core/reference/"
 cp -r "$bots/addon/CoABotUI" "$out/Extras/CoABotUI"
 # The offline bot factory: creates fully equipped bots straight in the database while the server is stopped.
