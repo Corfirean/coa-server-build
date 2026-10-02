@@ -5,7 +5,8 @@ param(
     [Parameter(Mandatory)] [string] $Out,
     [string] $Manager = "",
     [string] $CoreSha = "unknown",
-    [string] $BotsSha = "unknown"
+    [string] $BotsSha = "unknown",
+    [string] $ScalingSha = "unknown"
 )
 # Lays out the files of a release the way they sit in a server folder. Only shipped files: no configs the
 # server owner edits (those are merged by the Manager), no databases.
@@ -38,6 +39,7 @@ Copy-Item "$Bots/tools/offline_bot_factory.py" "$Out/Extras/CoABotTools/" -Force
 # Licences and the pointer to the exact sources of what was compiled (AGPL/GPL source availability).
 if ($Manager -and (Test-Path "$Manager/LICENSE")) { Copy-Item "$Manager/LICENSE" "$Out/Licenses/CoA-Server-Manager-AGPL-3.0.txt" -Force }
 if (Test-Path "$Bots/LICENSE") { Copy-Item "$Bots/LICENSE" "$Out/Licenses/mod-coa-playerbots-AGPL-3.0.txt" -Force }
+if (Test-Path "$Core/modules/mod-coa-content-scaling/LICENSE") { Copy-Item "$Core/modules/mod-coa-content-scaling/LICENSE" "$Out/Licenses/mod-coa-content-scaling-GPL-2.0.txt" -Force }
 if (Test-Path "$Core/LICENSE") { Copy-Item "$Core/LICENSE" "$Out/Licenses/AzerothCore-fork-LICENSE.txt" -Force }
 @"
 CoA Server Manager - notice
@@ -45,8 +47,9 @@ CoA Server Manager - notice
 Server binaries (Core\worldserver.exe, Core\authserver.exe) were built from:
   core  https://github.com/Corfirean/azerothcore-wotlk-coa   commit $CoreSha
   bots  https://github.com/Corfirean/mod-coa-playerbots       commit $BotsSha
+  scaling https://github.com/Corfirean/mod-coa-content-scaling commit $ScalingSha (with its TBC and WotLK content packs)
 The core keeps its upstream licences (GPL-2.0-or-later for the MaNGOS-derived parts, AGPL-3.0 for AzerothCore-original
-files); the bots module and CoA Server Manager are AGPL-3.0. The complete corresponding source is at the links above.
+files); the bots module and CoA Server Manager are AGPL-3.0; the Content Scaling module is GPL-2.0. The complete corresponding source is at the links above.
 
 The bundled MySQL is GPL-2.0 (see MySQL-LICENSE.txt in this folder).
 

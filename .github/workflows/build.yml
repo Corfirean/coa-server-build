@@ -12,6 +12,9 @@ on:
       bots_ref:
         description: mod-coa-playerbots ref (branch, tag or SHA)
         default: master
+      scaling_ref:
+        description: mod-coa-content-scaling ref (branch, tag or SHA)
+        default: main
 
 concurrency:
   group: build
@@ -26,6 +29,7 @@ jobs:
     with:
       core_ref: ${{ inputs.core_ref || 'coa-bots' }}
       bots_ref: ${{ inputs.bots_ref || 'master' }}
+      scaling_ref: ${{ inputs.scaling_ref || 'main' }}
 
   package:
     needs: binaries
@@ -35,6 +39,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       CORE_SHA: ${{ needs.binaries.outputs.core_sha }}
       BOTS_SHA: ${{ needs.binaries.outputs.bots_sha }}
+      SCALING_SHA: ${{ needs.binaries.outputs.scaling_sha }}
     steps:
       - uses: actions/checkout@v7
       - name: Manager tools (coa-release)
@@ -58,6 +63,22 @@ jobs:
           repository: Corfirean/mod-coa-playerbots
           ref: ${{ env.BOTS_SHA }}
           path: _bots
+      - name: Content Scaling module at the exact commit
+        uses: actions/checkout@v7
+        with:
+          repository: Corfirean/mod-coa-content-scaling
+          ref: ${{ env.SCALING_SHA }}
+          path: _scaling
+      - name: Place Content Scaling and its content packs into the core tree (their SQL and configs ship with the release)
+        shell: pwsh
+        run: |
+          robocopy '_scaling' '_core\modules\mod-coa-content-scaling' /E /XD .git artifacts docs tools /NFL /NDL /NJH /NJS /NP | Out-Null
+          if ($LASTEXITCODE -ge 8) { throw "copying mod-coa-content-scaling failed ($LASTEXITCODE)" }
+          foreach ($pack in 'mod-coa-tbc-content', 'mod-coa-wotlk-content') {
+            robocopy "_scaling\content-packs\$pack" "_core\modules\$pack" /E /NFL /NDL /NJH /NJS /NP | Out-Null
+            if ($LASTEXITCODE -ge 8) { throw "copying $pack failed ($LASTEXITCODE)" }
+          }
+          $global:LASTEXITCODE = 0
       - name: Download the compiled binaries
         uses: actions/download-artifact@v4
         with:
@@ -65,7 +86,7 @@ jobs:
           path: _binaries
       - name: Assemble the release tree
         shell: pwsh
-        run: ./scripts/assemble-tree.ps1 -Binaries _binaries -Core _core -Bots _bots -Out _tree -Manager _manager -CoreSha $env:CORE_SHA -BotsSha $env:BOTS_SHA
+        run: ./scripts/assemble-tree.ps1 -Binaries _binaries -Core _core -Bots _bots -Out _tree -Manager _manager -CoreSha $env:CORE_SHA -BotsSha $env:BOTS_SHA -ScalingSha $env:SCALING_SHA
       - name: Fetch the base manifest
         shell: pwsh
         run: |
@@ -99,4 +120,4 @@ jobs:
           $files | ForEach-Object { gh release upload edge $_.FullName --clobber --repo $env:GITHUB_REPOSITORY }
           $keep = $files.Name
           foreach ($n in $old) { if ($keep -notcontains $n) { gh release delete-asset edge $n --yes --repo $env:GITHUB_REPOSITORY } }
-          gh release edit edge --notes "Version $env:VERSION`ncore $env:CORE_SHA`nbots $env:BOTS_SHA" --repo $env:GITHUB_REPOSITORY
+          gh release edit edge --notes "Version $env:VERSION`ncore $env:CORE_SHA`nbots $env:BOTS_SHA`nscaling $env:SCALING_SHA" --repo $env:GITHUB_REPOSITORY
