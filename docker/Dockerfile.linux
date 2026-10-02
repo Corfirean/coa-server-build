@@ -1,0 +1,47 @@
+# Compiles the CoA fork with mod-coa-playerbots on Linux and hands back the two server binaries.
+#
+#   docker buildx build -f docker/Dockerfile.linux --target binaries --output type=local,dest=_binaries <core-checkout>
+#
+# The build context is a checkout of the core with the bots module already placed at modules/mod-coa-playerbots
+# (module/src -> src, module/conf -> conf), exactly like the Windows job does. The core's own .git is mounted at build
+# time only because the version banner reads it.
+ARG UBUNTU_VERSION=26.04
+
+FROM ubuntu:${UBUNTU_VERSION} AS build
+ARG DEBIAN_FRONTEND=noninteractive
+ARG BUILD_TYPE=RelWithDebInfo
+# Parallel compile jobs. Defaults to the number of CPUs; lower it on a machine with little memory.
+ARG JOBS=0
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        build-essential ccache clang cmake ninja-build git ca-certificates \
+        libboost-all-dev libssl-dev libreadline-dev zlib1g-dev libbz2-dev liblzma-dev libncurses-dev \
+        default-libmysqlclient-dev libmysql++-dev libicu-dev libstdc++-16-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /azerothcore
+COPY CMakeLists.txt ./
+COPY conf conf
+COPY deps deps
+COPY src src
+COPY modules modules
+
+WORKDIR /azerothcore/build
+RUN --mount=type=cache,id=coa-ccache,target=/ccache,sharing=locked \
+    --mount=type=bind,target=/azerothcore/.git,source=.git \
+    git config --global --add safe.directory /azerothcore \
+    && export CCACHE_DIR=/ccache CCACHE_MAXSIZE=2G \
+    && cmake /azerothcore -G Ninja \
+        -DCMAKE_INSTALL_PREFIX=/azerothcore/env/dist \
+        -DAPPS_BUILD=all -DTOOLS_BUILD=none \
+        -DSCRIPTS=static -DMODULES=static \
+        -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
+        -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+        -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+        -DBoost_USE_STATIC_LIBS=ON \
+    && cmake --build . --target worldserver authserver -j "$([ "${JOBS}" -gt 0 ] && echo "${JOBS}" || nproc)"
+
+FROM scratch AS binaries
+COPY --from=build /azerothcore/build/src/server/apps/worldserver /worldserver
+COPY --from=build /azerothcore/build/src/server/apps/authserver /authserver

@@ -1,0 +1,85 @@
+name: build-linux
+# EXPERIMENTAL. Compiles the fork + bots module on Linux inside Docker and publishes an UNSIGNED update package to the
+# "linux-unsigned" prerelease. This workflow has no access to the signing key: the package is signed and promoted
+# separately by the repository owner. Windows releases (edge, stable, base) are not touched.
+on:
+  workflow_dispatch:
+    inputs:
+      core_ref:
+        description: Fork ref (branch, tag or SHA)
+        default: coa-bots
+      bots_ref:
+        description: mod-coa-playerbots ref (branch, tag or SHA)
+        default: master
+
+concurrency:
+  group: build-linux
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Manager tools (coa-release)
+        uses: actions/checkout@v7
+        with:
+          repository: Corfirean/coa-server-manager
+          path: _manager
+      - name: Core sources
+        uses: actions/checkout@v7
+        with:
+          repository: Corfirean/azerothcore-wotlk-coa
+          ref: ${{ inputs.core_ref }}
+          path: _core
+          fetch-depth: 0
+      - name: Bots module
+        uses: actions/checkout@v7
+        with:
+          repository: Corfirean/mod-coa-playerbots
+          ref: ${{ inputs.bots_ref }}
+          path: _bots
+      - name: Record the exact commits
+        run: |
+          echo "CORE_SHA=$(git -C _core rev-parse HEAD)" >> "$GITHUB_ENV"
+          echo "BOTS_SHA=$(git -C _bots rev-parse HEAD)" >> "$GITHUB_ENV"
+      - name: Place the bots module in the core
+        run: |
+          dst=_core/modules/mod-coa-playerbots
+          mkdir -p "$dst/conf"
+          cp -r _bots/module/src "$dst/src"
+          cp _bots/module/conf/* "$dst/conf/"
+      - uses: docker/setup-buildx-action@v3
+      - name: Compile in Docker
+        run: docker buildx build -f docker/Dockerfile.linux --target binaries --output type=local,dest=_binaries _core
+      - name: Smoke test the binaries
+        run: |
+          file _binaries/worldserver _binaries/authserver
+          _binaries/worldserver --version
+      - name: Build coa-release
+        run: cargo build --release -p coa-release --manifest-path _manager/Cargo.toml
+      - name: Assemble the release tree
+        run: ./scripts/assemble-tree.sh --binaries _binaries --core _core --bots _bots --out _tree --manager _manager --core-sha "$CORE_SHA" --bots-sha "$BOTS_SHA"
+      - name: Pack (every file, there is no Linux base package yet)
+        run: |
+          version="0.$(date +%y%m%d).${{ github.run_number }}"
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          echo '{"schema":1,"kind":"base","version":"0.0.0","core":{"commit":null},"builtAt":"none","minManagerVersion":"0.1.0","files":[]}' > base-manifest.json
+          _manager/target/release/coa-release pack-update --tree _tree --base-manifest base-manifest.json --core _core --bots _bots --out _out \
+            --version "$version" --core-commit "$CORE_SHA" --bots-commit "$BOTS_SHA"
+      - name: Publish to the linux-unsigned release
+        run: |
+          gh release view linux-unsigned >/dev/null 2>&1 || gh release create linux-unsigned --prerelease --title "Linux builds (unsigned, experimental)" --notes "Not signed. Not usable by the Manager until signed."
+          old=$(gh release view linux-unsigned --json assets --jq '.assets[].name')
+          for f in _out/*; do gh release upload linux-unsigned "$f" --clobber; done
+          for n in $old; do [ -f "_out/$n" ] || gh release delete-asset linux-unsigned "$n" --yes; done
+          gh release edit linux-unsigned --notes "Version $VERSION
+          core $CORE_SHA
+          bots $BOTS_SHA
+          UNSIGNED: the Manager refuses it until it is signed."
