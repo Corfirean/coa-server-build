@@ -7,6 +7,7 @@ Build and release pipeline for **CoA Server Manager** packages.
 | `base` | Base install package (server files, clean databases, game data) | "Install new server" |
 | `edge` | Latest nightly cumulative update (prerelease) | anyone testing new builds |
 | `stable` | The promoted update | every Manager, by default |
+| `linux-unsigned` | Experimental Linux build, **not signed** | the repository owner, who signs it |
 
 Each release carries `manifest.json`, `manifest.json.sig` (Ed25519, checked by the app against its built-in public key)
 and the archive parts (`*.tar.zst.NNN`, below GitHub's 2 GiB asset limit).
@@ -15,6 +16,10 @@ and the archive parts (`*.tar.zst.NNN`, below GitHub's 2 GiB asset limit).
 * **build** - nightly + manual. Compiles [the fork](https://github.com/Corfirean/azerothcore-wotlk-coa) with
   [mod-coa-playerbots](https://github.com/Corfirean/mod-coa-playerbots) on Windows, builds a cumulative update against the
   `base` manifest, signs it, publishes it to `edge`. Versions are `0.YYMMDD.<run>`.
+* **build-linux** - manual, **experimental**. Compiles the same fork and bots module on Linux inside Docker
+  (`docker/Dockerfile.linux`, Ubuntu 26.04), lays the files out with `scripts/assemble-tree.sh` and publishes an
+  **unsigned** package to `linux-unsigned`. It has no access to the signing key and does not touch `edge`, `stable` or
+  `base`. Signing and promoting it is a separate, manual step for the repository owner.
 * **promote** - manual. Copies `edge` to `stable`.
 * **sync-fork** - hourly. Mirrors upstream `main` into the fork and merges it into `coa-bots`; a conflict opens an issue.
 
