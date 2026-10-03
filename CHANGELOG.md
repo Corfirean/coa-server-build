@@ -3,6 +3,28 @@
 Everything that changed for players and server owners across the CoA server, bots, Content Scaling, the Manager and the renderer, newest first.
 Written from the `changelog.d/` fragments of each repository (see `changelog/GUIDE.md`).
 
+## 2026-10-03-2 - Manager 0.5.0
+
+### For players
+
+**Bot UI addon**
+
+- Fixed: Stock tab shows each item's limit. A gold limit line appears under the item and updates as soon as you set it.
+
+### For server owners
+
+**Server**
+
+- Fixed: A missing config option is reported once, not on every world tick. Servers lacking some module config files logged two lines per tick and filled the logs.
+
+**Manager**
+
+- Added: Switch between CoA and Wildcard while keeping separate characters and module settings. Run one world at a time with shared accounts. Wildcard keeps its own progress; CoA companions are unavailable there, and other modules show experimental compatibility. Backups and server updates cover both realms.
+- Changed: Updating the game client shows a progress bar on its button. No window covers the app while the client updates.
+- Fixed: Imported servers get the module config files they lack. They are created at start and after an update; existing files are never changed.
+- Fixed: Modules marked Soon stay greyed out
+- Fixed: The Bots page is hidden when the module is not on the server
+
 ## 2026-10-03 - Server 0.261002.13
 
 ### For players

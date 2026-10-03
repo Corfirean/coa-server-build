@@ -2,6 +2,90 @@
   "schema": 1,
   "releases": [
     {
+      "id": "2026-10-03-2",
+      "date": "2026-10-03",
+      "versions": {
+        "manager": "0.5.0"
+      },
+      "entries": [
+        {
+          "id": "bots:20261003-stock-tab-shows-each-item-s-limit.md",
+          "source": "bots",
+          "repo": "Corfirean/mod-coa-playerbots",
+          "date": "2026-10-03",
+          "area": "addon",
+          "type": "fixed",
+          "audience": "players",
+          "title": "Stock tab shows each item's limit",
+          "body": "A gold limit line appears under the item and updates as soon as you set it."
+        },
+        {
+          "id": "server:20261003-a-missing-config-option-is-reported-once-not-on.md",
+          "source": "server",
+          "repo": "Corfirean/azerothcore-wotlk-coa",
+          "date": "2026-10-03",
+          "area": "server",
+          "type": "fixed",
+          "audience": "admins",
+          "title": "A missing config option is reported once, not on every world tick",
+          "body": "Servers lacking some module config files logged two lines per tick and filled the logs."
+        },
+        {
+          "id": "manager:20261003-wildcard-realm-profiles.md",
+          "source": "manager",
+          "repo": "Corfirean/coa-server-manager",
+          "date": "2026-10-03",
+          "area": "manager",
+          "type": "added",
+          "audience": "admins",
+          "title": "Switch between CoA and Wildcard while keeping separate characters and module settings",
+          "body": "Run one world at a time with shared accounts. Wildcard keeps its own progress; CoA companions are unavailable there, and other modules show experimental compatibility. Backups and server updates cover both realms."
+        },
+        {
+          "id": "manager:20261003-updating-the-game-client-shows-a-progress-bar-on.md",
+          "source": "manager",
+          "repo": "Corfirean/coa-server-manager",
+          "date": "2026-10-03",
+          "area": "manager",
+          "type": "changed",
+          "audience": "admins",
+          "title": "Updating the game client shows a progress bar on its button",
+          "body": "No window covers the app while the client updates."
+        },
+        {
+          "id": "manager:20261003-imported-servers-get-the-module-config-files-the.md",
+          "source": "manager",
+          "repo": "Corfirean/coa-server-manager",
+          "date": "2026-10-03",
+          "area": "manager",
+          "type": "fixed",
+          "audience": "admins",
+          "title": "Imported servers get the module config files they lack",
+          "body": "They are created at start and after an update; existing files are never changed."
+        },
+        {
+          "id": "manager:20261003-modules-marked-soon-stay-greyed-out.md",
+          "source": "manager",
+          "repo": "Corfirean/coa-server-manager",
+          "date": "2026-10-03",
+          "area": "manager",
+          "type": "fixed",
+          "audience": "admins",
+          "title": "Modules marked Soon stay greyed out"
+        },
+        {
+          "id": "manager:20261003-the-bots-page-is-hidden-when-the-module-is-not-o.md",
+          "source": "manager",
+          "repo": "Corfirean/coa-server-manager",
+          "date": "2026-10-03",
+          "area": "manager",
+          "type": "fixed",
+          "audience": "admins",
+          "title": "The Bots page is hidden when the module is not on the server"
+        }
+      ]
+    },
+    {
       "id": "2026-10-03",
       "date": "2026-10-03",
       "versions": {
