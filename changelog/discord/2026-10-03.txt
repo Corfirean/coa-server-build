@@ -1,0 +1,11 @@
+**Update 2026-10-03** (Server 0.261002.13)
+
+**Content Scaling**
+- Added: Dungeons and raids scale to your group size, with solo modes. Content Scaling is on by default. Switch it off on the Manager's Modules page to keep stock difficulty.
+- Added: TBC and WotLK content packs. Outland and Northrend dungeons and raids, scaled to your level range.
+
+**Content Scaling** (for server owners)
+- Fixed: Boss health scaling reads the real raid difficulty table. Fixes a start-up stop on servers built from the shipped SQL.
+
+**Server modules** (for server owners)
+- Known: NPC Enchanter may say an empty line on servers without its config file. Copy npc_enchanter.conf.dist to npc_enchanter.conf, or let the Manager create it.

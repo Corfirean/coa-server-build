@@ -1,0 +1,9 @@
+{
+  "sources": [
+    { "name": "server",   "repo": "Corfirean/azerothcore-wotlk-coa",    "branch": "coa-bots" },
+    { "name": "bots",     "repo": "Corfirean/mod-coa-playerbots",       "branch": "master" },
+    { "name": "scaling",  "repo": "Corfirean/mod-coa-content-scaling",  "branch": "main" },
+    { "name": "manager",  "repo": "Corfirean/coa-server-manager",       "branch": "master" },
+    { "name": "renderer", "repo": "Corfirean/modern-wow-renderer",      "branch": "main" }
+  ]
+}

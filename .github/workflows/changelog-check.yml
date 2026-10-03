@@ -1,0 +1,21 @@
+name: changelog-check
+# Reusable: every CoA repository calls this when its changelog.d/ changes. It validates the fragment files with the
+# shared script, so a malformed one is reported on the commit that added it.
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Shared changelog tools
+        uses: actions/checkout@v7
+        with:
+          repository: Corfirean/coa-server-build
+          path: _changelog_tools
+      - name: Check changelog.d
+        run: python3 _changelog_tools/changelog/changelog.py check --dir changelog.d --name "${{ github.event.repository.name }}"

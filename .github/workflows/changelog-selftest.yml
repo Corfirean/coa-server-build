@@ -1,0 +1,17 @@
+name: changelog-selftest
+on:
+  push:
+    paths: ['changelog/**']
+  pull_request:
+    paths: ['changelog/**']
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: python3 -m unittest test_changelog
+        working-directory: changelog

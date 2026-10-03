@@ -1,0 +1,76 @@
+name: changelog-release
+# Run this when a release has gone out (Actions > changelog-release > Run workflow). It collects the changelog.d/
+# fragments of every CoA repository that are not released yet, and commits CHANGELOG.md, changelog/changelog.json and
+# the ready-to-post Discord text (changelog/discord/<id>.txt, also shown in this run's summary).
+on:
+  workflow_dispatch:
+    inputs:
+      id:
+        description: Release id, usually the date (2026-10-03; add -2 for a second one that day)
+        required: true
+      server:
+        description: Server version that shipped (optional, e.g. 0.261002.13)
+        required: false
+      manager:
+        description: Manager version (optional, e.g. 0.4.0)
+        required: false
+      addon:
+        description: Bot UI addon version (optional)
+        required: false
+      renderer:
+        description: Renderer version (optional)
+        required: false
+      dry_run:
+        description: Only show what would be released
+        type: boolean
+        default: false
+
+concurrency:
+  group: changelog-release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Collect and render
+        shell: bash
+        env:
+          REL_ID: ${{ inputs.id }}
+          REL_SERVER: ${{ inputs.server }}
+          REL_MANAGER: ${{ inputs.manager }}
+          REL_ADDON: ${{ inputs.addon }}
+          REL_RENDERER: ${{ inputs.renderer }}
+          REL_DRY: ${{ inputs.dry_run }}
+        run: |
+          args=(release --remote --id "$REL_ID")
+          [ -n "$REL_SERVER" ]   && args+=(--server "$REL_SERVER")
+          [ -n "$REL_MANAGER" ]  && args+=(--manager "$REL_MANAGER")
+          [ -n "$REL_ADDON" ]    && args+=(--addon "$REL_ADDON")
+          [ -n "$REL_RENDERER" ] && args+=(--renderer "$REL_RENDERER")
+          [ "$REL_DRY" = "true" ] && args+=(--dry-run)
+          python3 changelog/changelog.py "${args[@]}" | tee release.log
+      - name: Show the Discord text
+        if: ${{ !inputs.dry_run }}
+        shell: bash
+        env:
+          REL_ID: ${{ inputs.id }}
+        run: |
+          { echo '## Discord text'; echo; echo '```'; cat "changelog/discord/$REL_ID.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - name: Commit
+        if: ${{ !inputs.dry_run }}
+        shell: bash
+        env:
+          REL_ID: ${{ inputs.id }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md changelog/changelog.json changelog/releases changelog/discord
+          git commit -m "Changelog $REL_ID"
+          git push

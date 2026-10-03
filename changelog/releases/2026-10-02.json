@@ -1,0 +1,232 @@
+{
+  "id": "2026-10-02",
+  "date": "2026-10-02",
+  "versions": {
+    "server": "0.261002.12",
+    "manager": "0.4.0",
+    "addon": "2.1.1"
+  },
+  "entries": [
+    {
+      "id": "server:20261002-bots-no-longer-take-realm-first-achievements.md",
+      "source": "server",
+      "repo": "Corfirean/azerothcore-wotlk-coa",
+      "date": "2026-10-02",
+      "area": "server",
+      "type": "changed",
+      "audience": "players",
+      "title": "Bots no longer take Realm First achievements",
+      "body": "Set Achievement.RealmFirstBlockBots = 0 to allow it again."
+    },
+    {
+      "id": "bots:20261002-starter-pack-bots-get-22-slot-bags.md",
+      "source": "bots",
+      "repo": "Corfirean/mod-coa-playerbots",
+      "date": "2026-10-02",
+      "area": "bots",
+      "type": "added",
+      "audience": "players",
+      "title": "Starter pack bots get 22-slot bags"
+    },
+    {
+      "id": "bots:20261002-trade-with-your-bots.md",
+      "source": "bots",
+      "repo": "Corfirean/mod-coa-playerbots",
+      "date": "2026-10-02",
+      "area": "bots",
+      "type": "added",
+      "audience": "players",
+      "title": "Trade with your bots",
+      "body": "Open a trade window and hand a bot items directly, no more mailing them."
+    },
+    {
+      "id": "bots:20261002-dungeon-fill-picks-bots-by-role-more-reliably.md",
+      "source": "bots",
+      "repo": "Corfirean/mod-coa-playerbots",
+      "date": "2026-10-02",
+      "area": "bots",
+      "type": "changed",
+      "audience": "players",
+      "title": "Dungeon fill picks bots by role more reliably"
+    },
+    {
+      "id": "server:20261002-npc-enchanter-in-orgrimmar-and-stormwind.md",
+      "source": "server",
+      "repo": "Corfirean/azerothcore-wotlk-coa",
+      "date": "2026-10-02",
+      "area": "modules",
+      "type": "added",
+      "audience": "players",
+      "title": "NPC Enchanter in Orgrimmar and Stormwind",
+      "body": "Beauregard Boneglitter stands next to the War Games organizer."
+    },
+    {
+      "id": "bots:20261002-browse-tab-lists-every-online-bot.md",
+      "source": "bots",
+      "repo": "Corfirean/mod-coa-playerbots",
+      "date": "2026-10-02",
+      "area": "addon",
+      "type": "added",
+      "audience": "players",
+      "title": "Browse tab lists every online bot",
+      "body": "Filter by role, class, level, guildmates or name and invite to your group or guild. It replaces the /who workaround, which stays capped at 49 names."
+    },
+    {
+      "id": "bots:20261002-collect-gold-and-stock-tabs-for-the-bot-economy.md",
+      "source": "bots",
+      "repo": "Corfirean/mod-coa-playerbots",
+      "date": "2026-10-02",
+      "area": "addon",
+      "type": "added",
+      "audience": "players",
+      "title": "Collect gold and Stock tabs for the bot economy"
+    },
+    {
+      "id": "bots:20261002-invite-one-bot-by-role.md",
+      "source": "bots",
+      "repo": "Corfirean/mod-coa-playerbots",
+      "date": "2026-10-02",
+      "area": "addon",
+      "type": "added",
+      "audience": "players",
+      "title": "Invite one bot by role",
+      "body": "Choose tank, healer or damage and a free bot of your faction joins your group."
+    },
+    {
+      "id": "bots:20261002-bot-economy-experimental-and-off-by-default.md",
+      "source": "bots",
+      "repo": "Corfirean/mod-coa-playerbots",
+      "date": "2026-10-02",
+      "area": "bots",
+      "type": "added",
+      "audience": "admins",
+      "title": "Bot economy, experimental and off by default",
+      "body": "Gold orders, stock limits, selling surplus on the auction house, a guild share and level-appropriate food. Enable with CoaBots.Economy.Enable = 1; it starts in dry-run mode."
+    },
+    {
+      "id": "bots:20261002-master-switch-for-the-companion-bots.md",
+      "source": "bots",
+      "repo": "Corfirean/mod-coa-playerbots",
+      "date": "2026-10-02",
+      "area": "bots",
+      "type": "added",
+      "audience": "admins",
+      "title": "Master switch for the companion bots",
+      "body": "CoaBots.Enable = 0 stops all bot spawning. The Manager's Modules page switches it."
+    },
+    {
+      "id": "bots:20261002-a-huge-botcmd-spawnrandom-no-longer-floods-the-s.md",
+      "source": "bots",
+      "repo": "Corfirean/mod-coa-playerbots",
+      "date": "2026-10-02",
+      "area": "bots",
+      "type": "fixed",
+      "audience": "admins",
+      "title": "A huge .botcmd spawnrandom no longer floods the server",
+      "body": "The count is clamped and bots spawn in small batches."
+    },
+    {
+      "id": "server:20261002-auction-house-bot-is-built-in-but-inactive-until.md",
+      "source": "server",
+      "repo": "Corfirean/azerothcore-wotlk-coa",
+      "date": "2026-10-02",
+      "area": "modules",
+      "type": "added",
+      "audience": "admins",
+      "title": "Auction House Bot is built in but inactive until configured"
+    },
+    {
+      "id": "server:20261002-optional-fee-for-the-npc-enchanter.md",
+      "source": "server",
+      "repo": "Corfirean/azerothcore-wotlk-coa",
+      "date": "2026-10-02",
+      "area": "modules",
+      "type": "added",
+      "audience": "admins",
+      "title": "Optional fee for the NPC Enchanter",
+      "body": "Set Enchanter.CostCopper in copper; 0 keeps the enchantments free."
+    },
+    {
+      "id": "manager:20261002-collections-tab-with-transmog-vanity-riding-and.md",
+      "source": "manager",
+      "repo": "Corfirean/coa-server-manager",
+      "date": "2026-10-02",
+      "area": "manager",
+      "type": "added",
+      "audience": "admins",
+      "title": "Collections tab with transmog, vanity, riding and companion switches"
+    },
+    {
+      "id": "manager:20261002-delete-an-account-from-the-players-page.md",
+      "source": "manager",
+      "repo": "Corfirean/coa-server-manager",
+      "date": "2026-10-02",
+      "area": "manager",
+      "type": "added",
+      "audience": "admins",
+      "title": "Delete an account from the Players page",
+      "body": "You type the account name to confirm; online and system accounts are refused."
+    },
+    {
+      "id": "manager:20261002-modules-page-with-cards-status-badges-and-per-mo.md",
+      "source": "manager",
+      "repo": "Corfirean/coa-server-manager",
+      "date": "2026-10-02",
+      "area": "manager",
+      "type": "added",
+      "audience": "admins",
+      "title": "Modules page with cards, status badges and per-module settings",
+      "body": "Switch the companion bots and NPC Enchanter on and off; a module's settings open under its card."
+    },
+    {
+      "id": "manager:20261002-importing-a-server-suggests-the-right-folder-whe.md",
+      "source": "manager",
+      "repo": "Corfirean/coa-server-manager",
+      "date": "2026-10-02",
+      "area": "manager",
+      "type": "changed",
+      "audience": "admins",
+      "title": "Importing a server suggests the right folder when you pick the wrong one"
+    },
+    {
+      "id": "manager:20261002-report-a-problem-collects-more-and-ignores-repea.md",
+      "source": "manager",
+      "repo": "Corfirean/coa-server-manager",
+      "date": "2026-10-02",
+      "area": "manager",
+      "type": "changed",
+      "audience": "admins",
+      "title": "Report a problem collects more and ignores repeated config warnings"
+    },
+    {
+      "id": "manager:20261002-server-settings-in-one-panel-with-search-tabs-an.md",
+      "source": "manager",
+      "repo": "Corfirean/coa-server-manager",
+      "date": "2026-10-02",
+      "area": "manager",
+      "type": "changed",
+      "audience": "admins",
+      "title": "Server settings in one panel with search, tabs and a single Save bar"
+    },
+    {
+      "id": "manager:20261002-companion-bots-are-recognised-from-their-default.md",
+      "source": "manager",
+      "repo": "Corfirean/coa-server-manager",
+      "date": "2026-10-02",
+      "area": "manager",
+      "type": "fixed",
+      "audience": "admins",
+      "title": "Companion bots are recognised from their default config file"
+    },
+    {
+      "id": "manager:20261002-the-update-check-says-you-are-up-to-date-instead.md",
+      "source": "manager",
+      "repo": "Corfirean/coa-server-manager",
+      "date": "2026-10-02",
+      "area": "manager",
+      "type": "fixed",
+      "audience": "admins",
+      "title": "The update check says you are up to date instead of offering the same version"
+    }
+  ]
+}

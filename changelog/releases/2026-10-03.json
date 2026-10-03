@@ -1,0 +1,53 @@
+{
+  "id": "2026-10-03",
+  "date": "2026-10-03",
+  "versions": {
+    "server": "0.261002.13"
+  },
+  "entries": [
+    {
+      "id": "scaling:20261003-dungeons-and-raids-scale-to-your-group-size-with.md",
+      "source": "scaling",
+      "repo": "Corfirean/mod-coa-content-scaling",
+      "date": "2026-10-03",
+      "area": "scaling",
+      "type": "added",
+      "audience": "players",
+      "title": "Dungeons and raids scale to your group size, with solo modes",
+      "body": "Content Scaling is on by default. Switch it off on the Manager's Modules page to keep stock difficulty."
+    },
+    {
+      "id": "scaling:20261003-tbc-and-wotlk-content-packs.md",
+      "source": "scaling",
+      "repo": "Corfirean/mod-coa-content-scaling",
+      "date": "2026-10-03",
+      "area": "scaling",
+      "type": "added",
+      "audience": "players",
+      "title": "TBC and WotLK content packs",
+      "body": "Outland and Northrend dungeons and raids, scaled to your level range."
+    },
+    {
+      "id": "scaling:20261003-boss-health-scaling-reads-the-real-raid-difficul.md",
+      "source": "scaling",
+      "repo": "Corfirean/mod-coa-content-scaling",
+      "date": "2026-10-03",
+      "area": "scaling",
+      "type": "fixed",
+      "audience": "admins",
+      "title": "Boss health scaling reads the real raid difficulty table",
+      "body": "Fixes a start-up stop on servers built from the shipped SQL."
+    },
+    {
+      "id": "server:20261003-npc-enchanter-may-say-an-empty-line-on-servers-w.md",
+      "source": "server",
+      "repo": "Corfirean/azerothcore-wotlk-coa",
+      "date": "2026-10-03",
+      "area": "modules",
+      "type": "known-issue",
+      "audience": "admins",
+      "title": "NPC Enchanter may say an empty line on servers without its config file",
+      "body": "Copy npc_enchanter.conf.dist to npc_enchanter.conf, or let the Manager create it."
+    }
+  ]
+}

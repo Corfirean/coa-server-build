@@ -33,6 +33,12 @@ gh secret set FORK_PUSH_TOKEN -R Corfirean/coa-server-build
 It is only needed by the hourly `sync-fork` workflow. Without `COA_SIGNING_KEY` nothing is published (unsigned packages
 are refused by every Manager anyway).
 
+## Changelog
+The changelog of every CoA project lives here: [CHANGELOG.md](CHANGELOG.md). Each repository (server fork, bots, Content Scaling,
+Manager, renderer) keeps one small `changelog.d/` file per change, written in the same format by people and AIs alike;
+the **changelog-release** workflow collects them at release time and also produces the Discord text. Rules, format and
+examples: [changelog/GUIDE.md](changelog/GUIDE.md).
+
 ## Base package
 The base contains game data and a database built from the maintainer's repack, so it is produced on the maintainer's
 machine (`coa-release clean-base` + `pack-base`, see the manager repository) and uploaded to the `base` release.
