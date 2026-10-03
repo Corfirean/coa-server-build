@@ -31,6 +31,8 @@ Get-ChildItem "$Out/Core/configs/modules/*.conf.dist" | ForEach-Object {
     Copy-Item $_.FullName ($_.FullName -replace '\.dist$', '') -Force
 }
 Copy-Item "$Bots/dist/reference/*" "$Out/Core/reference/" -Recurse -Force
+New-Item -ItemType Directory -Force -Path "$Out/Data/dbc" | Out-Null
+Copy-Item "$Bots/reference/coa_missing_equipment_displays.txt" "$Out/Data/dbc/" -Force
 Copy-Item "$Bots/addon/CoABotUI" "$Out/Extras/CoABotUI" -Recurse -Force
 # The offline bot factory: creates fully equipped bots straight in the database while the server is stopped.
 New-Item -ItemType Directory -Force -Path "$Out/Extras/CoABotTools" | Out-Null
