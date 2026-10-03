@@ -15,7 +15,7 @@ Written from the `changelog.d/` fragments of each repository (see `changelog/GUI
 **Companion bots**
 
 - Changed: Companions follow and recover movement more consistently. Updated movement handling coordinates following, mounting and route recovery so interrupted actions do not take over a newer movement request.
-- Fixed: Companions fly from the opening of Burning Crusade content. Companions can mount for flight from the realmвЂ™s Burning Crusade unlock level instead of a fixed level 60, and switch from ground mounts when the leader flies.
+- Fixed: Companions fly from the opening of Burning Crusade content. Companions can mount for flight from the realm’s Burning Crusade unlock level instead of a fixed level 60, and switch from ground mounts when the leader flies.
 - Fixed: Companions avoid helmets and shoulders with missing models. Equipment repair rejects display models missing from the audited client, preventing broken helmet and shoulder visuals.
 - Fixed: Companion equipment repair continues with full bags. When a companion has full bags, equipment replaced by the gear filter is preserved in its mailbox. The gradual repair queue no longer stalls because old items cannot fit in the inventory.
 
