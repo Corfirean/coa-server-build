@@ -2,6 +2,70 @@
   "schema": 1,
   "releases": [
     {
+      "id": "2026-10-03-manager-0.6.0",
+      "date": "2026-10-03",
+      "versions": {
+        "manager": "0.6.0"
+      },
+      "entries": [
+        {
+          "id": "manager:20261003-client-realm-sync.md",
+          "source": "manager",
+          "repo": "Corfirean/coa-server-manager",
+          "date": "2026-10-03",
+          "area": "manager",
+          "type": "fixed",
+          "audience": "players",
+          "title": "The game client follows the realm selected in the Manager",
+          "body": "Switching realms updates the closed client's saved realm automatically. Play checks it again before launch, preventing login attempts to the previous realm. If the client is running, the update waits until the next launch."
+        },
+        {
+          "id": "manager:20261003-linux-preview.md",
+          "source": "manager",
+          "repo": "Corfirean/coa-server-manager",
+          "date": "2026-10-03",
+          "area": "manager",
+          "type": "added",
+          "audience": "admins",
+          "title": "Experimental Linux startup and Docker server controls",
+          "body": "The Manager can start on Linux and control manually prepared Docker servers. One-click installation, updates, backups and Wine or Proton client launch are not available yet."
+        },
+        {
+          "id": "manager:20261003-simplified-chinese.md",
+          "source": "manager",
+          "repo": "Corfirean/coa-server-manager",
+          "date": "2026-10-03",
+          "area": "manager",
+          "type": "added",
+          "audience": "admins",
+          "title": "Simplified Chinese is available in the Manager",
+          "body": "The interface and server and bot settings are now available in Simplified Chinese. Choose Simplified Chinese in the language selector."
+        },
+        {
+          "id": "manager:20261003-config-snapshot-restore.md",
+          "source": "manager",
+          "repo": "Corfirean/coa-server-manager",
+          "date": "2026-10-03",
+          "area": "manager",
+          "type": "fixed",
+          "audience": "admins",
+          "title": "Configuration snapshots no longer overwrite each other",
+          "body": "Snapshots created close together keep separate copies, so restoring a configuration reliably restores the selected snapshot."
+        },
+        {
+          "id": "manager:20261003-report-browser.md",
+          "source": "manager",
+          "repo": "Corfirean/coa-server-manager",
+          "date": "2026-10-03",
+          "area": "manager",
+          "type": "fixed",
+          "audience": "admins",
+          "title": "Problem reports open in the default browser",
+          "body": "GitHub reports open in the default browser instead of Windows Explorer. Long reports use the clipboard fallback."
+        }
+      ]
+    },
+    {
       "id": "2026-10-03-2",
       "date": "2026-10-03",
       "versions": {

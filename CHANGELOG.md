@@ -3,6 +3,23 @@
 Everything that changed for players and server owners across the CoA server, bots, Content Scaling, the Manager and the renderer, newest first.
 Written from the `changelog.d/` fragments of each repository (see `changelog/GUIDE.md`).
 
+## 2026-10-03-manager-0.6.0 - Manager 0.6.0
+
+### For players
+
+**Manager**
+
+- Fixed: The game client follows the realm selected in the Manager. Switching realms updates the closed client's saved realm automatically. Play checks it again before launch, preventing login attempts to the previous realm. If the client is running, the update waits until the next launch.
+
+### For server owners
+
+**Manager**
+
+- Added: Experimental Linux startup and Docker server controls. The Manager can start on Linux and control manually prepared Docker servers. One-click installation, updates, backups and Wine or Proton client launch are not available yet.
+- Added: Simplified Chinese is available in the Manager. The interface and server and bot settings are now available in Simplified Chinese. Choose Simplified Chinese in the language selector.
+- Fixed: Configuration snapshots no longer overwrite each other. Snapshots created close together keep separate copies, so restoring a configuration reliably restores the selected snapshot.
+- Fixed: Problem reports open in the default browser. GitHub reports open in the default browser instead of Windows Explorer. Long reports use the clipboard fallback.
+
 ## 2026-10-03-2 - Manager 0.5.0
 
 ### For players
