@@ -3,6 +3,49 @@
 Everything that changed for players and server owners across the CoA server, bots, Content Scaling, the Manager and the renderer, newest first.
 Written from the `changelog.d/` fragments of each repository (see `changelog/GUIDE.md`).
 
+## 2026-10-03-server16 - Server 0.261003.16
+
+### For players
+
+**Server**
+
+- Changed: Companions follow safer navigation paths. Companion movement uses validated paths and geometry checks, reducing unsafe movement and keeping recovery behavior consistent when a route fails.
+- Fixed: Dungeon Finder respects scaled realm levels across enabled expansions. Dungeon access checks use the realm progression ranges, and Dungeon Finder defaults to the server expansion. Enabled Classic, Burning Crusade and Wrath content remains visible at a reduced level cap.
+
+**Companion bots**
+
+- Changed: Companions follow and recover movement more consistently. Updated movement handling coordinates following, mounting and route recovery so interrupted actions do not take over a newer movement request.
+- Fixed: Companions fly from the opening of Burning Crusade content. Companions can mount for flight from the realm’s Burning Crusade unlock level instead of a fixed level 60, and switch from ground mounts when the leader flies.
+- Fixed: Companions avoid helmets and shoulders with missing models. Equipment repair rejects display models missing from the audited client, preventing broken helmet and shoulder visuals.
+- Fixed: Companion equipment repair continues with full bags. When a companion has full bags, equipment replaced by the gear filter is preserved in its mailbox. The gradual repair queue no longer stalls because old items cannot fit in the inventory.
+
+**Content Scaling**
+
+- Fixed: All dungeon difficulties and combat gear variants follow realm progression. Classic, BC and Wrath normal, heroic and mythic queues support bot-fill or current-party entry. Reference loot and combat gear variants, including Bloodforged, scale requirements and stats while retaining difficulty progression. Forge of Souls quests use their actual expansion.
+- Fixed: Custom progression at level 80 now scales item requirements and rewards consistently. Custom era boundaries now apply to item budgets, quest XP, dungeon access and group finder rewards even when the maximum player level is 80.
+- Fixed: Downscaled dungeon creatures keep their loot rewards. The damage needed to earn loot now follows a creature's scaled health, including encounter health changes. Player participation is still required.
+- Fixed: Dungeon Finder shows all enabled expansions at a reduced level cap. Updated client addon support displays the server's effective dungeon level ranges. Earlier expansions stay available through the level cap; quest and equipment requirements still apply.
+- Fixed: Items now scale correctly on servers with a reduced level cap. Equipment stats, item levels and required levels are adjusted after item data loads. Dungeon item-level requirements follow the same scaling.
+- Fixed: Scaled encounters retain normal boss loot. Dungeon and raid encounters preserve their normal loot when scaled for smaller groups. Equipment is no longer randomly discarded in favor of currency.
+
+### For server owners
+
+**Server**
+
+- Fixed: Remote console shutdown no longer blocks server management. Graceful shutdown through the remote console releases pending console requests so the manager can stop the worldserver and switch realms reliably.
+
+**Companion bots**
+
+- Fixed: Bots get level-appropriate gear without holiday, event or vanity items. Equipment checks required level, item level and PvE/PvP Power. Use .fixbotgear to repair existing bots gradually. Suitable gear stays; replaced items remain in bags or are mailed when bags are full. The repair queue survives server restarts.
+- Fixed: Existing bots follow a lowered server level cap. Bots above the cap are lowered when they log in. Online bots are handled gradually outside combat, with experience reset and replacement gear queued.
+
+**Content Scaling**
+
+- Fixed: Destroyed instances release their saved scaling state. Encounter snapshots and group scaling settings are cleared when a map is destroyed, preventing stale state from reaching a later instance that reuses its ID.
+- Fixed: Invalid progression settings stop scaling before items are changed. If the progression layout fails validation, scaling initialization stops before item templates are modified or combat hooks are enabled.
+- Fixed: Disabling Content Scaling now stops item and group finder changes. After restarting the worldserver, disabled scaling preserves original items and group finder rules. Creature and quest levels, combat, rewards and encounter mechanics also retain their original behavior.
+- Fixed: Explicit scaling overrides now take priority over generated content profiles. Map overrides apply to creatures on every map, area overrides take priority for quests, and item era overrides retain each item's safety protections.
+
 ## 2026-10-03-2 - Manager 0.5.0
 
 ### For players
