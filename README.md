@@ -55,6 +55,24 @@ examples: [changelog/GUIDE.md](changelog/GUIDE.md).
 The base contains game data and a database built from the maintainer's repack, so it is produced on the maintainer's
 machine (`coa-release clean-base` + `pack-base`, see the manager repository) and uploaded to the `base` release.
 
+## Database acceptance
+
+The package job downloads the signed `base`, verifies every archive entry and extracts only the database and launcher
+files into a new `coa-schema-fixture-*` directory. It applies the same ordered core, bots and corrective SQL that will
+ship in the update, checks critical character/Wildcard structures, and captures `Scripts/database-schema.json`.
+The fixture uses temporary free ports and never starts a world server. A failed migration or schema check stops
+packaging and publication. The release tools require the complete contract when packing/signing, and `verify`
+checks the signature, every archived file and the contract before edge publication or stable promotion.
+
+`database-repairs/{auth,characters,world}` holds narrowly scoped corrective migrations with new immutable IDs.
+They are appended after the ordinary SQL and recorded as `manager_repair__<filename>`; old migration history is
+never cleared or blindly replayed. The Wildcard repair creates missing tables without touching existing rows.
+This restores missing structure, not any previously lost player data. Wrong existing column definitions remain
+visible failures for a separate targeted correction.
+
+These workflows require the release tooling from Manager PR #17. Merge that dependency before this pipeline change;
+the manual `manager_ref` input permits testing its branch without changing the production default.
+
 ## License
 The scripts and workflows in this repository are under the [GNU Affero General Public License v3.0](LICENSE).
 The packages published from it contain a `Licenses` folder with the licences of everything shipped (the server fork,

@@ -14,10 +14,13 @@ jobs:
     steps:
       - name: Download edge
         run: gh release download edge --dir edge --repo "$GITHUB_REPOSITORY"
-      - name: Verify it is signed and intact
-        run: |
-          test -f edge/manifest.json && test -f edge/manifest.json.sig
-          ls edge/*.tar.zst.* >/dev/null
+      - name: Manager release verification tools
+        uses: actions/checkout@v7
+        with:
+          repository: Corfirean/coa-server-manager
+          path: _manager
+      - name: Verify signature, every archive file and the full database schema contract
+        run: cargo run --release -p coa-release --manifest-path _manager/Cargo.toml -- verify --dir edge
       - name: Publish to stable
         run: |
           gh release view stable --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || gh release create stable --title "Stable" --notes "Promoted builds" --latest --repo "$GITHUB_REPOSITORY"
