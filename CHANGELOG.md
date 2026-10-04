@@ -3,6 +3,21 @@
 Everything that changed for players and server owners across the CoA server, bots, Content Scaling, the Manager and the renderer, newest first.
 Written from the `changelog.d/` fragments of each repository (see `changelog/GUIDE.md`).
 
+## 2026-10-04-manager-0.6.1 - Manager 0.6.1
+
+### For server owners
+
+**Server**
+
+- Fixed: Open remote-console connections no longer prevent server shutdown. The shutdown fix is merged in the server source. A server package containing it is required; updating the Manager alone does not update the server binaries.
+
+**Manager**
+
+- Added: Check database structure and repair server files with a safety backup. Settings can check both realm databases and restore official files plus pending SQL. Installation and updates check character-save columns. Clean packages no longer keep old character migration records when rebuilding their database.
+- Added: Start CoA and Wildcard together from Settings. Both worlds can run on separate ports with their own characters, settings and logs, sharing accounts. Stop saves both worlds before shutting down the shared database.
+- Fixed: Server multipliers now accept decimals typed with a dot or comma. Talent settings now explain that the multiplier does not affect CoA talents. The rested experience setting now correctly describes bonus accumulation.
+- Fixed: Play launches only the game client without starting your local server. Use the left button to start the server and PLAY to launch the client with your selected realmlist, including connections to other servers.
+
 ## 2026-10-03-server17 - Server 0.261003.17
 
 ### For players

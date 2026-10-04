@@ -2,6 +2,71 @@
   "schema": 1,
   "releases": [
     {
+      "id": "2026-10-04-manager-0.6.1",
+      "date": "2026-10-04",
+      "versions": {
+        "manager": "0.6.1"
+      },
+      "entries": [
+        {
+          "id": "server:20261004-remote-console-shutdown.md",
+          "source": "server",
+          "repo": "Corfirean/azerothcore-wotlk-coa",
+          "date": "2026-10-04",
+          "area": "server",
+          "type": "fixed",
+          "audience": "admins",
+          "title": "Open remote-console connections no longer prevent server shutdown",
+          "body": "The shutdown fix is merged in the server source. A server package containing it is required; updating the Manager alone does not update the server binaries.",
+          "refs": "https://github.com/Corfirean/azerothcore-wotlk-coa/pull/2"
+        },
+        {
+          "id": "manager:20261004-repair-and-database-validation.md",
+          "source": "manager",
+          "repo": "Corfirean/coa-server-manager",
+          "date": "2026-10-04",
+          "area": "manager",
+          "type": "added",
+          "audience": "admins",
+          "title": "Check database structure and repair server files with a safety backup",
+          "body": "Settings can check both realm databases and restore official files plus pending SQL. Installation and updates check character-save columns. Clean packages no longer keep old character migration records when rebuilding their database."
+        },
+        {
+          "id": "manager:20261004-simultaneous-realms.md",
+          "source": "manager",
+          "repo": "Corfirean/coa-server-manager",
+          "date": "2026-10-04",
+          "area": "manager",
+          "type": "added",
+          "audience": "admins",
+          "title": "Start CoA and Wildcard together from Settings",
+          "body": "Both worlds can run on separate ports with their own characters, settings and logs, sharing accounts. Stop saves both worlds before shutting down the shared database."
+        },
+        {
+          "id": "manager:20261004-fractional-settings.md",
+          "source": "manager",
+          "repo": "Corfirean/coa-server-manager",
+          "date": "2026-10-04",
+          "area": "manager",
+          "type": "fixed",
+          "audience": "admins",
+          "title": "Server multipliers now accept decimals typed with a dot or comma",
+          "body": "Talent settings now explain that the multiplier does not affect CoA talents. The rested experience setting now correctly describes bonus accumulation."
+        },
+        {
+          "id": "manager:20261004-independent-client-launch.md",
+          "source": "manager",
+          "repo": "Corfirean/coa-server-manager",
+          "date": "2026-10-04",
+          "area": "manager",
+          "type": "fixed",
+          "audience": "admins",
+          "title": "Play launches only the game client without starting your local server",
+          "body": "Use the left button to start the server and PLAY to launch the client with your selected realmlist, including connections to other servers."
+        }
+      ]
+    },
+    {
       "id": "2026-10-03-server17",
       "date": "2026-10-03",
       "versions": {
