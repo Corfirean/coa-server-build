@@ -6,7 +6,8 @@ param(
     [string] $Manager = "",
     [string] $CoreSha = "unknown",
     [string] $BotsSha = "unknown",
-    [string] $ScalingSha = "unknown"
+    [string] $ScalingSha = "unknown",
+    [string] $SquidSha = "unknown"
 )
 # Lays out the files of a release the way they sit in a server folder. Only shipped files: no configs the
 # server owner edits (those are merged by the Manager), no databases.
@@ -25,6 +26,14 @@ Copy-Item "$Bots/module/conf/mod_coa_playerbots.conf.dist" "$Out/Core/configs/mo
 # The CoA compatibility settings live in the core, not in a module folder. They must be active: without CoA.Enable = 1
 # the world server rejects the Ascension client's extension packets and drops the connection after login.
 Copy-Item "$Core/src/server/coa/conf/coa.conf.dist" "$Out/Core/configs/modules/" -Force
+# Both bot modules compile together, but SQUID starts disabled on a new installation.
+$squidConfig = "$Out/Core/configs/modules/playerbots.conf.dist"
+(Get-Content $squidConfig -Raw) -replace '(?m)^AiPlayerbot.Enabled\s*=\s*1\s*$', 'AiPlayerbot.Enabled = 0' |
+    Set-Content $squidConfig -Encoding utf8
+New-Item -ItemType Directory -Force -Path "$Out/Extras/SquidPlayerbots", "$Out/Scripts" | Out-Null
+Copy-Item "$Core/modules/mod-playerbots/data/sql" "$Out/Extras/SquidPlayerbots/sql" -Recurse -Force
+Copy-Item "$PSScriptRoot/manage.py", "$PSScriptRoot/squid_playerbots.py" "$Out/Scripts/" -Force
+Copy-Item "$Core/modules/mod-playerbots/LICENSE" "$Out/Licenses/mod-playerbots-LICENSE.txt" -Force
 # Every module reads configs/modules/<name>.conf. Ship an active copy of each .dist (created only when missing on
 # install/update, never overwritten) so a fresh server runs with the documented defaults instead of warnings.
 Get-ChildItem "$Out/Core/configs/modules/*.conf.dist" | ForEach-Object {
@@ -49,6 +58,7 @@ CoA Server Manager - notice
 Server binaries (Core\worldserver.exe, Core\authserver.exe) were built from:
   core  https://github.com/Corfirean/azerothcore-wotlk-coa   commit $CoreSha
   bots  https://github.com/Corfirean/mod-coa-playerbots       commit $BotsSha
+  squid https://github.com/Zyth45/mod-playerbots             commit $SquidSha (unchanged upstream source)
   scaling https://github.com/Corfirean/mod-coa-content-scaling commit $ScalingSha (with its TBC and WotLK content packs)
 The core keeps its upstream licences (GPL-2.0-or-later for the MaNGOS-derived parts, AGPL-3.0 for AzerothCore-original
 files); the bots module and CoA Server Manager are AGPL-3.0; the Content Scaling module is GPL-2.0. The complete corresponding source is at the links above.

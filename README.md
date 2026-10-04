@@ -13,10 +13,22 @@ and the archive parts (`*.tar.zst.NNN`, below GitHub's 2 GiB asset limit).
 
 ## Workflows
 * **build** - nightly + manual. Compiles [the fork](https://github.com/Corfirean/azerothcore-wotlk-coa) with
-  [mod-coa-playerbots](https://github.com/Corfirean/mod-coa-playerbots) on Windows, builds a cumulative update against the
+  [mod-coa-playerbots](https://github.com/Corfirean/mod-coa-playerbots) and unchanged
+  [SQUID Playerbots](https://github.com/Zyth45/mod-playerbots/tree/coa) on Windows, builds a cumulative update against the
   `base` manifest, signs it, publishes it to `edge`. Versions are `0.YYMMDD.<run>`.
 * **promote** - manual. Copies `edge` to `stable`.
 * **sync-fork** - hourly. Mirrors upstream `main` into the fork and merges it into `coa-bots`; a conflict opens an issue.
+
+The `squid_ref` build input defaults to `coa`; the binary and package jobs use the same resolved commit.
+SQUID is disabled on fresh installs. The launcher rejects configurations that enable both bot systems,
+including starts from batch files. It provisions `acore_playerbots` using the existing repack credentials
+and imports the module's shipped SQL before the first world start. Applied files are recorded in each
+database's `coa_squid_migrations` table and never repeated; a changed applied migration stops startup.
+The upstream module source and SQL are copied unchanged. Only the packaged default master switch is disabled.
+
+`scripts/manage.py` is the launcher from the published base package (SHA256
+`780f8ed024f8e0e1fe322ac01fcf59a2e12685cde2cdd1dca24140796cd31a79`) with the SQUID integration hooks.
+Run `python -B scripts/test_squid_playerbots.py` to check conflict detection and migration behavior.
 
 ## Secrets (set by the repository owner)
 Run these in PowerShell on the machine where `gh` is logged in.

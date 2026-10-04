@@ -15,6 +15,9 @@ on:
       scaling_ref:
         description: mod-coa-content-scaling ref (branch, tag or SHA)
         default: main
+      squid_ref:
+        description: SQUID Playerbots ref (branch, tag or SHA)
+        default: coa
 
 concurrency:
   group: build
@@ -25,11 +28,12 @@ permissions:
 
 jobs:
   binaries:
-    uses: Corfirean/azerothcore-wotlk-coa/.github/workflows/coa-bots-build.yml@coa-bots
+    uses: ./.github/workflows/server-binaries.yml
     with:
       core_ref: ${{ inputs.core_ref || 'coa-bots' }}
       bots_ref: ${{ inputs.bots_ref || 'master' }}
       scaling_ref: ${{ inputs.scaling_ref || 'main' }}
+      squid_ref: ${{ inputs.squid_ref || 'coa' }}
 
   package:
     needs: binaries
@@ -37,6 +41,7 @@ jobs:
     timeout-minutes: 90
     env:
       GH_TOKEN: ${{ github.token }}
+      SQUID_SHA: ${{ needs.binaries.outputs.squid_sha }}
       CORE_SHA: ${{ needs.binaries.outputs.core_sha }}
       BOTS_SHA: ${{ needs.binaries.outputs.bots_sha }}
       SCALING_SHA: ${{ needs.binaries.outputs.scaling_sha }}
@@ -69,6 +74,12 @@ jobs:
           repository: Corfirean/mod-coa-content-scaling
           ref: ${{ env.SCALING_SHA }}
           path: _scaling
+      - name: SQUID Playerbots at the exact unmodified commit
+        uses: actions/checkout@v7
+        with:
+          repository: Zyth45/mod-playerbots
+          ref: ${{ env.SQUID_SHA }}
+          path: _core/modules/mod-playerbots
       - name: Place Content Scaling and its content packs into the core tree (their SQL and configs ship with the release)
         shell: pwsh
         run: |
@@ -86,7 +97,7 @@ jobs:
           path: _binaries
       - name: Assemble the release tree
         shell: pwsh
-        run: ./scripts/assemble-tree.ps1 -Binaries _binaries -Core _core -Bots _bots -Out _tree -Manager _manager -CoreSha $env:CORE_SHA -BotsSha $env:BOTS_SHA -ScalingSha $env:SCALING_SHA
+        run: ./scripts/assemble-tree.ps1 -Binaries _binaries -Core _core -Bots _bots -Out _tree -Manager _manager -CoreSha $env:CORE_SHA -BotsSha $env:BOTS_SHA -ScalingSha $env:SCALING_SHA -SquidSha $env:SQUID_SHA
       - name: Fetch the base manifest
         shell: pwsh
         run: |
@@ -120,4 +131,4 @@ jobs:
           $files | ForEach-Object { gh release upload edge $_.FullName --clobber --repo $env:GITHUB_REPOSITORY }
           $keep = $files.Name
           foreach ($n in $old) { if ($keep -notcontains $n) { gh release delete-asset edge $n --yes --repo $env:GITHUB_REPOSITORY } }
-          gh release edit edge --notes "Version $env:VERSION`ncore $env:CORE_SHA`nbots $env:BOTS_SHA`nscaling $env:SCALING_SHA" --repo $env:GITHUB_REPOSITORY
+          gh release edit edge --notes "Version $env:VERSION`ncore $env:CORE_SHA`nbots $env:BOTS_SHA`nscaling $env:SCALING_SHA`nsquid $env:SQUID_SHA" --repo $env:GITHUB_REPOSITORY

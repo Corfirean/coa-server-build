@@ -1,0 +1,609 @@
+"""Portable Windows launcher for the CoA repack. Uses only the bundled Python runtime."""
+from __future__ import annotations
+
+import argparse
+from contextlib import contextmanager
+import ctypes
+from ctypes import wintypes
+import getpass
+import importlib.util
+import json
+import msvcrt
+import os
+from pathlib import Path
+import re
+import socket
+import struct
+import subprocess
+import sys
+import time
+
+ROOT = Path(__file__).resolve().parents[1]
+STATE = ROOT / ".state"
+PYTHON = ROOT / "Runtime/python/python.exe"
+HIDDEN = subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP
+kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+kernel.OpenProcess.restype = wintypes.HANDLE
+kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+kernel.QueryFullProcessImageNameW.argtypes = [wintypes.HANDLE, wintypes.DWORD, wintypes.LPWSTR,
+                                           ctypes.POINTER(wintypes.DWORD)]
+kernel.GetProcessTimes.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.FILETIME),
+                                  ctypes.POINTER(wintypes.FILETIME), ctypes.POINTER(wintypes.FILETIME),
+                                  ctypes.POINTER(wintypes.FILETIME)]
+kernel.TerminateProcess.argtypes = [wintypes.HANDLE, wintypes.UINT]
+kernel.GetShortPathNameW.argtypes = [wintypes.LPCWSTR, wintypes.LPWSTR, wintypes.DWORD]
+
+
+def read_json(path):
+    return json.loads(path.read_text(encoding="utf-8-sig"))
+
+
+def atomic_json(path, value):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + ".tmp")
+    temporary.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
+    os.replace(temporary, path)
+
+
+def identity(pid):
+    handle = kernel.OpenProcess(0x1000, False, int(pid))
+    if not handle:
+        return None
+    try:
+        name = ctypes.create_unicode_buffer(32768)
+        size = wintypes.DWORD(len(name))
+        created, exited, system, user = [wintypes.FILETIME() for _ in range(4)]
+        if not kernel.QueryFullProcessImageNameW(handle, 0, name, ctypes.byref(size)):
+            return None
+        if not kernel.GetProcessTimes(handle, ctypes.byref(created), ctypes.byref(exited),
+                                      ctypes.byref(system), ctypes.byref(user)):
+            return None
+        if exited.dwLowDateTime or exited.dwHighDateTime:
+            return None
+        return {"pid": int(pid), "exe": name.value,
+                "created": (created.dwHighDateTime << 32) | created.dwLowDateTime}
+    finally:
+        kernel.CloseHandle(handle)
+
+
+def same_process(record):
+    if not record:
+        return False
+    current = identity(record["pid"])
+    return bool(current and current["created"] == record["created"]
+                and os.path.normcase(current["exe"]) == os.path.normcase(record["exe"]))
+
+
+def process(name):
+    path = STATE / (name + ".json")
+    if not path.exists():
+        return None
+    record = read_json(path)
+    return record if same_process(record) else None
+
+
+def save_process(name, pid):
+    record = identity(pid)
+    if not record:
+        raise RuntimeError(name + " exited during startup; check its log.")
+    atomic_json(STATE / (name + ".json"), record)
+    return record
+
+
+def listeners():
+    api = ctypes.WinDLL("iphlpapi").GetExtendedTcpTable
+    api.argtypes = [ctypes.c_void_p, ctypes.POINTER(wintypes.DWORD), wintypes.BOOL,
+                    wintypes.ULONG, ctypes.c_int, wintypes.ULONG]
+    size = wintypes.DWORD()
+    api(None, ctypes.byref(size), False, socket.AF_INET, 5, 0)
+    for _ in range(3):
+        buffer = ctypes.create_string_buffer(size.value)
+        code = api(buffer, ctypes.byref(size), False, socket.AF_INET, 5, 0)
+        if code == 122:
+            continue
+        if code:
+            raise OSError(code, "Cannot inspect local TCP listeners")
+        count = struct.unpack_from("<I", buffer)[0]
+        rows = [struct.unpack_from("<6I", buffer, 4 + 24 * i) for i in range(count)]
+        return [(socket.ntohs(row[2] & 65535), row[5]) for row in rows if row[0] == 2]
+    raise RuntimeError("TCP listeners changed too quickly; try again.")
+
+
+def ensure_free(port):
+    if any(p == port for p, _ in listeners()):
+        raise RuntimeError(f"Port {port} is already used. Stop the other server or change Settings/repack.json.")
+
+
+def ready(name, port):
+    record = process(name)
+    return bool(record and (port, record["pid"]) in listeners())
+
+
+def wait_ready(name, port, seconds=180):
+    until = time.monotonic() + seconds
+    while time.monotonic() < until:
+        if ready(name, port):
+            return
+        if not process(name):
+            raise RuntimeError(name + " stopped during startup. Check its log.")
+        time.sleep(0.5)
+    raise RuntimeError(f"{name} is still starting; check its log and run Status_Server.bat.")
+
+
+@contextmanager
+def control_lock():
+    STATE.mkdir(parents=True, exist_ok=True)
+    with (STATE / "control.lock").open("a+b") as lock:
+        lock.seek(0, 2)
+        if not lock.tell():
+            lock.write(b"0")
+            lock.flush()
+        lock.seek(0)
+        try:
+            msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
+        except OSError:
+            raise RuntimeError("Another start/stop action is in progress.") from None
+        try:
+            yield
+        finally:
+            lock.seek(0)
+            msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
+
+
+def native_root():
+    value = str(ROOT)
+    if not value.isascii():
+        short = ctypes.create_unicode_buffer(32768)
+        if kernel.GetShortPathNameW(value, short, len(short)):
+            value = short.value
+    if not value.isascii():
+        raise RuntimeError("Extract the repack to a path with Latin letters, such as C:\\Games\\CoA-Repack.")
+    return Path(value).as_posix()
+
+
+def settings(offset=0):
+    value = read_json(ROOT / "Settings/repack.json")
+    for key in ("mysqlPort", "authPort", "worldPort", "raPort"):
+        if type(value[key]) is not int or not 1024 < value[key] + offset < 65536:
+            raise ValueError("Invalid port in Settings/repack.json")
+        value[key] += offset
+    if len({value[key] for key in ("mysqlPort", "authPort", "worldPort", "raPort")}) != 4:
+        raise ValueError("Each service needs a different port.")
+    return value
+
+
+DEBUG_TEMPLATES = ("worldserver.conf.template", "authserver.conf.template")
+
+
+def _debug_transform_line(line):
+    match = re.match(r'^#?\s*(Appender\.(?:Console|Server))=(\d+),(\d+),(\d+),(.*)$', line)
+    if match:
+        return f"{match.group(1)}={match.group(2)},6,7,{match.group(5)}"
+    match = re.match(r'^#?\s*(Logger\.[\w.]+)=(\d+),(.*)$', line)
+    if match:
+        return f"{match.group(1)}=6,{match.group(3)}"
+    match = re.match(r'^Log\.Async\.Enable\s*=\s*\d+\s*$', line)
+    if match:
+        return "Log.Async.Enable = 1"
+    return line
+
+
+def debug_logs(enable):
+    changed = []
+    for name in DEBUG_TEMPLATES:
+        path = ROOT / "Settings" / name
+        original = path.with_name(path.name + ".original")
+        if not original.exists():
+            original.write_bytes(path.read_bytes())
+        if enable:
+            raw = original.read_bytes()
+            text = raw.decode("utf-8")
+            newline = "\r\n" if "\r\n" in text else "\n"
+            new_text = newline.join(_debug_transform_line(line) for line in text.splitlines())
+            if text.endswith(("\r\n", "\n")):
+                new_text += newline
+            new_bytes = new_text.encode("utf-8")
+        else:
+            new_bytes = original.read_bytes()
+        if path.read_bytes() != new_bytes:
+            path.write_bytes(new_bytes)
+            changed.append(name)
+    atomic_json(STATE / "debug-logs.json", {"enabled": enable})
+    return changed
+
+
+def debug_logs_enabled():
+    marker = STATE / "debug-logs.json"
+    return read_json(marker)["enabled"] if marker.exists() else False
+
+
+def debug_logs_status():
+    enabled = debug_logs_enabled()
+    print("Detailed server logging is " + ("ON" if enabled else "off") + ".")
+    if enabled:
+        print("Every AzerothCore logger is forced to Trace level in Core/Logs (Server.log, Auth.log, "
+              "world-console.log, auth-console.log). Expect much larger, faster-growing log files.")
+    print("Run Debug_Logs_On.bat / Debug_Logs_Off.bat, then restart the affected service(s) to apply.")
+
+
+def prepare(config):
+    base = native_root()
+    signature = {"root": str(ROOT), "ports": {k: v for k, v in config.items() if k.endswith("Port")}}
+    previous = STATE / "configuration.json"
+    if previous.exists() and read_json(previous) != signature and any(
+            process(name) for name in ("mysql", "auth", "world", "supervisor", "relay")):
+        raise RuntimeError("Stop this repack before moving its folder or changing its ports.")
+    credentials = read_json(ROOT / "Settings/database.json")
+    for key in ("rootPassword", "appPassword"):
+        if not re.fullmatch(r"[a-f0-9]{48}", credentials[key]):
+            raise ValueError("Invalid packaged database configuration.")
+    for folder in ("Core/configs/modules", "Core/Logs", "BugReport/reports", "BugReport/Logs", "mysql/logs", ".state"):
+        (ROOT / folder).mkdir(parents=True, exist_ok=True)
+    values = {"DATA": base + "/Data", "LOGS": base + "/Core/Logs", "ASCENSION_DBC": base + "/Data/dbc/Ascension",
+              "MYSQL_EXE": base + "/mysql/bin/mysql.exe",
+              "AUTH_PORT": str(config["authPort"]), "WORLD_PORT": str(config["worldPort"]), "RA_PORT": str(config["raPort"])}
+    for key, db in (("LoginDatabaseInfo", "acore_auth"), ("WorldDatabaseInfo", "acore_world"),
+                    ("CharacterDatabaseInfo", "acore_characters")):
+        values[key] = f"127.0.0.1;{config['mysqlPort']};acore;{credentials['appPassword']};{db}"
+    for name, target in (("authserver.conf", "Core/configs/authserver.conf"),
+                         ("worldserver.conf", "Core/configs/worldserver.conf"),
+                         ("mod_ascension_compat.conf", "Core/configs/modules/mod_ascension_compat.conf")):
+        text = (ROOT / "Settings" / (name + ".template")).read_text(encoding="utf-8")
+        for key, value in values.items():
+            text = text.replace("@" + key + "@", value)
+        if any(re.search(r"@[A-Z_a-z]+@", line) for line in text.splitlines()
+               if line.strip() and not line.lstrip().startswith("#")):
+            raise ValueError("An unresolved placeholder remains in a server configuration.")
+        (ROOT / target).write_text(text, encoding="utf-8", newline="\n")
+    (ROOT / "Core/configs/modules/coa_bugreport.conf").write_text(
+        '# Managed by the repack launcher. Enabled whenever worldserver starts.\n'
+        'CoABugReport.Enable = 1\nCoABugReport.SpoolDirectory = "' + base + '/BugReport/reports"\n'
+        'CoABugReport.CooldownSeconds = 120\n', encoding="utf-8")
+    (ROOT / "mysql/my.ini").write_text(
+        f'[mysqld]\nbasedir="{base}/mysql"\ndatadir="{base}/mysql/data"\n'
+        f'port={config["mysqlPort"]}\nbind-address=127.0.0.1\nmysqlx=0\n'
+        'character-set-server=utf8mb4\ncollation-server=utf8mb4_unicode_ci\n'
+        'max_allowed_packet=128M\ninnodb_buffer_pool_size=256M\nskip-log-bin\n'
+        f'log-error="{base}/mysql/logs/mysql-error.log"\npid-file="{base}/mysql/mysql.pid"\n', encoding="utf-8")
+    (ROOT / "mysql/admin-client.ini").write_text(
+        f'[client]\nuser=root\npassword={credentials["rootPassword"]}\nhost=127.0.0.1\n'
+        f'port={config["mysqlPort"]}\nprotocol=tcp\ndefault-character-set=utf8mb4\n', encoding="utf-8")
+    atomic_json(previous, signature)
+
+
+def spawn(name, command, cwd, log):
+    log.parent.mkdir(parents=True, exist_ok=True)
+    with log.open("ab", buffering=0) as output:
+        child = subprocess.Popen([str(x) for x in command], cwd=cwd, stdin=subprocess.DEVNULL,
+                                 stdout=output, stderr=output, creationflags=HIDDEN)
+    save_process(name, child.pid)
+    return child
+
+
+def mysql(sql=None, admin=None):
+    exe = ROOT / ("mysql/bin/mysqladmin.exe" if admin else "mysql/bin/mysql.exe")
+    arguments = [str(exe), "--defaults-file=" + str(ROOT / "mysql/admin-client.ini")]
+    arguments += [admin] if admin else ["--batch", "--skip-column-names"]
+    result = subprocess.run(arguments, input=sql.encode("utf-8") if sql else None,
+                            capture_output=True, timeout=90, creationflags=HIDDEN)
+    if result.returncode:
+        raise RuntimeError("The repack database command failed; check mysql/logs/mysql-error.log.")
+    return result.stdout.decode("utf-8").strip()
+
+
+def start_mysql(config):
+    existing = process("mysql")
+    if existing:
+        wait_ready("mysql", config["mysqlPort"], 60)
+        mysql(admin="ping")
+        print("MySQL is already running.", flush=True)
+        return
+    ensure_free(config["mysqlPort"])
+    if not (ROOT / "mysql/data/mysql").is_dir():
+        raise RuntimeError("The packaged database is missing. Extract the complete repack.")
+    print("Starting MySQL...", flush=True)
+    spawn("mysql", [ROOT / "mysql/bin/mysqld.exe", "--defaults-file=" + str(ROOT / "mysql/my.ini"), "--no-monitor"],
+          ROOT / "mysql", ROOT / "mysql/logs/startup.log")
+    wait_ready("mysql", config["mysqlPort"], 60)
+    mysql(admin="ping")
+    mysql(f"UPDATE acore_auth.realmlist SET name='AzerothCore',address='127.0.0.1',"
+          f"localAddress='127.0.0.1',port={config['worldPort']} WHERE id=1;")
+
+
+def start_auth(config):
+    start_mysql(config)
+    if process("auth"):
+        wait_ready("auth", config["authPort"], 60)
+        print("Authserver is already running.", flush=True)
+        return
+    ensure_free(config["authPort"])
+    # An interrupted world startup can leave flag 3, which authserver excludes.
+    mysql("UPDATE acore_auth.realmlist SET flag=0 WHERE id=1;")
+    print("Starting authserver...", flush=True)
+    spawn("auth", [ROOT / "Core/authserver.exe", "-c", ROOT / "Core/configs/authserver.conf"],
+          ROOT / "Core", ROOT / "Core/Logs/auth-console.log")
+    wait_ready("auth", config["authPort"], 60)
+
+
+def start_world(config, offset):
+    from squid_playerbots import validate_bots, prepare_playerbots
+    validate_bots(ROOT)
+    start_mysql(config)
+    if process("world"):
+        if not process("supervisor"):
+            raise RuntimeError("Worldserver has no repack supervisor. Use Stop_All_Server.bat before restarting it.")
+        wait_ready("world", config["worldPort"])
+        wait_relay()
+        print("Worldserver and bug-report relay are already running.", flush=True)
+        return
+    ensure_free(config["worldPort"])
+    ensure_free(config["raPort"])
+    if process("supervisor") or process("relay"):
+        raise RuntimeError("The previous world/relay shutdown is still finishing. Try again shortly.")
+    prepare_playerbots(ROOT, config, mysql)
+    print("Starting worldserver and its bug-report relay...", flush=True)
+    stop = STATE / "stop-relay"
+    if stop.exists():
+        stop.unlink()
+    spawn("supervisor", [PYTHON, "-B", Path(__file__), "--port-offset", str(offset), "watch-world"],
+          ROOT, ROOT / "Core/Logs/supervisor.log")
+    until = time.monotonic() + 20
+    while not process("world") and time.monotonic() < until:
+        if not process("supervisor"):
+            raise RuntimeError("World startup failed; check Core/Logs/supervisor.log.")
+        time.sleep(0.25)
+    wait_ready("world", config["worldPort"])
+    wait_ready("world", config["raPort"])
+    wait_relay()
+    print("Worldserver and automatic bug reporting are ready.", flush=True)
+
+
+def wait_relay():
+    until = time.monotonic() + 20
+    while time.monotonic() < until:
+        record = process("relay")
+        initialized = process("relay-ready")
+        if record and initialized == record:
+            return
+        time.sleep(0.25)
+    raise RuntimeError("Bug-report relay is not ready; check BugReport/Logs/relay.log.")
+
+
+def terminate(record):
+    if not same_process(record):
+        return
+    handle = kernel.OpenProcess(0x1001, False, record["pid"])
+    if not handle:
+        raise RuntimeError("Unable to stop the repack process.")
+    try:
+        if not same_process(record) or not kernel.TerminateProcess(handle, 0):
+            raise RuntimeError("The process changed while stopping it.")
+    finally:
+        kernel.CloseHandle(handle)
+
+
+def wait_stopped(record, seconds):
+    until = time.monotonic() + seconds
+    while same_process(record) and time.monotonic() < until:
+        time.sleep(0.25)
+    return not same_process(record)
+
+
+def ra(command, config):
+    if not ready("world", config["raPort"]):
+        raise RuntimeError("Start this repack's worldserver first.")
+    with socket.create_connection(("127.0.0.1", config["raPort"]), timeout=10) as connection:
+        def until(prompt):
+            data = bytearray()
+            while not data.endswith(prompt):
+                part = connection.recv(1)
+                if not part or len(data) > 131072:
+                    raise RuntimeError("The world console closed its connection.")
+                data.extend(part)
+            return data.decode("utf-8", errors="replace")
+        until(b"Username: ")
+        connection.sendall((config["raUsername"] + "\r\n").encode())
+        until(b"Password: ")
+        connection.sendall((config["raPassword"] + "\r\n").encode())
+        until(b"AC>")
+        connection.sendall((command + "\r\n").encode())
+        if command.startswith("server shutdown"):
+            return "Graceful world shutdown requested."
+        return until(b"AC>").rsplit("AC>", 1)[0].strip()
+
+
+def stop_all(config):
+    world = process("world")
+    if world:
+        print(ra("server shutdown 1s 0", config), flush=True)
+        if not wait_stopped(world, 90):
+            raise RuntimeError("Worldserver is still stopping; its database has been left running.")
+    supervisor = process("supervisor")
+    if supervisor and not wait_stopped(supervisor, 45):
+        raise RuntimeError("The report relay is still finishing a request. Try Stop All again shortly.")
+    relay = process("relay")
+    if relay:
+        (STATE / "stop-relay").touch()
+        if not wait_stopped(relay, 40):
+            raise RuntimeError("The report relay did not finish; it was left running for recovery.")
+    auth = process("auth")
+    if auth:
+        terminate(auth)
+        if not wait_stopped(auth, 10):
+            raise RuntimeError("Authserver did not stop.")
+    database = process("mysql")
+    if database:
+        mysql(admin="shutdown")
+        if not wait_stopped(database, 60):
+            raise RuntimeError("MySQL is still stopping; wait before copying the repack.")
+    print("All services from this repack are stopped. It is safe to move or copy this folder.", flush=True)
+
+
+def watch_world():
+    from squid_playerbots import validate_bots
+    validate_bots(ROOT)
+    world = spawn("world", [ROOT / "Core/worldserver.exe", "-c", ROOT / "Core/configs/worldserver.conf"],
+                  ROOT / "Core", ROOT / "Core/Logs/world-console.log")
+    relay = None
+    try:
+        while world.poll() is None:
+            if relay is None or relay.poll() is not None:
+                try:
+                    relay = spawn("relay", [PYTHON, "-B", Path(__file__), "relay-worker"],
+                                  ROOT, ROOT / "BugReport/Logs/relay.log")
+                except (OSError, RuntimeError) as error:
+                    print("Report relay could not start (" + type(error).__name__ + "); retrying.", flush=True)
+                    time.sleep(5)
+                    continue
+            time.sleep(2)
+            if relay.poll() is not None:
+                time.sleep(5)
+    finally:
+        (STATE / "stop-relay").touch()
+        if relay:
+            try:
+                relay.wait(timeout=40)
+            except subprocess.TimeoutExpired:
+                # An interrupted POST remains uncertain in the persistent journal; it is not resent.
+                terminate(process("relay"))
+
+
+def relay_worker():
+    spec = importlib.util.spec_from_file_location("coa_relay", ROOT / "BugReport/relay.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    spool = ROOT / "BugReport/reports"
+    with module.worker_lock(spool):
+        service = module.ReportService(os.environ.get("COA_BUGREPORT_API_KEY", module.DEFAULT_API_KEY))
+        worker = module.Relay(spool, service)
+        try:
+            save_process("relay-ready", os.getpid())
+            print("Bug-report relay ready. Waiting for in-game reports.", flush=True)
+            while not (STATE / "stop-relay").exists():
+                for path in sorted(spool.glob("*.report")):
+                    worker.process(path)
+                for _ in range(10):
+                    if (STATE / "stop-relay").exists():
+                        return
+                    time.sleep(0.5)
+        finally:
+            worker.close()
+
+
+def create_account(config):
+    username = input("New account name (letters and digits, up to 16): ").strip()
+    password = getpass.getpass("New account password (letters and digits, up to 16): ")
+    confirmation = getpass.getpass("Repeat password: ")
+    if not re.fullmatch(r"[A-Za-z0-9]{1,16}", username) or not re.fullmatch(r"[A-Za-z0-9]{1,16}", password):
+        raise ValueError("Use 1-16 letters or digits for the account name and password.")
+    if password != confirmation:
+        raise ValueError("Passwords do not match.")
+    print(ra("account create " + username + " " + password, config))
+    if input("Give this account GM permissions? [y/N]: ").strip().lower() == "y":
+        print(ra("account set gmlevel " + username + " 3 -1", config))
+
+
+def world_console(config):
+    print("World console. Enter a server command, or exit to close this window.")
+    while True:
+        command = input("AC> ").strip()
+        if command.lower() in ("exit", "quit"):
+            return
+        if command:
+            print(ra(command, config))
+
+
+def status_json():
+    data = {name: bool(process(name)) for name in ("mysql", "auth", "world", "relay")}
+    data["debugLogs"] = debug_logs_enabled()
+    print(json.dumps(data))
+
+
+def ra_once(config):
+    command = sys.stdin.readline().strip()
+    if not command:
+        raise ValueError("No command given.")
+    print(ra(command, config))
+
+
+def create_account_once(config):
+    request = json.loads(sys.stdin.readline())
+    username = str(request.get("username", "")).strip()
+    password = str(request.get("password", ""))
+    if not re.fullmatch(r"[A-Za-z0-9]{1,16}", username) or not re.fullmatch(r"[A-Za-z0-9]{1,16}", password):
+        raise ValueError("Use 1-16 letters or digits for the account name and password.")
+    result = [ra("account create " + username + " " + password, config)]
+    if request.get("gm"):
+        result.append(ra("account set gmlevel " + username + " 3 -1", config))
+    print(json.dumps({"messages": result}))
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--port-offset", type=int, default=0, help=argparse.SUPPRESS)
+    parser.add_argument("action", choices=("start-all", "start-mysql", "start-auth", "start-world", "stop-all",
+                                          "status", "status-json", "create-account", "create-account-once",
+                                          "console", "ra-once", "prepare", "watch-world",
+                                          "relay-worker", "debug-logs-on", "debug-logs-off", "debug-logs-status"))
+    args = parser.parse_args()
+    if args.action == "watch-world":
+        watch_world()
+        return
+    if args.action == "relay-worker":
+        relay_worker()
+        return
+    if args.action == "debug-logs-status":
+        debug_logs_status()
+        return
+    if args.action in ("debug-logs-on", "debug-logs-off"):
+        with control_lock():
+            changed = debug_logs(args.action == "debug-logs-on")
+        if changed:
+            print(("Enabled" if args.action == "debug-logs-on" else "Restored") +
+                  " detailed logging in: " + ", ".join(changed))
+        else:
+            print("Detailed logging was already " + ("on" if args.action == "debug-logs-on" else "off") + ".")
+        print("Restart the affected service(s) (Stop_All_Server.bat then Start_All_Server.bat) to apply this.")
+        return
+    config = settings(args.port_offset)
+    if args.action in ("console", "create-account", "ra-once", "create-account-once"):
+        if args.action == "console":
+            world_console(config)
+        elif args.action == "create-account":
+            create_account(config)
+        elif args.action == "ra-once":
+            ra_once(config)
+        else:
+            create_account_once(config)
+        return
+    with control_lock():
+        if args.action == "status":
+            for name in ("mysql", "auth", "world", "relay"):
+                record = process(name)
+                print(f"{name:12} " + (f"running (PID {record['pid']})" if record else "stopped"))
+            return
+        if args.action == "status-json":
+            status_json()
+            return
+        prepare(config)
+        if args.action == "prepare":
+            return
+        if args.action in ("start-all", "start-mysql"):
+            start_mysql(config)
+        if args.action in ("start-all", "start-auth"):
+            start_auth(config)
+        if args.action in ("start-all", "start-world"):
+            start_world(config, args.port_offset)
+        if args.action == "stop-all":
+            stop_all(config)
+    if args.action.startswith("start-"):
+        print("Use Stop_All_Server.bat to shut down this repack safely.")
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+        print("ERROR: " + str(error), file=sys.stderr, flush=True)
+        raise SystemExit(1)
