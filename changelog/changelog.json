@@ -2,6 +2,82 @@
   "schema": 1,
   "releases": [
     {
+      "id": "2026-10-05-database-fix",
+      "date": "2026-10-05",
+      "versions": {
+        "server": "0.261005.0",
+        "manager": "0.6.2"
+      },
+      "entries": [
+        {
+          "id": "build:20261005-restore-missing-wildcard-tables.md",
+          "source": "build",
+          "repo": "Corfirean/coa-server-build",
+          "date": "2026-10-05",
+          "area": "server",
+          "type": "fixed",
+          "audience": "admins",
+          "title": "Updates restore missing Wildcard character tables without resetting existing data",
+          "body": "A new corrective update creates only missing Wildcard card and specialization-cache tables. Existing tables and their data are preserved. Release builds now apply SQL on a disposable database before publishing its expected schema."
+        },
+        {
+          "id": "manager:20261004-auction-item-types.md",
+          "source": "manager",
+          "repo": "Corfirean/coa-server-manager",
+          "date": "2026-10-04",
+          "area": "manager",
+          "type": "added",
+          "audience": "admins",
+          "title": "Choose which item types the auction bot sells",
+          "body": "Switch 15 item categories on or off and adjust listing frequency by quality. Labels and descriptions are translated into all six languages. Changes affect new listings; existing auctions remain."
+        },
+        {
+          "id": "manager:20261004-squid-playerbots.md",
+          "source": "manager",
+          "repo": "Corfirean/coa-server-manager",
+          "date": "2026-10-04",
+          "area": "manager",
+          "type": "added",
+          "audience": "admins",
+          "title": "Configure SQUID Playerbots and prevent conflicting bot systems",
+          "body": "The Bots tab shows translated settings for the active bot system. Bot module cards keep enable switches without duplicate settings. Enable one bot system at a time; the Manager checks manual config changes before starting the server. Recovery points also include the SQUID database when installed."
+        },
+        {
+          "id": "manager:20261004-module-settings.md",
+          "source": "manager",
+          "repo": "Corfirean/coa-server-manager",
+          "date": "2026-10-04",
+          "area": "manager",
+          "type": "changed",
+          "audience": "admins",
+          "title": "Module settings now offer translated controls and an enemy damage slider",
+          "body": "Configure scaling, auctions and enchantments with translated controls. Module switches no longer appear twice. Modules without settings hide their settings button; short lists need no search. New server builds support dungeon and raid damage from 25% to 200%."
+        },
+        {
+          "id": "manager:20261004-recover-server-updates.md",
+          "source": "manager",
+          "repo": "Corfirean/coa-server-manager",
+          "date": "2026-10-04",
+          "area": "manager",
+          "type": "fixed",
+          "audience": "admins",
+          "title": "Failed server updates restore databases and files together",
+          "body": "Updates save a full backup and recover databases and files together. Interrupted SQL is not replayed. Checks cover Wildcard tables and every supported race/class pair, including existing characters. Unfinished updates block startup until recovered."
+        },
+        {
+          "id": "manager:20261005-validate-release-database.md",
+          "source": "manager",
+          "repo": "Corfirean/coa-server-manager",
+          "date": "2026-10-05",
+          "area": "manager",
+          "type": "fixed",
+          "audience": "admins",
+          "title": "Server packages must include a complete database schema check",
+          "body": "Release tools generate the expected database structure on an isolated copy of the signed base, verify all archive files and refuse packages without the schema check. Corrective SQL can restore missing Wildcard tables without replaying old updates."
+        }
+      ]
+    },
+    {
       "id": "2026-10-04-manager-0.6.1",
       "date": "2026-10-04",
       "versions": {

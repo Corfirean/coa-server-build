@@ -3,6 +3,22 @@
 Everything that changed for players and server owners across the CoA server, bots, Content Scaling, the Manager and the renderer, newest first.
 Written from the `changelog.d/` fragments of each repository (see `changelog/GUIDE.md`).
 
+## 2026-10-05-database-fix - Server 0.261005.0 · Manager 0.6.2
+
+### For server owners
+
+**Server**
+
+- Fixed: Updates restore missing Wildcard character tables without resetting existing data. A new corrective update creates only missing Wildcard card and specialization-cache tables. Existing tables and their data are preserved. Release builds now apply SQL on a disposable database before publishing its expected schema.
+
+**Manager**
+
+- Added: Choose which item types the auction bot sells. Switch 15 item categories on or off and adjust listing frequency by quality. Labels and descriptions are translated into all six languages. Changes affect new listings; existing auctions remain.
+- Added: Configure SQUID Playerbots and prevent conflicting bot systems. The Bots tab shows translated settings for the active bot system. Bot module cards keep enable switches without duplicate settings. Enable one bot system at a time; the Manager checks manual config changes before starting the server. Recovery points also include the SQUID database when installed.
+- Changed: Module settings now offer translated controls and an enemy damage slider. Configure scaling, auctions and enchantments with translated controls. Module switches no longer appear twice. Modules without settings hide their settings button; short lists need no search. New server builds support dungeon and raid damage from 25% to 200%.
+- Fixed: Failed server updates restore databases and files together. Updates save a full backup and recover databases and files together. Interrupted SQL is not replayed. Checks cover Wildcard tables and every supported race/class pair, including existing characters. Unfinished updates block startup until recovered.
+- Fixed: Server packages must include a complete database schema check. Release tools generate the expected database structure on an isolated copy of the signed base, verify all archive files and refuse packages without the schema check. Corrective SQL can restore missing Wildcard tables without replaying old updates.
+
 ## 2026-10-04-manager-0.6.1 - Manager 0.6.1
 
 ### For server owners

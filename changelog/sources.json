@@ -1,5 +1,6 @@
 {
   "sources": [
+    { "name": "build",    "repo": "Corfirean/coa-server-build",        "branch": "main" },
     { "name": "server",   "repo": "Corfirean/azerothcore-wotlk-coa",    "branch": "coa-bots" },
     { "name": "bots",     "repo": "Corfirean/mod-coa-playerbots",       "branch": "master" },
     { "name": "scaling",  "repo": "Corfirean/mod-coa-content-scaling",  "branch": "main" },
