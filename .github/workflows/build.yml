@@ -18,6 +18,9 @@ on:
       squid_ref:
         description: SQUID Playerbots ref (branch, tag or SHA)
         default: coa
+      manager_ref:
+        description: Manager release-tool ref (must support release schema validation)
+        default: master
 
 concurrency:
   group: build
@@ -51,6 +54,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: Corfirean/coa-server-manager
+          ref: ${{ inputs.manager_ref || 'master' }}
           path: _manager
       - name: Build coa-release
         shell: pwsh
@@ -98,15 +102,21 @@ jobs:
       - name: Assemble the release tree
         shell: pwsh
         run: ./scripts/assemble-tree.ps1 -Binaries _binaries -Core _core -Bots _bots -Out _tree -Manager _manager -CoreSha $env:CORE_SHA -BotsSha $env:BOTS_SHA -ScalingSha $env:SCALING_SHA -SquidSha $env:SQUID_SHA
-      - name: Fetch the base manifest
+      - name: Fetch the signed base package for database acceptance
         shell: pwsh
         run: |
-          gh release download base --pattern manifest.json --output base-manifest.json --repo $env:GITHUB_REPOSITORY
-          if ($LASTEXITCODE -ne 0) {
-            Write-Host "No base release yet: this update will carry every file."
-            '{"schema":1,"kind":"base","version":"0.0.0","core":{"commit":null},"builtAt":"none","minManagerVersion":"0.1.0","files":[]}' | Set-Content base-manifest.json -Encoding utf8
-          }
-          $global:LASTEXITCODE = 0   # a missing base release is expected; do not let gh's exit code fail the step
+          gh release download base --pattern manifest.json --pattern manifest.json.sig --pattern '*.tar.zst.*' --dir _schema-base --repo $env:GITHUB_REPOSITORY
+          if ($LASTEXITCODE) { throw "A signed base package is required for database acceptance." }
+          Copy-Item _schema-base/manifest.json base-manifest.json
+      - name: Apply release SQL on an isolated database and capture the expected schema
+        shell: pwsh
+        run: |
+          $tool = "_manager/target/release/coa-release.exe"
+          & $tool extract-schema-base --package _schema-base --fixture coa-schema-fixture-build
+          if ($LASTEXITCODE) { throw "Preparing the isolated database failed." }
+          & $tool schema-contract --repack coa-schema-fixture-build --tree _tree --core _core --bots _bots --repairs database-repairs
+          if ($LASTEXITCODE) { throw "Database acceptance failed; this release will not be published." }
+          if (-not (Test-Path _tree/Scripts/database-schema.json)) { throw "The database schema contract was not produced." }
       - name: Pack, sign, verify
         shell: pwsh
         env:
@@ -117,7 +127,7 @@ jobs:
           "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           $tool = "_manager/target/release/coa-release.exe"
           & $tool pack-update --tree _tree --base-manifest base-manifest.json --core _core --bots _bots --out _out `
-            --version $version --core-commit $env:CORE_SHA --bots-commit $env:BOTS_SHA
+            --version $version --core-commit $env:CORE_SHA --bots-commit $env:BOTS_SHA --repairs database-repairs
           if ($LASTEXITCODE) { throw "pack-update failed" }
           & $tool sign --dir _out;   if ($LASTEXITCODE) { throw "sign failed" }
           & $tool verify --dir _out; if ($LASTEXITCODE) { throw "verify failed" }
