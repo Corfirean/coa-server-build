@@ -16,10 +16,16 @@ def options(path):
     return result
 
 
+def package_root(root):
+    return root.parent.parent if root.name == "secondary" and root.parent.name == ".realms" else root
+
+
 def module_options(root, name):
     folder = root / "Core/configs/modules"
     active = folder / name
     path = active if active.exists() else folder / (name + ".dist")
+    if not path.exists() and name == "playerbots.conf":
+        path = package_root(root) / "Core/configs/modules/playerbots.conf.dist"
     return path, options(path)
 
 
@@ -60,14 +66,14 @@ def prepare_playerbots(root, config, mysql):
     if not path.exists():
         return
     validate_bots(root)
-    sql_root = root / "Extras/SquidPlayerbots/sql"
+    sql_root = package_root(root) / "Extras/SquidPlayerbots/sql"
     if not (sql_root / "playerbots/base").is_dir():
         raise RuntimeError("SQUID Playerbots database files are missing. Repair the server installation.")
     world = options(root / "Core/configs/worldserver.conf")
     schemas = {"playerbots": "acore_playerbots"}
     for kind, key in (("world", "WorldDatabaseInfo"), ("characters", "CharacterDatabaseInfo")):
         schema = world[key].split(";")[-1]
-        if not re.fullmatch(r"acore_(?:wildcard_)?(?:world|characters)", schema):
+        if not re.fullmatch(r"acore_(?:world|characters)(?:_wildcard)?", schema):
             raise RuntimeError("Unsupported world/characters database for SQUID Playerbots.")
         schemas[kind] = schema
     mysql("CREATE DATABASE IF NOT EXISTS acore_playerbots CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;")
@@ -79,7 +85,8 @@ def prepare_playerbots(root, config, mysql):
     if not re.fullmatch(r"[a-f0-9]{48}", password):
         raise RuntimeError("Invalid packaged database configuration.")
     if path.name.endswith(".dist"):
-        active = path.with_suffix("")
+        active = root / "Core/configs/modules/playerbots.conf"
+        active.parent.mkdir(parents=True, exist_ok=True)
         active.write_bytes(path.read_bytes())
         path = active
     set_options(path, {"PlayerbotsDatabaseInfo": f'"127.0.0.1;{config["mysqlPort"]};acore;{password};acore_playerbots"',
