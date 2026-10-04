@@ -6,6 +6,9 @@ on:
     - cron: '30 1 * * *'
   workflow_dispatch:
     inputs:
+      release_version:
+        description: Optional release version (0.yyMMdd.build); must be newer than stable
+        default: ''
       core_ref:
         description: Fork ref (branch, tag or SHA)
         default: coa-bots
@@ -121,14 +124,25 @@ jobs:
         shell: pwsh
         env:
           COA_SIGNING_KEY: ${{ secrets.COA_SIGNING_KEY }}
+          RELEASE_VERSION: ${{ inputs.release_version }}
         run: |
           if (-not $env:COA_SIGNING_KEY) { throw "Add the COA_SIGNING_KEY secret (see README) - unsigned packages are never published." }
-          $version = "0.$((Get-Date).ToString('yyMMdd')).${{ github.run_number }}"
+          $version = $env:RELEASE_VERSION
+          if (-not $version) { $version = "0.$((Get-Date).ToString('yyMMdd')).${{ github.run_number }}" }
+          if ($version -notmatch '^0\.[0-9]{6}\.[0-9]+$') { throw "Invalid release version: $version" }
+          gh release download stable --pattern manifest.json --dir _stable-version --repo $env:GITHUB_REPOSITORY
+          if ($LASTEXITCODE) { throw "Cannot determine the current stable version; refusing to publish." }
+          $stableVersion = (Get-Content _stable-version/manifest.json -Raw | ConvertFrom-Json).version
+          if ([version]$version -le [version]$stableVersion) { throw "Release $version must be newer than stable $stableVersion." }
           "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           $tool = "_manager/target/release/coa-release.exe"
           & $tool pack-update --tree _tree --base-manifest base-manifest.json --core _core --bots _bots --out _out `
             --version $version --core-commit $env:CORE_SHA --bots-commit $env:BOTS_SHA --repairs database-repairs
           if ($LASTEXITCODE) { throw "pack-update failed" }
+          $manifestPath = '_out/manifest.json'
+          $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
+          $manifest.minManagerVersion = '0.6.2'
+          $manifest | ConvertTo-Json -Depth 100 | Set-Content $manifestPath -Encoding utf8NoBOM
           & $tool sign --dir _out;   if ($LASTEXITCODE) { throw "sign failed" }
           & $tool verify --dir _out; if ($LASTEXITCODE) { throw "verify failed" }
       - name: Publish to the edge release
