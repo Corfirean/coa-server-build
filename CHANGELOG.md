@@ -3,6 +3,48 @@
 Everything that changed for players and server owners across the CoA server, bots, Content Scaling, the Manager and the renderer, newest first.
 Written from the `changelog.d/` fragments of each repository (see `changelog/GUIDE.md`).
 
+## 2026-10-05-pending-features - Server 0.261005.22 · Manager 0.6.4
+
+### For players
+
+**Companion bots**
+
+- Fixed: Forming a party with real players no longer crashes the server when CoABotUI is enabled. Invalid or stale bot requests are safely rejected, including when bots are disabled.
+
+**Content Scaling**
+
+- Added: Small groups can enter Dungeon Finder without waiting for five players. With group scaling enabled, parties of one to five players can enter together. Server owners can retain standard matchmaking through configuration.
+
+**Manager**
+
+- Added: Download and update the game client without installing a server. Choose to host a server or connect to someone else's. Players joining a friend can download, update and launch the client, save the host's address and use the Manager without installing a local server.
+- Added: Start your installed server or client without downloading an available update. Choose to update later and keep playing with your installed version. Interrupted server updates still require recovery before startup.
+
+### For server owners
+
+**Server**
+
+- Fixed: Server updates no longer fail to start with the bundled Python runtime. The launcher and its supervisor can load their integration scripts with the repack's isolated Python runtime. This fixes startup failures after an update.
+- Fixed: Server releases reject versions older than the current stable package. Release builds check the stable package version before publishing and require a Manager with the database update safeguards. Manual releases can specify an explicit version when the build date differs from the release date.
+
+**Companion bots**
+
+- Changed: Grouped bots leave corpse loot to players by default. Bots in parties and raids no longer automatically open corpses or take items and money. Server owners can enable the previous behavior in configuration. Solo looting and Need/Greed rolls are unchanged.
+
+**Content Scaling**
+
+- Added: Adjust dungeon and raid enemy damage from 25% to 200%. Choose an enemy damage multiplier on top of group scaling and solo assistance. The default preserves the existing balance. Reload the configuration to apply it without restarting.
+- Added: Open-world life steal can be enabled with a configurable healing percentage. Enable passive healing from damage dealt to open-world creatures and choose a percentage from 0 to 100. Players, pets and instances are excluded.
+
+**Server modules**
+
+- Added: Auction bot filters listings using CoA item sources. Auction listings use loot, vendor and profession items by default. A master switch and smaller default auction targets make setup easier.
+
+**Manager**
+
+- Added: Configure partial dungeon parties and open-world life steal in module settings. Choose whether Dungeon Finder enters with the current party and enable open-world life steal with a healing percentage from 0 to 100. Available on server builds that support these options.
+- Fixed: Finish a server update that was blocked by a startup failure. The Manager repairs the launcher import path and lets you retry startup for an already applied update. Successful validation finishes the update without replaying SQL or restoring old databases. Failure details are preserved and rollback remains available.
+
 ## 2026-10-05-database-fix - Server 0.261005.0 · Manager 0.6.2
 
 ### For server owners

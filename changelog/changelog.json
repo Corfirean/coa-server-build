@@ -2,6 +2,148 @@
   "schema": 1,
   "releases": [
     {
+      "id": "2026-10-05-pending-features",
+      "date": "2026-10-05",
+      "versions": {
+        "server": "0.261005.22",
+        "manager": "0.6.4"
+      },
+      "entries": [
+        {
+          "id": "bots:20261005-addon-party-crash.md",
+          "source": "bots",
+          "repo": "Corfirean/mod-coa-playerbots",
+          "date": "2026-10-05",
+          "area": "bots",
+          "type": "fixed",
+          "audience": "players",
+          "title": "Forming a party with real players no longer crashes the server when CoABotUI is enabled",
+          "body": "Invalid or stale bot requests are safely rejected, including when bots are disabled."
+        },
+        {
+          "id": "scaling:20261004-partial-lfg.md",
+          "source": "scaling",
+          "repo": "Corfirean/mod-coa-content-scaling",
+          "date": "2026-10-04",
+          "area": "scaling",
+          "type": "added",
+          "audience": "players",
+          "title": "Small groups can enter Dungeon Finder without waiting for five players",
+          "body": "With group scaling enabled, parties of one to five players can enter together. Server owners can retain standard matchmaking through configuration."
+        },
+        {
+          "id": "manager:20261005-connect-without-server.md",
+          "source": "manager",
+          "repo": "Corfirean/coa-server-manager",
+          "date": "2026-10-05",
+          "area": "manager",
+          "type": "added",
+          "audience": "players",
+          "title": "Download and update the game client without installing a server",
+          "body": "Choose to host a server or connect to someone else's. Players joining a friend can download, update and launch the client, save the host's address and use the Manager without installing a local server."
+        },
+        {
+          "id": "manager:20261005-launch-without-updating.md",
+          "source": "manager",
+          "repo": "Corfirean/coa-server-manager",
+          "date": "2026-10-05",
+          "area": "manager",
+          "type": "added",
+          "audience": "players",
+          "title": "Start your installed server or client without downloading an available update",
+          "body": "Choose to update later and keep playing with your installed version. Interrupted server updates still require recovery before startup."
+        },
+        {
+          "id": "build:20261005-isolated-launcher-imports.md",
+          "source": "build",
+          "repo": "Corfirean/coa-server-build",
+          "date": "2026-10-05",
+          "area": "server",
+          "type": "fixed",
+          "audience": "admins",
+          "title": "Server updates no longer fail to start with the bundled Python runtime",
+          "body": "The launcher and its supervisor can load their integration scripts with the repack's isolated Python runtime. This fixes startup failures after an update."
+        },
+        {
+          "id": "build:20261005-release-version-guard.md",
+          "source": "build",
+          "repo": "Corfirean/coa-server-build",
+          "date": "2026-10-05",
+          "area": "server",
+          "type": "fixed",
+          "audience": "admins",
+          "title": "Server releases reject versions older than the current stable package",
+          "body": "Release builds check the stable package version before publishing and require a Manager with the database update safeguards. Manual releases can specify an explicit version when the build date differs from the release date."
+        },
+        {
+          "id": "bots:20261004-group-auto-loot.md",
+          "source": "bots",
+          "repo": "Corfirean/mod-coa-playerbots",
+          "date": "2026-10-04",
+          "area": "bots",
+          "type": "changed",
+          "audience": "admins",
+          "title": "Grouped bots leave corpse loot to players by default",
+          "body": "Bots in parties and raids no longer automatically open corpses or take items and money. Server owners can enable the previous behavior in configuration. Solo looting and Need/Greed rolls are unchanged."
+        },
+        {
+          "id": "scaling:20261004-dungeon-damage-difficulty.md",
+          "source": "scaling",
+          "repo": "Corfirean/mod-coa-content-scaling",
+          "date": "2026-10-04",
+          "area": "scaling",
+          "type": "added",
+          "audience": "admins",
+          "title": "Adjust dungeon and raid enemy damage from 25% to 200%",
+          "body": "Choose an enemy damage multiplier on top of group scaling and solo assistance. The default preserves the existing balance. Reload the configuration to apply it without restarting."
+        },
+        {
+          "id": "scaling:20261004-world-leech.md",
+          "source": "scaling",
+          "repo": "Corfirean/mod-coa-content-scaling",
+          "date": "2026-10-04",
+          "area": "scaling",
+          "type": "added",
+          "audience": "admins",
+          "title": "Open-world life steal can be enabled with a configurable healing percentage",
+          "body": "Enable passive healing from damage dealt to open-world creatures and choose a percentage from 0 to 100. Players, pets and instances are excluded."
+        },
+        {
+          "id": "server:20261004-coa-auction-assortment.md",
+          "source": "server",
+          "repo": "Corfirean/azerothcore-wotlk-coa",
+          "date": "2026-10-04",
+          "area": "modules",
+          "type": "added",
+          "audience": "admins",
+          "title": "Auction bot filters listings using CoA item sources",
+          "body": "Auction listings use loot, vendor and profession items by default. A master switch and smaller default auction targets make setup easier."
+        },
+        {
+          "id": "manager:20261004-scaling-lfg-leech-settings.md",
+          "source": "manager",
+          "repo": "Corfirean/coa-server-manager",
+          "date": "2026-10-04",
+          "area": "manager",
+          "type": "added",
+          "audience": "admins",
+          "title": "Configure partial dungeon parties and open-world life steal in module settings",
+          "body": "Choose whether Dungeon Finder enters with the current party and enable open-world life steal with a healing percentage from 0 to 100. Available on server builds that support these options."
+        },
+        {
+          "id": "manager:20261005-retry-update-startup.md",
+          "source": "manager",
+          "repo": "Corfirean/coa-server-manager",
+          "date": "2026-10-05",
+          "area": "manager",
+          "type": "fixed",
+          "audience": "admins",
+          "title": "Finish a server update that was blocked by a startup failure",
+          "body": "The Manager repairs the launcher import path and lets you retry startup for an already applied update. Successful validation finishes the update without replaying SQL or restoring old databases. Failure details are preserved and rollback remains available."
+        }
+      ]
+    },
+    {
       "id": "2026-10-05-database-fix",
       "date": "2026-10-05",
       "versions": {
