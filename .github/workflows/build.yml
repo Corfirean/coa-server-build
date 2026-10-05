@@ -117,6 +117,8 @@ jobs:
           $tool = "_manager/target/release/coa-release.exe"
           & $tool extract-schema-base --package _schema-base --fixture coa-schema-fixture-build
           if ($LASTEXITCODE) { throw "Preparing the isolated database failed." }
+          & coa-schema-fixture-build/Runtime/python/python.exe -I -c "import runpy,sys;runpy.run_path(sys.argv[1]);import squid_playerbots" _tree/Scripts/manage.py
+          if ($LASTEXITCODE) { throw "The release launcher cannot load its helper with the bundled Python runtime." }
           & $tool schema-contract --repack coa-schema-fixture-build --tree _tree --core _core --bots _bots --repairs database-repairs
           if ($LASTEXITCODE) { throw "Database acceptance failed; this release will not be published." }
           if (-not (Test-Path _tree/Scripts/database-schema.json)) { throw "The database schema contract was not produced." }
@@ -141,7 +143,7 @@ jobs:
           if ($LASTEXITCODE) { throw "pack-update failed" }
           $manifestPath = '_out/manifest.json'
           $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
-          $manifest.minManagerVersion = '0.6.2'
+          $manifest.minManagerVersion = '0.6.4'
           $manifest | ConvertTo-Json -Depth 100 | Set-Content $manifestPath -Encoding utf8NoBOM
           & $tool sign --dir _out;   if ($LASTEXITCODE) { throw "sign failed" }
           & $tool verify --dir _out; if ($LASTEXITCODE) { throw "verify failed" }

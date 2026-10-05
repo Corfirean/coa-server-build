@@ -19,6 +19,7 @@ import sys
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 STATE = ROOT / ".state"
 PYTHON = ROOT / "Runtime/python/python.exe"
 HIDDEN = subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP
