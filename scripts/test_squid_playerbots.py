@@ -122,6 +122,55 @@ class IntegrationTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "history does not match"):
                 prepare_playerbots(root, {"mysqlPort": 3307}, mismatched)
 
+    def test_interrupted_base_import_stays_pending_and_blocks_adoption_on_restart(self):
+        for kind in ("playerbots", "world", "characters"):
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as folder:
+                root = Path(folder)
+                sql_root = self.make_enabled_root(root)
+                base = sql_root / kind / "base"
+                base.mkdir(parents=True, exist_ok=True)
+                (base / "large.sql").write_text("CREATE TABLE imported_data(id INT); INSERT INTO imported_data VALUES (1);")
+                pending, created, calls = [], set(), []
+                def mysql(sql):
+                    calls.append(sql)
+                    if "SELECT TABLE_NAME" in sql and f"TABLE_SCHEMA='acore_{kind}'" in sql:
+                        return "\n".join(created)
+                    if sql.startswith(f"SELECT path FROM `acore_{kind}`.coa_squid_pending"):
+                        return "\n".join(pending)
+                    if sql.startswith(f"CREATE TABLE IF NOT EXISTS `acore_{kind}`.coa_squid_pending"):
+                        created.add("coa_squid_pending")
+                    if sql.startswith(f"INSERT INTO `acore_{kind}`.coa_squid_pending"):
+                        pending.append(kind + "/base/large.sql")
+                    if "CREATE TABLE imported_data" in sql:
+                        self.assertTrue(pending, "The marker must commit before the base SQL starts")
+                        created.add("imported_data")
+                        raise TimeoutError("base SQL exceeded 90 seconds")
+                    return ""
+                with self.assertRaises(TimeoutError):
+                    prepare_playerbots(root, {"mysqlPort": 3307}, mysql)
+                calls.clear()
+                with self.assertRaisesRegex(RuntimeError, "base import was interrupted"):
+                    prepare_playerbots(root, {"mysqlPort": 3307}, mysql)
+                self.assertTrue(all(call.startswith("SELECT") for call in calls))
+                self.assertEqual(pending, [kind + "/base/large.sql"])
+
+    def test_successful_base_import_clears_pending_only_after_sql_and_history(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            sql_root = self.make_enabled_root(root)
+            (sql_root / "playerbots/base/done.sql").write_text("CREATE TABLE finished_data(id INT);")
+            calls = []
+            def mysql(sql):
+                calls.append(sql)
+                return ""
+            prepare_playerbots(root, {"mysqlPort": 3307}, mysql)
+            marker = next(i for i, call in enumerate(calls) if call.startswith("INSERT INTO `acore_playerbots`.coa_squid_pending"))
+            imported = next(i for i, call in enumerate(calls) if "CREATE TABLE finished_data" in call)
+            self.assertLess(marker, imported)
+            statement = calls[imported]
+            self.assertLess(statement.index("CREATE TABLE finished_data"), statement.index("coa_squid_migrations VALUES"))
+            self.assertLess(statement.index("coa_squid_migrations VALUES"), statement.index("DELETE FROM `acore_playerbots`.coa_squid_pending"))
+
     def make_enabled_root(self, root):
         modules = root / "Core/configs/modules"
         modules.mkdir(parents=True)

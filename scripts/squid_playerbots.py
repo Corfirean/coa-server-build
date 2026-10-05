@@ -77,7 +77,7 @@ def prepare_playerbots(root, config, mysql):
             raise RuntimeError("Unsupported world/characters database for SQUID Playerbots.")
         schemas[kind] = schema
     existing_playerbots = set(mysql("SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA='acore_playerbots';").splitlines())
-    data_tables = existing_playerbots - {"updates", "updates_include", "version_db_playerbots", "coa_squid_migrations", "coa_bots_installed"}
+    data_tables = existing_playerbots - {"updates", "updates_include", "version_db_playerbots", "coa_squid_migrations", "coa_bots_installed", "coa_squid_pending"}
     installer_history = set()
     if "coa_bots_installed" in existing_playerbots:
         for name in mysql("SELECT file FROM `acore_playerbots`.coa_bots_installed;").splitlines():
@@ -87,6 +87,10 @@ def prepare_playerbots(root, config, mysql):
     histories, ledgers, tables = {}, {}, {}
     for kind, schema in schemas.items():
         tables[kind] = existing_playerbots if kind == "playerbots" else set(mysql(f"SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA='{schema}';").splitlines())
+        if "coa_squid_pending" in tables[kind]:
+            pending = mysql(f"SELECT path FROM `{schema}`.coa_squid_pending;").strip()
+            if pending:
+                raise RuntimeError("A SQUID base import was interrupted. Restore the database backup or repair the incomplete import before continuing; no SQL was applied: " + pending)
         history = {}
         if "updates" in tables[kind]:
             for row in mysql(f"SELECT name,hash FROM `{schema}`.updates;").splitlines():
@@ -120,6 +124,7 @@ def prepare_playerbots(root, config, mysql):
                        "Playerbots.Updates.EnableDatabases": "0"})
     for kind, schema in schemas.items():
         mysql(f"CREATE TABLE IF NOT EXISTS `{schema}`.coa_squid_migrations (path VARCHAR(240) PRIMARY KEY, sha256 CHAR(64) NOT NULL);")
+        mysql(f"CREATE TABLE IF NOT EXISTS `{schema}`.coa_squid_pending (path VARCHAR(240) PRIMARY KEY, sha256 CHAR(64) NOT NULL);")
         history = histories[kind]
         recorded = ledgers[kind]
         for stage in ("base", "updates", "custom"):
@@ -145,7 +150,9 @@ def prepare_playerbots(root, config, mysql):
                         if ledger_sql:
                             mysql(ledger_sql)
                         continue
-                    mysql(f"USE `{schema}`;\n" + source.read_text(encoding="utf-8-sig") + "\n" + ledger_sql)
+                    mysql(f"INSERT INTO `{schema}`.coa_squid_pending VALUES ('{relative}','{digest}'); COMMIT;")
+                    complete_sql = f"DELETE FROM `{schema}`.coa_squid_pending WHERE path='{relative}' AND sha256='{digest}'; COMMIT;"
+                    mysql(f"USE `{schema}`;\n" + source.read_text(encoding="utf-8-sig") + "\n" + ledger_sql + "\n" + complete_sql)
                     tables[kind].update(definitions)
                     continue
                 if any(name == relative or name.endswith("/" + relative) for name in installer_history):
