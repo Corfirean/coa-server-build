@@ -15,8 +15,10 @@ on:
         default: main
       squid_ref:
         type: string
-        default: coa
+        default: latest-release
     outputs:
+      squid_tag:
+        value: ${{ jobs.build.outputs.squid_tag }}
       squid_sha:
         value: ${{ jobs.build.outputs.squid_sha }}
       core_sha:
@@ -35,6 +37,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 240
     outputs:
+      squid_tag: ${{ steps.squid.outputs.squid_tag }}
       squid_sha: ${{ steps.shas.outputs.squid_sha }}
       core_sha: ${{ steps.shas.outputs.core_sha }}
       bots_sha: ${{ steps.shas.outputs.bots_sha }}
@@ -161,11 +164,22 @@ jobs:
           repository: Corfirean/mod-coa-content-scaling
           ref: ${{ inputs.scaling_ref || 'main' }}
           path: _scaling
+      - name: Release integration tools
+        uses: actions/checkout@v7
+        with:
+          path: _pipeline
+      - name: Resolve the SQUID release tag to an exact commit
+        id: squid
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SQUID_REF: ${{ inputs.squid_ref || 'latest-release' }}
+        run: ./_pipeline/scripts/resolve-squid.ps1 -Ref $env:SQUID_REF
       - name: Fetch unchanged SQUID Playerbots
         uses: actions/checkout@v7
         with:
           repository: Zyth45/mod-playerbots
-          ref: ${{ inputs.squid_ref || 'coa' }}
+          ref: ${{ steps.squid.outputs.squid_sha }}
           path: modules/mod-playerbots
       - name: Place the modules where the core expects them
         id: shas

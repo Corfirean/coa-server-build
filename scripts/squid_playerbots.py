@@ -56,14 +56,14 @@ def set_options(path, values):
 
 
 def prepare_playerbots(root, config, mysql):
-    """Provision once per SQL file, before the world starts, including when SQUID is disabled.
+    """Provision enabled SQUID without replaying imported base tables.
 
     Each target database has its own migration ledger. Completed base imports never
     run again, so existing bot accounts, characters and caches survive restarts.
     """
     root = Path(root)
     path, values = module_options(root, "playerbots.conf")
-    if not path.exists():
+    if not path.exists() or not enabled(values, "AiPlayerbot.Enabled"):
         return
     validate_bots(root)
     sql_root = package_root(root) / "Extras/SquidPlayerbots/sql"
@@ -76,6 +76,8 @@ def prepare_playerbots(root, config, mysql):
         if not re.fullmatch(r"acore_(?:world|characters)(?:_wildcard)?", schema):
             raise RuntimeError("Unsupported world/characters database for SQUID Playerbots.")
         schemas[kind] = schema
+    existing_playerbots = set(mysql("SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA='acore_playerbots';").splitlines())
+    imported_playerbots = bool(existing_playerbots - {"updates", "updates_include", "version_db_playerbots", "coa_squid_migrations"})
     mysql("CREATE DATABASE IF NOT EXISTS acore_playerbots CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;")
     # Use the repack's existing application account; do not create another password.
     for host in ("localhost", "127.0.0.1"):
@@ -93,6 +95,12 @@ def prepare_playerbots(root, config, mysql):
                        "Playerbots.Updates.EnableDatabases": "0"})
     for kind, schema in schemas.items():
         mysql(f"CREATE TABLE IF NOT EXISTS `{schema}`.coa_squid_migrations (path VARCHAR(240) PRIMARY KEY, sha256 CHAR(64) NOT NULL);")
+        history = {}
+        has_history = mysql(f"SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA='{schema}' AND TABLE_NAME='updates';").strip() == "1"
+        if has_history:
+            for row in mysql(f"SELECT name,hash FROM `{schema}`.updates;").splitlines():
+                name, digest = row.split("\t", 1)
+                history[name] = digest.lower()
         recorded = {}
         for row in mysql(f"SELECT path,sha256 FROM `{schema}`.coa_squid_migrations;").splitlines():
             name, digest = row.split("\t")
@@ -107,5 +115,19 @@ def prepare_playerbots(root, config, mysql):
                     if recorded[relative] != digest:
                         raise RuntimeError("A previously applied SQUID database migration changed: " + relative)
                     continue
-                mysql(f"USE `{schema}`;\n" + source.read_text(encoding="utf-8-sig") +
-                      f"\nINSERT INTO `{schema}`.coa_squid_migrations VALUES ('{relative}','{digest}');")
+                ledger_sql = f"INSERT INTO `{schema}`.coa_squid_migrations VALUES ('{relative}','{digest}');"
+                if kind == "playerbots" and stage == "base" and imported_playerbots:
+                    definitions = re.findall(r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?`?([A-Za-z0-9_]+)`?", source.read_text(encoding="utf-8-sig"), re.I)
+                    if any(table not in existing_playerbots for table in definitions):
+                        raise RuntimeError("An existing SQUID database is missing a base table; refusing destructive base imports: " + relative)
+                    mysql(ledger_sql)
+                    continue
+                if source.name in history:
+                    upstream_hash = history[source.name]
+                    contents = source.read_bytes()
+                    upstream_hashes = {hashlib.sha1(contents).hexdigest(), hashlib.sha1(contents.replace(b"\r\n", b"\n")).hexdigest()}
+                    if upstream_hash and upstream_hash not in upstream_hashes:
+                        raise RuntimeError("SQUID update history does not match the shipped SQL: " + relative)
+                    mysql(ledger_sql)
+                    continue
+                mysql(f"USE `{schema}`;\n" + source.read_text(encoding="utf-8-sig") + "\n" + ledger_sql)

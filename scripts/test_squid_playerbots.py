@@ -33,12 +33,22 @@ class IntegrationTests(unittest.TestCase):
             squid.write_text("AiPlayerbot.Enabled = 0\n")
             validate_bots(root)
 
-    def test_provisioning_is_idempotent_and_changed_sql_is_rejected(self):
+    def test_disabled_bots_do_not_touch_sql_or_require_packaged_sql(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
             modules = root / "Core/configs/modules"
             modules.mkdir(parents=True)
             (modules / "playerbots.conf").write_text("AiPlayerbot.Enabled = 0\n")
+            def forbidden(sql):
+                self.fail("Disabled module accessed SQL")
+            prepare_playerbots(root, {"mysqlPort": 3307}, forbidden)
+
+    def test_provisioning_is_idempotent_and_changed_sql_is_rejected(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            modules = root / "Core/configs/modules"
+            modules.mkdir(parents=True)
+            (modules / "playerbots.conf").write_text("AiPlayerbot.Enabled = 1\n")
             (root / "Settings").mkdir()
             (root / "Settings/database.json").write_text(json.dumps({"appPassword": "a" * 48}))
             (root / "Core/configs/worldserver.conf").write_text('WorldDatabaseInfo = "x;x;x;x;acore_world"\nCharacterDatabaseInfo = "x;x;x;x;acore_characters"\n')
@@ -63,6 +73,53 @@ class IntegrationTests(unittest.TestCase):
             source.write_text("DROP TABLE bot;")
             with self.assertRaises(RuntimeError):
                 prepare_playerbots(root, {"mysqlPort": 3307}, mysql)
+
+    def test_imported_database_seeds_history_without_replaying_destructive_sql(self):
+        import hashlib
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            modules = root / "Core/configs/modules"
+            modules.mkdir(parents=True)
+            (modules / "playerbots.conf").write_text("AiPlayerbot.Enabled = 1\n")
+            (root / "Settings").mkdir()
+            (root / "Settings/database.json").write_text(json.dumps({"appPassword": "a" * 48}))
+            (root / "Core/configs/worldserver.conf").write_text('WorldDatabaseInfo = "x;x;x;x;acore_world"\nCharacterDatabaseInfo = "x;x;x;x;acore_characters"\n')
+            base = root / "Extras/SquidPlayerbots/sql/playerbots/base"
+            base.mkdir(parents=True)
+            (base / "bot.sql").write_text("DROP TABLE IF EXISTS bot; CREATE TABLE bot(id INT);")
+            updates = base.parent / "updates"
+            updates.mkdir()
+            migration = updates / "applied.sql"
+            migration.write_bytes(b"DELETE FROM bot;\r\n")
+            calls = []
+            def mysql(sql):
+                calls.append(sql)
+                if "SELECT TABLE_NAME" in sql:
+                    return "bot\nupdates"
+                if "SELECT COUNT(*)" in sql:
+                    return "1" if "TABLE_SCHEMA='acore_playerbots'" in sql else "0"
+                if "SELECT name,hash FROM `acore_playerbots`" in sql:
+                    return "applied.sql\t" + hashlib.sha1(migration.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
+                return ""
+            prepare_playerbots(root, {"mysqlPort": 3307}, mysql)
+            self.assertFalse(any("DROP TABLE" in call or "DELETE FROM bot" in call for call in calls))
+            self.assertTrue(any("playerbots/base/bot.sql" in call for call in calls))
+            self.assertTrue(any("playerbots/updates/applied.sql" in call for call in calls))
+            def incomplete(sql):
+                if "SELECT TABLE_NAME" in sql:
+                    return "another_table\nupdates"
+                return mysql(sql)
+            with self.assertRaisesRegex(RuntimeError, "missing a base table"):
+                prepare_playerbots(root, {"mysqlPort": 3307}, incomplete)
+            self.assertFalse(any("DROP TABLE" in call for call in calls))
+            migration.write_text("DELETE FROM bot WHERE id=1;")
+            def mismatched(sql):
+                if "SELECT name,hash" in sql:
+                    return "applied.sql\t" + "0" * 40
+                return mysql(sql)
+            with self.assertRaisesRegex(RuntimeError, "history does not match"):
+                prepare_playerbots(root, {"mysqlPort": 3307}, mismatched)
+
 
 
 if __name__ == "__main__":
