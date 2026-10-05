@@ -77,7 +77,32 @@ def prepare_playerbots(root, config, mysql):
             raise RuntimeError("Unsupported world/characters database for SQUID Playerbots.")
         schemas[kind] = schema
     existing_playerbots = set(mysql("SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA='acore_playerbots';").splitlines())
-    imported_playerbots = bool(existing_playerbots - {"updates", "updates_include", "version_db_playerbots", "coa_squid_migrations"})
+    data_tables = existing_playerbots - {"updates", "updates_include", "version_db_playerbots", "coa_squid_migrations", "coa_bots_installed"}
+    installer_history = set()
+    if "coa_bots_installed" in existing_playerbots:
+        for name in mysql("SELECT file FROM `acore_playerbots`.coa_bots_installed;").splitlines():
+            normalized = re.sub(r"/+", "/", name.replace("\\", "/")).strip("/")
+            if normalized.lower().endswith(".sql"):
+                installer_history.add(normalized)
+    histories, ledgers, tables = {}, {}, {}
+    for kind, schema in schemas.items():
+        tables[kind] = existing_playerbots if kind == "playerbots" else set(mysql(f"SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA='{schema}';").splitlines())
+        history = {}
+        if "updates" in tables[kind]:
+            for row in mysql(f"SELECT name,hash FROM `{schema}`.updates;").splitlines():
+                name, digest = row.split("\t", 1)
+                history[name] = digest.lower()
+        histories[kind] = history
+        ledgers[kind] = {}
+        if "coa_squid_migrations" in tables[kind]:
+            for row in mysql(f"SELECT path,sha256 FROM `{schema}`.coa_squid_migrations;").splitlines():
+                name, digest = row.split("\t", 1)
+                ledgers[kind][name] = digest
+    if data_tables and not (installer_history or histories["playerbots"] or ledgers["playerbots"]):
+        for table in data_tables:
+            quoted = table.replace("`", "``")
+            if mysql(f"SELECT EXISTS(SELECT 1 FROM `acore_playerbots`.`{quoted}` LIMIT 1);").strip() == "1":
+                raise RuntimeError("Existing SQUID data has no recorded installation history. Repair the imported database history before continuing; no SQL was applied.")
     mysql("CREATE DATABASE IF NOT EXISTS acore_playerbots CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;")
     # Use the repack's existing application account; do not create another password.
     for host in ("localhost", "127.0.0.1"):
@@ -95,16 +120,8 @@ def prepare_playerbots(root, config, mysql):
                        "Playerbots.Updates.EnableDatabases": "0"})
     for kind, schema in schemas.items():
         mysql(f"CREATE TABLE IF NOT EXISTS `{schema}`.coa_squid_migrations (path VARCHAR(240) PRIMARY KEY, sha256 CHAR(64) NOT NULL);")
-        history = {}
-        has_history = mysql(f"SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA='{schema}' AND TABLE_NAME='updates';").strip() == "1"
-        if has_history:
-            for row in mysql(f"SELECT name,hash FROM `{schema}`.updates;").splitlines():
-                name, digest = row.split("\t", 1)
-                history[name] = digest.lower()
-        recorded = {}
-        for row in mysql(f"SELECT path,sha256 FROM `{schema}`.coa_squid_migrations;").splitlines():
-            name, digest = row.split("\t")
-            recorded[name] = digest
+        history = histories[kind]
+        recorded = ledgers[kind]
         for stage in ("base", "updates", "custom"):
             for source in sorted((sql_root / kind / stage).glob("*.sql")):
                 relative = source.relative_to(sql_root).as_posix()
@@ -114,12 +131,24 @@ def prepare_playerbots(root, config, mysql):
                 if relative in recorded:
                     if recorded[relative] != digest:
                         raise RuntimeError("A previously applied SQUID database migration changed: " + relative)
+                    if stage != "base":
+                        continue
+                ledger_sql = "" if relative in recorded else f"INSERT INTO `{schema}`.coa_squid_migrations VALUES ('{relative}','{digest}');"
+                if stage == "base":
+                    definitions = set(re.findall(r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?`?([A-Za-z0-9_]+)`?", source.read_text(encoding="utf-8-sig"), re.I))
+                    present = definitions & tables[kind]
+                    if present and present != definitions:
+                        raise RuntimeError("SQUID base file has only some of its tables. Repair the incomplete database before continuing: " + relative)
+                    if not definitions:
+                        raise RuntimeError("SQUID base file has no recognizable table definitions; repair is required: " + relative)
+                    if present == definitions:
+                        if ledger_sql:
+                            mysql(ledger_sql)
+                        continue
+                    mysql(f"USE `{schema}`;\n" + source.read_text(encoding="utf-8-sig") + "\n" + ledger_sql)
+                    tables[kind].update(definitions)
                     continue
-                ledger_sql = f"INSERT INTO `{schema}`.coa_squid_migrations VALUES ('{relative}','{digest}');"
-                if kind == "playerbots" and stage == "base" and imported_playerbots:
-                    definitions = re.findall(r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?`?([A-Za-z0-9_]+)`?", source.read_text(encoding="utf-8-sig"), re.I)
-                    if any(table not in existing_playerbots for table in definitions):
-                        raise RuntimeError("An existing SQUID database is missing a base table; refusing destructive base imports: " + relative)
+                if any(name == relative or name.endswith("/" + relative) for name in installer_history):
                     mysql(ledger_sql)
                     continue
                 if source.name in history:

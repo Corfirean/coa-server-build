@@ -31,9 +31,13 @@ The launcher rejects configurations that enable both bot systems,
 including starts from batch files. It provisions `acore_playerbots` using the existing repack credentials
 and imports the module's shipped SQL before the first world start. Applied files are recorded in each
 database's `coa_squid_migrations` table and never repeated; a changed applied migration stops startup.
-On imported installations, existing `updates` entries seed that ledger after SHA-1 validation.
-Existing Playerbots tables are never dropped by base SQL: complete bases are adopted, incomplete bases fail
-with an explicit repair error. This preserves user data instead of rebuilding an imported database.
+On imported installations, the installer ledger `acore_playerbots.coa_bots_installed` is read for all target
+databases, with Windows paths and MySQL batch escaping normalized. Existing `updates` entries also seed
+the ledger after SHA-1 validation. Playerbots data without either upstream history or Manager history stops
+before any SQL changes and requests history repair. The installer's `complete` marker alone is insufficient.
+For each base SQL file in Playerbots, world and characters: adopt when all defined tables exist, execute
+when none exist, and stop with a repair error when only some exist. Existing tables are never dropped
+by base imports. New base files can therefore be applied without rebuilding old tables.
 The upstream module source and SQL are copied unchanged. Only the packaged default master switch is disabled.
 
 `scripts/manage.py` is the launcher from the published base package (SHA256
