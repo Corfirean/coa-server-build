@@ -2,10 +2,20 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+import os
+import subprocess
+import sys
 from squid_playerbots import validate_bots, prepare_playerbots
 
 
 class IntegrationTests(unittest.TestCase):
+    @unittest.skipUnless(os.name == "nt", "The repack launcher requires Windows")
+    def test_primary_launcher_loads_its_helper_in_isolated_python(self):
+        launcher = Path(os.environ.get('COA_LAUNCHER_TEST_SCRIPT', Path(__file__).with_name('manage.py')))
+        code = "import runpy,sys;from pathlib import Path;runpy.run_path(sys.argv[1]);import squid_playerbots;assert Path(squid_playerbots.__file__).parent == Path(sys.argv[1]).parent"
+        result = subprocess.run([sys.executable, '-I', '-c', code, str(launcher)], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_manual_conflict_and_missing_or_invalid_key(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
