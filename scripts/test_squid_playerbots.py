@@ -5,10 +5,53 @@ import unittest
 import os
 import subprocess
 import sys
+import runpy
+from types import SimpleNamespace
+from unittest.mock import patch
 from squid_playerbots import validate_bots, prepare_playerbots
 
 
 class IntegrationTests(unittest.TestCase):
+    @unittest.skipUnless(os.name == "nt", "The repack launcher requires Windows")
+    def test_squid_world_can_become_ready_after_the_normal_startup_deadline(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            modules = root / "Core/configs/modules"
+            modules.mkdir(parents=True)
+            (modules / "mod_coa_playerbots.conf").write_text("CoaBots.Enable = 0\n")
+            for enabled in (False, True):
+                (modules / "playerbots.conf").write_text("AiPlayerbot.Enabled = " + str(int(enabled)) + "\n")
+                launcher = runpy.run_path(str(Path(__file__).with_name("manage.py")))
+                state = {"time": 0, "spawned": False}
+                def sleep(seconds):
+                    state["time"] += seconds
+                def spawn(*args):
+                    state["spawned"] = True
+                launcher["start_world"].__globals__.update(
+                    ROOT=root, STATE=root / ".state", start_mysql=lambda config: None,
+                    ensure_free=lambda port: None, wait_relay=lambda: None, spawn=spawn,
+                    process=lambda name: state["spawned"] if name in ("world", "supervisor") else None,
+                    ready=lambda name, port: state["time"] >= 200,
+                    time=SimpleNamespace(monotonic=lambda: state["time"], sleep=sleep))
+                with patch("squid_playerbots.prepare_playerbots"):
+                    if enabled:
+                        launcher["start_world"]({"worldPort": 1, "raPort": 2}, 0)
+                        self.assertEqual(state["time"], 200)
+                    else:
+                        with self.assertRaisesRegex(RuntimeError, "still starting"):
+                            launcher["start_world"]({"worldPort": 1, "raPort": 2}, 0)
+
+    @unittest.skipUnless(os.name == "nt", "The repack launcher requires Windows")
+    def test_large_import_does_not_use_the_normal_database_command_deadline(self):
+        launcher = runpy.run_path(str(Path(__file__).with_name("manage.py")))
+        with patch("subprocess.run", return_value=SimpleNamespace(returncode=0, stdout=b"")) as execute:
+            launcher["mysql"]("SELECT 1;")
+            self.assertEqual(execute.call_args.kwargs["timeout"], 90)
+            launcher["mysql"]("x" * (1024 * 1024 + 1))
+            self.assertEqual(execute.call_args.kwargs["timeout"], 900)
+            launcher["mysql"](admin="ping")
+            self.assertEqual(execute.call_args.kwargs["timeout"], 90)
+
     @unittest.skipUnless(os.name == "nt", "The repack launcher requires Windows")
     def test_primary_launcher_loads_its_helper_in_isolated_python(self):
         launcher = Path(os.environ.get('COA_LAUNCHER_TEST_SCRIPT', Path(__file__).with_name('manage.py')))

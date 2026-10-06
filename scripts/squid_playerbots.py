@@ -41,6 +41,11 @@ def validate_bots(root):
         raise RuntimeError("CoA Companions and SQUID Playerbots cannot both be enabled. Disable one bot module in Modules or its config.")
 
 
+def startup_timeout(root):
+    path, values = module_options(Path(root), "playerbots.conf")
+    return 1500 if path.exists() and enabled(values, "AiPlayerbot.Enabled") else 180
+
+
 def set_options(path, values):
     text = path.read_text(encoding="utf-8-sig")
     for key, value in values.items():
