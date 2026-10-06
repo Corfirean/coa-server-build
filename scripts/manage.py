@@ -337,12 +337,13 @@ def start_auth(config):
 
 def start_world(config, offset):
     start_mysql(config)
-    from squid_playerbots import validate_bots, prepare_playerbots
+    from squid_playerbots import validate_bots, prepare_playerbots, startup_timeout
     validate_bots(ROOT)
+    seconds = startup_timeout(ROOT)
     if process("world"):
         if not process("supervisor"):
             raise RuntimeError("Worldserver has no repack supervisor. Use Stop_All_Server.bat before restarting it.")
-        wait_ready("world", config["worldPort"])
+        wait_ready("world", config["worldPort"], seconds)
         wait_relay()
         print("Worldserver and bug-report relay are already running.", flush=True)
         return
@@ -362,8 +363,8 @@ def start_world(config, offset):
         if not process("supervisor"):
             raise RuntimeError("World startup failed; check Core/Logs/supervisor.log.")
         time.sleep(0.25)
-    wait_ready("world", config["worldPort"])
-    wait_ready("world", config["raPort"])
+    wait_ready("world", config["worldPort"], seconds)
+    wait_ready("world", config["raPort"], seconds)
     wait_relay()
     print("Worldserver and automatic bug reporting are ready.", flush=True)
 
