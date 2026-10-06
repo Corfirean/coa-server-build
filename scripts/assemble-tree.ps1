@@ -7,7 +7,8 @@ param(
     [string] $CoreSha = "unknown",
     [string] $BotsSha = "unknown",
     [string] $ScalingSha = "unknown",
-    [string] $SquidSha = "unknown"
+    [string] $SquidSha = "unknown",
+    [string] $SquidTag = ""
 )
 # Lays out the files of a release the way they sit in a server folder. Only shipped files: no configs the
 # server owner edits (those are merged by the Manager), no databases.
@@ -33,6 +34,9 @@ $squidConfig = "$Out/Core/configs/modules/playerbots.conf.dist"
 New-Item -ItemType Directory -Force -Path "$Out/Extras/SquidPlayerbots", "$Out/Scripts" | Out-Null
 Copy-Item "$Core/modules/mod-playerbots/data/sql" "$Out/Extras/SquidPlayerbots/sql" -Recurse -Force
 Copy-Item "$PSScriptRoot/manage.py", "$PSScriptRoot/squid_playerbots.py" "$Out/Scripts/" -Force
+@{ schema = 1; tag = $SquidTag; commit = $SquidSha } | ConvertTo-Json | Set-Content "$Out/Extras/SquidPlayerbots/release.json" -Encoding utf8NoBOM
+$settingsJson = "$Core/modules/mod-playerbots/conf/playerbots.conf.settings.json"
+if (Test-Path $settingsJson) { Copy-Item $settingsJson "$Out/Core/configs/modules/playerbots.conf.settings.json" -Force }
 Copy-Item "$Core/modules/mod-playerbots/LICENSE" "$Out/Licenses/mod-playerbots-LICENSE.txt" -Force
 # Every module reads configs/modules/<name>.conf. Ship an active copy of each .dist (created only when missing on
 # install/update, never overwritten) so a fresh server runs with the documented defaults instead of warnings.

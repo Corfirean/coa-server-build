@@ -19,11 +19,25 @@ and the archive parts (`*.tar.zst.NNN`, below GitHub's 2 GiB asset limit).
 * **promote** - manual. Copies `edge` to `stable`.
 * **sync-fork** - hourly. Mirrors upstream `main` into the fork and merges it into `coa-bots`; a conflict opens an issue.
 
-The `squid_ref` build input defaults to `coa`; the binary and package jobs use the same resolved commit.
-SQUID is disabled on fresh installs. The launcher rejects configurations that enable both bot systems,
+The `squid_ref` build input defaults to `latest-release`, selecting the highest stable numeric `v*` tag.
+Both jobs use its exact resolved commit; an explicit branch, tag or commit still overrides this.
+`Extras/SquidPlayerbots/release.json` records the tag and commit for the Manager and diagnostics.
+When the selected release supplies `conf/playerbots.conf.settings.json`, it is copied unchanged next to
+`playerbots.conf.dist`. The Manager accepts its format-1 settings/groups, including types, bounds, descriptions,
+`default` and the separate `default_if_missing`. Older releases without this file use the existing controls.
+SQUID is disabled on fresh installs. Its SQL is skipped entirely while `AiPlayerbot.Enabled` is off.
+This requires the matching core module-loader change before these launcher updates are released.
+The launcher rejects configurations that enable both bot systems,
 including starts from batch files. It provisions `acore_playerbots` using the existing repack credentials
 and imports the module's shipped SQL before the first world start. Applied files are recorded in each
 database's `coa_squid_migrations` table and never repeated; a changed applied migration stops startup.
+On imported installations, the installer ledger `acore_playerbots.coa_bots_installed` is read for all target
+databases, with Windows paths and MySQL batch escaping normalized. Existing `updates` entries also seed
+the ledger after SHA-1 validation. Playerbots data without either upstream history or Manager history stops
+before any SQL changes and requests history repair. The installer's `complete` marker alone is insufficient.
+For each base SQL file in Playerbots, world and characters: adopt when all defined tables exist, execute
+when none exist, and stop with a repair error when only some exist. Existing tables are never dropped
+by base imports. New base files can therefore be applied without rebuilding old tables.
 The upstream module source and SQL are copied unchanged. Only the packaged default master switch is disabled.
 
 `scripts/manage.py` is the launcher from the published base package (SHA256

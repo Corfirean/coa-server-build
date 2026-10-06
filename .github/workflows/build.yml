@@ -19,8 +19,8 @@ on:
         description: mod-coa-content-scaling ref (branch, tag or SHA)
         default: main
       squid_ref:
-        description: SQUID Playerbots ref (branch, tag or SHA)
-        default: coa
+        description: 'SQUID source: latest-release selects the newest stable v* tag; explicit refs override'
+        default: latest-release
       manager_ref:
         description: Manager release-tool ref (must support release schema validation)
         default: master
@@ -39,7 +39,7 @@ jobs:
       core_ref: ${{ inputs.core_ref || 'coa-bots' }}
       bots_ref: ${{ inputs.bots_ref || 'master' }}
       scaling_ref: ${{ inputs.scaling_ref || 'main' }}
-      squid_ref: ${{ inputs.squid_ref || 'coa' }}
+      squid_ref: ${{ inputs.squid_ref || 'latest-release' }}
 
   package:
     needs: binaries
@@ -48,6 +48,7 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       SQUID_SHA: ${{ needs.binaries.outputs.squid_sha }}
+      SQUID_TAG: ${{ needs.binaries.outputs.squid_tag }}
       CORE_SHA: ${{ needs.binaries.outputs.core_sha }}
       BOTS_SHA: ${{ needs.binaries.outputs.bots_sha }}
       SCALING_SHA: ${{ needs.binaries.outputs.scaling_sha }}
@@ -104,7 +105,7 @@ jobs:
           path: _binaries
       - name: Assemble the release tree
         shell: pwsh
-        run: ./scripts/assemble-tree.ps1 -Binaries _binaries -Core _core -Bots _bots -Out _tree -Manager _manager -CoreSha $env:CORE_SHA -BotsSha $env:BOTS_SHA -ScalingSha $env:SCALING_SHA -SquidSha $env:SQUID_SHA
+        run: ./scripts/assemble-tree.ps1 -Binaries _binaries -Core _core -Bots _bots -Out _tree -Manager _manager -CoreSha $env:CORE_SHA -BotsSha $env:BOTS_SHA -ScalingSha $env:SCALING_SHA -SquidSha $env:SQUID_SHA -SquidTag $env:SQUID_TAG
       - name: Fetch the signed base package for database acceptance
         shell: pwsh
         run: |
