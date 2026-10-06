@@ -292,8 +292,10 @@ def mysql(sql=None, admin=None):
     exe = ROOT / ("mysql/bin/mysqladmin.exe" if admin else "mysql/bin/mysql.exe")
     arguments = [str(exe), "--defaults-file=" + str(ROOT / "mysql/admin-client.ini")]
     arguments += [admin] if admin else ["--batch", "--skip-column-names"]
-    result = subprocess.run(arguments, input=sql.encode("utf-8") if sql else None,
-                            capture_output=True, timeout=90, creationflags=HIDDEN)
+    payload = sql.encode("utf-8") if sql else None
+    timeout = 900 if payload and len(payload) > 1024 * 1024 else 90
+    result = subprocess.run(arguments, input=payload,
+                            capture_output=True, timeout=timeout, creationflags=HIDDEN)
     if result.returncode:
         raise RuntimeError("The repack database command failed; check mysql/logs/mysql-error.log.")
     return result.stdout.decode("utf-8").strip()

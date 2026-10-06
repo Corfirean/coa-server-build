@@ -5,10 +5,24 @@ import unittest
 import os
 import subprocess
 import sys
+import runpy
+from types import SimpleNamespace
+from unittest.mock import patch
 from squid_playerbots import validate_bots, prepare_playerbots
 
 
 class IntegrationTests(unittest.TestCase):
+    @unittest.skipUnless(os.name == "nt", "The repack launcher requires Windows")
+    def test_large_import_does_not_use_the_normal_database_command_deadline(self):
+        launcher = runpy.run_path(str(Path(__file__).with_name("manage.py")))
+        with patch("subprocess.run", return_value=SimpleNamespace(returncode=0, stdout=b"")) as execute:
+            launcher["mysql"]("SELECT 1;")
+            self.assertEqual(execute.call_args.kwargs["timeout"], 90)
+            launcher["mysql"]("x" * (1024 * 1024 + 1))
+            self.assertEqual(execute.call_args.kwargs["timeout"], 900)
+            launcher["mysql"](admin="ping")
+            self.assertEqual(execute.call_args.kwargs["timeout"], 90)
+
     @unittest.skipUnless(os.name == "nt", "The repack launcher requires Windows")
     def test_primary_launcher_loads_its_helper_in_isolated_python(self):
         launcher = Path(os.environ.get('COA_LAUNCHER_TEST_SCRIPT', Path(__file__).with_name('manage.py')))
