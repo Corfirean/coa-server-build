@@ -1,0 +1,110 @@
+name: build-linux
+# EXPERIMENTAL. Compiles the fork + bots module on Linux inside Docker and publishes an UNSIGNED update package to the
+# "linux-unsigned" prerelease. This workflow has no access to the signing key: the package is signed and promoted
+# separately by the repository owner. Windows releases (edge, stable, base) are not touched.
+on:
+  workflow_dispatch:
+    inputs:
+      core_ref:
+        description: Fork ref (branch, tag or SHA)
+        default: coa-bots
+      bots_ref:
+        description: mod-coa-playerbots ref (branch, tag or SHA)
+        default: master
+      scaling_ref:
+        description: mod-coa-content-scaling ref (branch, tag or SHA)
+        default: main
+
+concurrency:
+  group: build-linux
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Manager tools (coa-release)
+        uses: actions/checkout@v7
+        with:
+          repository: Corfirean/coa-server-manager
+          path: _manager
+      - name: Core sources
+        uses: actions/checkout@v7
+        with:
+          repository: Corfirean/azerothcore-wotlk-coa
+          ref: ${{ inputs.core_ref }}
+          path: _core
+          fetch-depth: 0
+      - name: Bots module
+        uses: actions/checkout@v7
+        with:
+          repository: Corfirean/mod-coa-playerbots
+          ref: ${{ inputs.bots_ref }}
+          path: _bots
+      - name: Content Scaling module
+        uses: actions/checkout@v7
+        with:
+          repository: Corfirean/mod-coa-content-scaling
+          ref: ${{ inputs.scaling_ref }}
+          path: _scaling
+      - name: Record the exact commits
+        run: |
+          echo "CORE_SHA=$(git -C _core rev-parse HEAD)" >> "$GITHUB_ENV"
+          echo "BOTS_SHA=$(git -C _bots rev-parse HEAD)" >> "$GITHUB_ENV"
+          echo "SCALING_SHA=$(git -C _scaling rev-parse HEAD)" >> "$GITHUB_ENV"
+      - name: Place the modules where the core expects them
+        run: |
+          dst=_core/modules/mod-coa-playerbots
+          mkdir -p "$dst/conf"
+          cp -r _bots/module/src "$dst/src"
+          cp _bots/module/conf/* "$dst/conf/"
+          # Same as the Windows job. Content Scaling is a module repository of its own and its TBC and WotLK content
+          # packs are modules of their own (in content-packs/); they must stand next to it in modules/.
+          mkdir -p _core/modules/mod-coa-content-scaling
+          tar -C _scaling --exclude=.git --exclude=artifacts --exclude=docs --exclude=tools -cf - . | tar -C _core/modules/mod-coa-content-scaling -xf -
+          for pack in mod-coa-tbc-content mod-coa-wotlk-content; do
+            cp -r "_scaling/content-packs/$pack" "_core/modules/$pack"
+          done
+      - uses: docker/setup-buildx-action@v3
+      - name: Compile in Docker
+        run: docker buildx build -f docker/Dockerfile.linux --target binaries --output type=local,dest=_binaries _core
+      - name: Smoke test the binaries (in a clean Ubuntu 26.04 with only the runtime libraries)
+        run: |
+          file _binaries/worldserver _binaries/authserver
+          docker run --rm -v "$PWD/_binaries:/b:ro" ubuntu:26.04 sh -c \
+            'apt-get update -qq && apt-get install -y -qq --no-install-recommends libmysqlclient24 libicu78 libncurses6 libreadline8t64 >/dev/null && /b/worldserver --version && /b/authserver --version'
+      - name: Build coa-release
+        run: cargo build --release -p coa-release --manifest-path _manager/Cargo.toml
+      - name: Assemble the release tree
+        run: ./scripts/assemble-tree.sh --binaries _binaries --core _core --bots _bots --out _tree --manager _manager --core-sha "$CORE_SHA" --bots-sha "$BOTS_SHA" --scaling-sha "$SCALING_SHA"
+      - name: Pack (every file, there is no Linux base package yet)
+        run: |
+          version="0.$(date +%y%m%d).${{ github.run_number }}"
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          echo '{"schema":1,"kind":"base","version":"0.0.0","core":{"commit":null},"builtAt":"none","minManagerVersion":"0.1.0","files":[]}' > base-manifest.json
+          _manager/target/release/coa-release pack-update --tree _tree --base-manifest base-manifest.json --core _core --bots _bots --out _out \
+            --version "$version" --core-commit "$CORE_SHA" --bots-commit "$BOTS_SHA"
+      - name: Smoke test the final archive, configuration is read from the package layout
+        run: |
+          # Extract exactly what will be published, then start the server from it.
+          mkdir _extracted
+          cat _out/*.tar.zst.* | zstd -dc | tar -x -C _extracted
+          ./scripts/smoke-test-linux.sh _extracted
+      - name: Publish to the linux-unsigned release
+        run: |
+          gh release view linux-unsigned >/dev/null 2>&1 || gh release create linux-unsigned --prerelease --title "Linux builds (unsigned, experimental)" --notes "Not signed. Not usable by the Manager until signed."
+          old=$(gh release view linux-unsigned --json assets --jq '.assets[].name')
+          for f in _out/*; do gh release upload linux-unsigned "$f" --clobber; done
+          for n in $old; do [ -f "_out/$n" ] || gh release delete-asset linux-unsigned "$n" --yes; done
+          gh release edit linux-unsigned --notes "Version $VERSION
+          core $CORE_SHA
+          bots $BOTS_SHA
+          scaling $SCALING_SHA
+          UNSIGNED: the Manager refuses it until it is signed."
