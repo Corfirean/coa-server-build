@@ -169,8 +169,10 @@ jobs:
         run: |
           gh release view linux-unsigned >/dev/null 2>&1 || gh release create linux-unsigned --prerelease --title "Linux builds (unsigned, experimental)" --notes "Not signed. Not usable by the Manager until signed."
           old=$(gh release view linux-unsigned --json assets --jq '.assets[].name')
-          for f in _out/*; do gh release upload linux-unsigned "$f" --clobber; done
-          for n in $old; do [ -f "_out/$n" ] || gh release delete-asset linux-unsigned "$n" --yes; done
+          # GitHub answers an upload now and then with a 500; the upload is repeatable, so try again.
+          retry() { for i in 1 2 3 4; do "$@" && return 0; sleep $((i * 15)); done; return 1; }
+          for f in _out/*; do retry gh release upload linux-unsigned "$f" --clobber; done
+          for n in $old; do [ -f "_out/$n" ] || retry gh release delete-asset linux-unsigned "$n" --yes; done
           gh release edit linux-unsigned --notes "Version $VERSION
           core $CORE_SHA
           bots $BOTS_SHA
