@@ -136,8 +136,10 @@ jobs:
         run: |
           tool=_manager/target/release/coa-release
           "$tool" extract-schema-base --package _schema-base --fixture coa-schema-fixture-build
-          # The same import the Windows job does with its bundled Python: the launcher must load its helper.
-          python3 -I -c 'import runpy,sys; sys.path.insert(0, sys.argv[1]); runpy.run_path(sys.argv[1] + "/manage.py"); import squid_playerbots' "$PWD/_tree/Scripts"
+          # The launcher (manage.py) is a Windows program, so it can only be compiled here; its SQUID helper is plain Python and
+          # must load, as it does for the Windows job.
+          python3 -I -m py_compile _tree/Scripts/manage.py _tree/Scripts/squid_playerbots.py
+          PYTHONDONTWRITEBYTECODE=1 python3 -I -c 'import sys; sys.path.insert(0, sys.argv[1]); import squid_playerbots' "$PWD/_tree/Scripts"
           "$tool" schema-contract --repack coa-schema-fixture-build --tree _tree --core _core --bots _bots --repairs database-repairs
           test -f _tree/Scripts/database-schema.json
           # The fixture now holds the databases of this release with every migration applied: they are the baseline.
