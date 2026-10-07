@@ -165,6 +165,13 @@ jobs:
           test -s _extracted/Database/baseline/world.sql.zst
           test -s _extracted/Scripts/database-schema.json
           ./scripts/smoke-test-linux.sh _extracted
+      - name: Keep the package as a workflow artifact too
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-package
+          path: _out
+          retention-days: 7
+          compression-level: 0
       - name: Publish to the linux-unsigned release
         run: |
           gh release view linux-unsigned >/dev/null 2>&1 || gh release create linux-unsigned --prerelease --title "Linux builds (unsigned, experimental)" --notes "Not signed. Not usable by the Manager until signed."
