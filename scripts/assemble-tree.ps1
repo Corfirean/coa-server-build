@@ -44,6 +44,10 @@ Get-ChildItem "$Out/Core/configs/modules/*.conf.dist" | ForEach-Object {
     Copy-Item $_.FullName ($_.FullName -replace '\.dist$', '') -Force
 }
 Copy-Item "$Bots/dist/reference/*" "$Out/Core/reference/" -Recurse -Force
+if (Test-Path "$Core/modules/mod-coa-custom-races/data/dbc") {
+    New-Item -ItemType Directory -Force -Path "$Out/Data/dbc_races" | Out-Null
+    Copy-Item "$Core/modules/mod-coa-custom-races/data/dbc/*" "$Out/Data/dbc_races/" -Force
+}
 New-Item -ItemType Directory -Force -Path "$Out/Data/dbc" | Out-Null
 Copy-Item "$Bots/reference/coa_missing_equipment_displays.txt" "$Out/Data/dbc/" -Force
 Copy-Item "$Bots/addon/CoABotUI" "$Out/Extras/CoABotUI" -Recurse -Force
@@ -66,6 +70,8 @@ Server binaries (Core\worldserver.exe, Core\authserver.exe) were built from:
   scaling https://github.com/Corfirean/mod-coa-content-scaling commit $ScalingSha (with its TBC and WotLK content packs)
 The core keeps its upstream licences (GPL-2.0-or-later for the MaNGOS-derived parts, AGPL-3.0 for AzerothCore-original
 files); the bots module and CoA Server Manager are AGPL-3.0; the Content Scaling module is GPL-2.0. The complete corresponding source is at the links above.
+
+Custom races integration includes contributions from ilusixn and Kalibros / Esteria.
 
 The bundled MySQL is GPL-2.0 (see MySQL-LICENSE.txt in this folder).
 

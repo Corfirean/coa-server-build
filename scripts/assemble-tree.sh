@@ -33,6 +33,10 @@ for f in "$core"/src/server/coa/conf/*.conf.dist; do cp "$f" "$out/Core/configs/
 # Only the .dist files are shipped: coa-release leaves active .conf files out of the package, and the Manager creates
 # them from the .dist ones.
 cp -r "$bots"/dist/reference/. "$out/Core/reference/"
+if [ -d "$core/modules/mod-coa-custom-races/data/dbc" ]; then
+    mkdir -p "$out/Data/dbc_races"
+    cp -r "$core/modules/mod-coa-custom-races/data/dbc/"* "$out/Data/dbc_races/"
+fi
 cp -r "$bots/addon/CoABotUI" "$out/Extras/CoABotUI"
 # The offline bot factory: creates fully equipped bots straight in the database while the server is stopped.
 cp "$bots/tools/offline_bot_factory.py" "$out/Extras/CoABotTools/"
@@ -51,6 +55,8 @@ Server binaries (Core/worldserver, Core/authserver) were built from:
   scaling https://github.com/Corfirean/mod-coa-content-scaling commit $scaling_sha (with its TBC and WotLK content packs)
 The core keeps its upstream licences (GPL-2.0-or-later for the MaNGOS-derived parts, AGPL-3.0 for AzerothCore-original
 files); the bots module and CoA Server Manager are AGPL-3.0; the Content Scaling module is GPL-2.0. The complete corresponding source is at the links above.
+
+Custom races integration includes contributions from ilusixn and Kalibros / Esteria.
 
 The game data in the Data folder (dbc, maps, vmaps, mmaps) comes from the discontinued Ascension "Conquest of Azeroth"
 realm client and is not covered by any of the licences above.
