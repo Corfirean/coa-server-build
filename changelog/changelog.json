@@ -2,6 +2,115 @@
   "schema": 1,
   "releases": [
     {
+      "id": "2026-10-08",
+      "date": "2026-10-08",
+      "versions": {
+        "server": "0.261008.27",
+        "manager": "0.6.7"
+      },
+      "entries": [
+        {
+          "id": "manager:20261008-backup-folder-and-bot-choices.md",
+          "source": "manager",
+          "repo": "Corfirean/coa-server-manager",
+          "date": "2026-10-08",
+          "area": "manager",
+          "type": "added",
+          "audience": "admins",
+          "title": "Choose where backups are stored, for example on another drive",
+          "body": "Backups can now live in any folder outside the server folder. Existing backups stay listed. A backups folder that you moved and linked from the old place also works again for updates."
+        },
+        {
+          "id": "manager:20261008-squid-dashboard-tab.md",
+          "source": "manager",
+          "repo": "Corfirean/coa-server-manager",
+          "date": "2026-10-08",
+          "area": "manager",
+          "type": "added",
+          "audience": "admins",
+          "title": "A Dashboard tab shows what the SQUID bots are doing",
+          "body": "With SQUID Playerbots on, the Dashboard tab downloads the dashboard release that matches your bots, starts it on this computer and shows it inside the Manager."
+        },
+        {
+          "id": "manager:20261008-start-after-update-options.md",
+          "source": "manager",
+          "repo": "Corfirean/coa-server-manager",
+          "date": "2026-10-08",
+          "area": "manager",
+          "type": "added",
+          "audience": "admins",
+          "title": "A stopped server stays stopped after an update, unless you ask it to start",
+          "body": "Updating no longer leaves a server running that was stopped before. Settings has a switch to start it afterwards, and the client card has one to open the game after a client update."
+        },
+        {
+          "id": "manager:20261008-bot-settings-drop-down.md",
+          "source": "manager",
+          "repo": "Corfirean/coa-server-manager",
+          "date": "2026-10-08",
+          "area": "manager",
+          "type": "changed",
+          "audience": "admins",
+          "title": "Bot settings with a fixed list of values show a drop-down",
+          "body": "SQUID bots 1.9 describes the chat language as a list of languages. The Manager shows it as a drop-down with names instead of a bare number."
+        },
+        {
+          "id": "manager:20261008-dashboard-delivery.md",
+          "source": "manager",
+          "repo": "Corfirean/coa-server-manager",
+          "date": "2026-10-08",
+          "area": "manager",
+          "type": "fixed",
+          "audience": "admins",
+          "title": "The bot dashboard loads completely and can be opened in the browser",
+          "body": "The dashboard no longer fails on large pages, starts again after a crash left its history files empty, and its Open in the browser button works. With both realms started together the realm drop-down is hidden."
+        },
+        {
+          "id": "manager:20261008-hide-squid-bot-accounts.md",
+          "source": "manager",
+          "repo": "Corfirean/coa-server-manager",
+          "date": "2026-10-08",
+          "area": "manager",
+          "type": "fixed",
+          "audience": "admins",
+          "title": "Accounts of the SQUID bots are hidden from the Accounts list",
+          "body": "The RNDBOT accounts that hold the random bots no longer fill the Accounts tab, and they cannot be renamed or deleted from there."
+        },
+        {
+          "id": "manager:20261008-update-check-survives-damaged-state.md",
+          "source": "manager",
+          "repo": "Corfirean/coa-server-manager",
+          "date": "2026-10-08",
+          "area": "manager",
+          "type": "fixed",
+          "audience": "admins",
+          "title": "Checking for updates no longer fails with \"Something went wrong\" after a crash",
+          "body": "A crash or power loss could leave a damaged status file that made every database start fail. The Manager now removes such files itself, still compares the files when the database is unavailable, and shows the real reason."
+        },
+        {
+          "id": "manager:20261008-wildcard-repair-checksum.md",
+          "source": "manager",
+          "repo": "Corfirean/coa-server-manager",
+          "date": "2026-10-08",
+          "area": "manager",
+          "type": "fixed",
+          "audience": "admins",
+          "title": "Server updates no longer stop with \"has a different checksum\" on the Wildcard repair",
+          "body": "Servers that applied one of the two published versions of the Wildcard table repair can now update to the other. Nothing in the database changes."
+        },
+        {
+          "id": "manager:20261008-world-server-from-coa-bots-folder.md",
+          "source": "manager",
+          "repo": "Corfirean/coa-server-manager",
+          "date": "2026-10-08",
+          "area": "manager",
+          "type": "fixed",
+          "audience": "admins",
+          "title": "A world server started from the coa-bots folder is recognised",
+          "body": "The Manager no longer reports a port conflict when the world server runs from the coa-bots folder inside the server folder, and a failed update now says that undoing it can take several minutes."
+        }
+      ]
+    },
+    {
       "id": "2026-10-07",
       "date": "2026-10-07",
       "versions": {
