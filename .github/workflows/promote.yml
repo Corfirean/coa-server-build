@@ -1,6 +1,8 @@
 name: promote
+# Runs automatically after every successful nightly build (called from build.yml) and can be run by hand.
 on:
   workflow_dispatch:
+  workflow_call:
 concurrency:
   group: stable-promotion
   cancel-in-progress: false

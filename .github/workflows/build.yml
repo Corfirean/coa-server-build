@@ -198,3 +198,11 @@ jobs:
           gh release upload edge _channel/channel.json --clobber --repo $env:GITHUB_REPOSITORY
           if ($LASTEXITCODE) { throw 'Channel switch failed; the previous release remains available.' }
           gh release edit edge --notes "Version $env:VERSION; immutable release $tag" --repo $env:GITHUB_REPOSITORY
+
+  # The build only reaches this point after the Windows acceptance gate passed and edge was switched.
+  # promote re-verifies everything against the immutable release and then moves stable; any failure leaves stable untouched.
+  promote:
+    needs: package
+    uses: ./.github/workflows/promote.yml
+    permissions:
+      contents: write
