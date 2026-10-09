@@ -292,8 +292,10 @@ def mysql(sql=None, admin=None):
     exe = ROOT / ("mysql/bin/mysqladmin.exe" if admin else "mysql/bin/mysql.exe")
     arguments = [str(exe), "--defaults-file=" + str(ROOT / "mysql/admin-client.ini")]
     arguments += [admin] if admin else ["--batch", "--skip-column-names"]
-    result = subprocess.run(arguments, input=sql.encode("utf-8") if sql else None,
-                            capture_output=True, timeout=90, creationflags=HIDDEN)
+    payload = sql.encode("utf-8") if sql else None
+    timeout = 900 if payload and len(payload) > 1024 * 1024 else 90
+    result = subprocess.run(arguments, input=payload,
+                            capture_output=True, timeout=timeout, creationflags=HIDDEN)
     if result.returncode:
         raise RuntimeError("The repack database command failed; check mysql/logs/mysql-error.log.")
     return result.stdout.decode("utf-8").strip()
@@ -335,12 +337,13 @@ def start_auth(config):
 
 def start_world(config, offset):
     start_mysql(config)
-    from squid_playerbots import validate_bots, prepare_playerbots
+    from squid_playerbots import validate_bots, prepare_playerbots, startup_timeout
     validate_bots(ROOT)
+    seconds = startup_timeout(ROOT)
     if process("world"):
         if not process("supervisor"):
             raise RuntimeError("Worldserver has no repack supervisor. Use Stop_All_Server.bat before restarting it.")
-        wait_ready("world", config["worldPort"])
+        wait_ready("world", config["worldPort"], seconds)
         wait_relay()
         print("Worldserver and bug-report relay are already running.", flush=True)
         return
@@ -360,8 +363,8 @@ def start_world(config, offset):
         if not process("supervisor"):
             raise RuntimeError("World startup failed; check Core/Logs/supervisor.log.")
         time.sleep(0.25)
-    wait_ready("world", config["worldPort"])
-    wait_ready("world", config["raPort"])
+    wait_ready("world", config["worldPort"], seconds)
+    wait_ready("world", config["raPort"], seconds)
     wait_relay()
     print("Worldserver and automatic bug reporting are ready.", flush=True)
 

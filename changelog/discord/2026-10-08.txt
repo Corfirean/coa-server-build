@@ -1,0 +1,16 @@
+**Manager** (for server owners)
+- Added: Choose where backups are stored, for example on another drive. Backups can now live in any folder outside the server folder. Existing backups stay listed. A backups folder that you moved and linked from the old place also works again for updates.
+- Added: A Dashboard tab shows what the SQUID bots are doing. With SQUID Playerbots on, the Dashboard tab downloads the dashboard release that matches your bots, starts it on this computer and shows it inside the Manager.
+- Added: A stopped server stays stopped after an update, unless you ask it to start. Updating no longer leaves a server running that was stopped before. Settings has a switch to start it afterwards, and the client card has one to open the game after a client update.
+- Changed: Bot settings with a fixed list of values show a drop-down. SQUID bots 1.9 describes the chat language as a list of languages. The Manager shows it as a drop-down with names instead of a bare number.
+- Fixed: The bot dashboard loads completely and can be opened in the browser. The dashboard no longer fails on large pages, starts again after a crash left its history files empty, and its Open in the browser button works. With both realms started together the realm drop-down is hidden.
+- Fixed: Accounts of the SQUID bots are hidden from the Accounts list. The RNDBOT accounts that hold the random bots no longer fill the Accounts tab, and they cannot be renamed or deleted from there.
+- Fixed: Checking for updates no longer fails with "Something went wrong" after a crash. A crash or power loss could leave a damaged status file that made every database start fail. The Manager now removes such files itself, still compares the files when the database is unavailable, and shows the real reason.
+
+----- next message -----
+
+**Update 2026-10-08** (Server 0.261008.27 · Manager 0.6.7)
+
+**Manager** (for server owners) (cont.)
+- Fixed: Server updates no longer stop with "has a different checksum" on the Wildcard repair. Servers that applied one of the two published versions of the Wildcard table repair can now update to the other. Nothing in the database changes.
+- Fixed: A world server started from the coa-bots folder is recognised. The Manager no longer reports a port conflict when the world server runs from the coa-bots folder inside the server folder, and a failed update now says that undoing it can take several minutes.

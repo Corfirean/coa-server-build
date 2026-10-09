@@ -1,0 +1,10 @@
+**Update 2026-10-08-2** (Server 0.261008.27 · Manager 0.6.7)
+
+**Server**
+- Added: Random dungeons pay Dungeon Spoils, and the final boss a Mark of Triumph. Random Classic, Heroic and Mythic dungeon runs give Dungeon Spoils, and Callboard caches are paid from the Dungeon Diving dailies. Classic raids follow the Callboard release stage.
+- Fixed: You can queue for arenas from the PvP frame. The arena queue is available from the PvP frame again.
+- Fixed: Class fixes for Necromancer, Venomancer, Bloodmage, Pyromancer, Tinker and Guardian. Many abilities, minions, tooltips and forms that did not work as described now do, and the Tinker's Overcharge on a Shield Beacon no longer crashes the server.
+- Fixed: Quest markers and quest givers repaired in Westfall, Northshire, Mulgore and more. Missing quests and map markers are back in Westfall and Northshire, and several quests mark all their objectives on the map.
+
+**Server** (for server owners)
+- Changed: SQUID bots 1.9.1: PvP bots, rated arenas and a chat language setting. Bots can queue for battlegrounds and rated arenas, some bots play with High Risk or War Mode, and the language the bots chat in is a setting. Existing servers keep their own bot settings.

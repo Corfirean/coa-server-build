@@ -3,6 +3,83 @@
 Everything that changed for players and server owners across the CoA server, bots, Content Scaling, the Manager and the renderer, newest first.
 Written from the `changelog.d/` fragments of each repository (see `changelog/GUIDE.md`).
 
+## 2026-10-08-2 - Server 0.261008.27 · Manager 0.6.7
+
+### For players
+
+**Server**
+
+- Added: Random dungeons pay Dungeon Spoils, and the final boss a Mark of Triumph. Random Classic, Heroic and Mythic dungeon runs give Dungeon Spoils, and Callboard caches are paid from the Dungeon Diving dailies. Classic raids follow the Callboard release stage.
+- Fixed: You can queue for arenas from the PvP frame. The arena queue is available from the PvP frame again.
+- Fixed: Class fixes for Necromancer, Venomancer, Bloodmage, Pyromancer, Tinker and Guardian. Many abilities, minions, tooltips and forms that did not work as described now do, and the Tinker's Overcharge on a Shield Beacon no longer crashes the server.
+- Fixed: Quest markers and quest givers repaired in Westfall, Northshire, Mulgore and more. Missing quests and map markers are back in Westfall and Northshire, and several quests mark all their objectives on the map.
+
+### For server owners
+
+**Server**
+
+- Changed: SQUID bots 1.9.1: PvP bots, rated arenas and a chat language setting. Bots can queue for battlegrounds and rated arenas, some bots play with High Risk or War Mode, and the language the bots chat in is a setting. Existing servers keep their own bot settings.
+
+## 2026-10-08 - Server 0.261008.27 · Manager 0.6.7
+
+### For server owners
+
+**Manager**
+
+- Added: Choose where backups are stored, for example on another drive. Backups can now live in any folder outside the server folder. Existing backups stay listed. A backups folder that you moved and linked from the old place also works again for updates.
+- Added: A Dashboard tab shows what the SQUID bots are doing. With SQUID Playerbots on, the Dashboard tab downloads the dashboard release that matches your bots, starts it on this computer and shows it inside the Manager.
+- Added: A stopped server stays stopped after an update, unless you ask it to start. Updating no longer leaves a server running that was stopped before. Settings has a switch to start it afterwards, and the client card has one to open the game after a client update.
+- Changed: Bot settings with a fixed list of values show a drop-down. SQUID bots 1.9 describes the chat language as a list of languages. The Manager shows it as a drop-down with names instead of a bare number.
+- Fixed: The bot dashboard loads completely and can be opened in the browser. The dashboard no longer fails on large pages, starts again after a crash left its history files empty, and its Open in the browser button works. With both realms started together the realm drop-down is hidden.
+- Fixed: Accounts of the SQUID bots are hidden from the Accounts list. The RNDBOT accounts that hold the random bots no longer fill the Accounts tab, and they cannot be renamed or deleted from there.
+- Fixed: Checking for updates no longer fails with "Something went wrong" after a crash. A crash or power loss could leave a damaged status file that made every database start fail. The Manager now removes such files itself, still compares the files when the database is unavailable, and shows the real reason.
+- Fixed: Server updates no longer stop with "has a different checksum" on the Wildcard repair. Servers that applied one of the two published versions of the Wildcard table repair can now update to the other. Nothing in the database changes.
+- Fixed: A world server started from the coa-bots folder is recognised. The Manager no longer reports a port conflict when the world server runs from the coa-bots folder inside the server folder, and a failed update now says that undoing it can take several minutes.
+
+## 2026-10-07 - Server 0.261007.24 · Manager 0.6.6
+
+### For players
+
+**Server**
+
+- Fixed: The world server no longer crashes with many units close together. A line-of-sight check could write past the end of its work list and end the server process without a crash report (Windows error 0xC0000409). It now stops safely at the limit.
+
+### For server owners
+
+**Server**
+
+- Added: Experimental Linux server build. A Linux build of the server, compiled in Docker on Ubuntu 26.04, is published as an unsigned package for testing. The Manager cannot install it yet.
+- Changed: SquidBots builds follow the latest stable module release. Nightly builds select the latest stable release tag and pin its exact commit. Bundled release identifiers and settings metadata are supplied to the Manager.
+- Fixed: Interrupted SquidBots database imports require recovery before restarting. Base imports record a pending marker before SQL starts and clear it only after SQL and history recording succeed. A later start detects unfinished imports and requests recovery instead of accepting partially filled tables as complete.
+- Fixed: SquidBots preserves imported bot databases and skips SQL when disabled. Imported installer and update histories prevent SQL replay. Each base file preserves complete existing tables, creates entirely missing tables, and stops on partial structure. Existing bot data without history requires repair. Disabled SquidBots skips SQL.
+- Fixed: Disabled SquidBots no longer require their database to start the server. The server skips registering SquidBots when their master switch is off. Enabling or disabling the module takes effect after a world-server restart; upstream module sources remain unchanged.
+- Fixed: Large SQUID database imports no longer use the short query timeout. Initial imports larger than one megabyte receive up to fifteen minutes to finish. Normal database queries keep their existing deadline, and interrupted imports remain blocked until recovered.
+- Fixed: First SQUID startup has time to create its initial bot pool. The launcher waits longer for the world when SQUID is enabled. Slow initial bot creation no longer uses the three-minute readiness limit intended for ordinary restarts.
+
+**Server modules**
+
+- Changed: The Auction House Bot creates its own character when enabled
+
+**Manager**
+
+- Added: Imported SquidBots servers warn before replacing their original binary. Imports explain that the original launcher and updater check the server binary hash. Updating that binary requires an explicit choice to keep or replace it.
+- Added: Install a server from a package on Linux, running in Docker (experimental). Experimental. The Manager creates the database, imports the packaged baseline and starts the server in Docker containers. It needs a Linux server package and your own game data folder.
+- Added: SquidBots settings follow the options shipped by the module. New settings use the module's descriptions, groups, defaults and value limits while retaining existing translations. Unknown formats or invalid fields use built-in controls so the settings page remains available.
+- Added: SquidBots shows its bundled release and includes it in problem reports. The Bots and Modules pages and problem reports include the release identifiers. Imported repacks use their recorded bot revision; empty tags are hidden. The settings file's source commit is not presented as the build revision.
+- Added: The NPC Enchanter card explains how to place and remove the NPC. The card now shows the two commands: `.npc add 601015` where you stand, and `.npc delete` on the targeted NPC.
+- Added: One button collects all diagnostics, including crashes and Windows crash records. Report a problem collects logs, crash reports and small dumps, Windows crash records, update journals and the running server programs in one file, then shows its folder. Crashes without a server crash report are no longer missing.
+- Added: Problem reports go to the right project. Choose what the problem is about: Manager and other modules, CoA Companions, or SQUID Playerbots. The report opens in that project's GitHub page with the versions filled in. The bot system that is switched on is preselected.
+- Changed: The Auction House Bot card no longer asks for a character GUID. Turning the module and the seller on is enough: a server build with the automatic auction character creates its own account and character. The GUID field moved to the advanced settings. The buyer option hint no longer says it spends the auction character's gold.
+- Fixed: Server updates accept verified published migration variants without rerunning them. Signed updates can recognise known published checksums without changing your migration history. Interrupted or failed SQL still requires recovery before retrying.
+- Fixed: Server updates replace older launchers adapted by the Manager for Wildcard. Updates recognize the Manager’s own realm and import adjustments even when older metadata still records the original launcher. New server binaries receive their matching launcher; genuine custom edits still require your decision.
+- Fixed: Choose and remember the local network address friends use to connect. Select an adapter or custom IPv4 address when sharing on LAN. Your choice survives restarts and mode changes; unavailable addresses show a warning instead of silently switching adapters.
+- Fixed: Older server packages cannot replace a newer installation. Update checks stop offering stale packages after an update. To undo an update, use its recovery point instead of applying an older server package.
+- Fixed: Checking again no longer offers an already installed launcher update. The Manager recognizes its own launcher integration while still detecting user edits and changes in newer signed packages.
+- Fixed: Large SQUID database imports have more time to finish on first startup. The Manager allows up to 45 minutes when SQUID Playerbots is enabled, covering its initial database import and bot creation. Ordinary server startup and shutdown keep their existing deadlines.
+- Fixed: Update history conflicts are detected before server files change. Damaged update records block changes and remain visible. Recovery checks saved copies before restoring, and unfinished updates protect backups from deletion and cleanup.
+- Fixed: Pending database updates remain visible when the server version matches. SQL files are checked before replacing server files. Update and recovery attempts refresh their saved status, including errors. Backup deletion cannot race with an update.
+- Fixed: Diagnostic files with database checks stay readable after secrets are removed. Removing a line that mentioned a secret could break the JSON files in a diagnostic package. Secret values are now replaced instead, so the files stay valid.
+
 ## 2026-10-05-pending-features - Server 0.261005.22 · Manager 0.6.4
 
 ### For players
