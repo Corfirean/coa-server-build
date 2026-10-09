@@ -43,8 +43,8 @@ jobs:
 
   package:
     needs: binaries
-    runs-on: windows-latest
-    timeout-minutes: 90
+    runs-on: [self-hosted, Windows, X64, coa-update-acceptance]
+    timeout-minutes: 1440
     env:
       GH_TOKEN: ${{ github.token }}
       SQUID_SHA: ${{ needs.binaries.outputs.squid_sha }}
@@ -62,7 +62,7 @@ jobs:
           path: _manager
       - name: Build coa-release
         shell: pwsh
-        run: cargo build --release -p coa-release --manifest-path _manager/Cargo.toml
+        run: cargo build --release -p coa-release --locked --manifest-path _manager/Cargo.toml
       - name: Core sources at the exact commit (full history, SQL order comes from it)
         uses: actions/checkout@v7
         with:
@@ -112,6 +112,20 @@ jobs:
           gh release download base --pattern manifest.json --pattern manifest.json.sig --pattern '*.tar.zst.*' --dir _schema-base --repo $env:GITHUB_REPOSITORY
           if ($LASTEXITCODE) { throw "A signed base package is required for database acceptance." }
           Copy-Item _schema-base/manifest.json base-manifest.json
+      - name: Freeze previously published migrations
+        shell: pwsh
+        run: |
+          $tool = '_manager/target/release/coa-release.exe'
+          & $tool resolve --source https://github.com/Corfirean/coa-server-build/releases/download/stable --out _previous-manifest.json
+          if ($LASTEXITCODE) { throw 'Cannot pin the previous stable release.' }
+          $previous = (Get-Content _previous-manifest.json -Raw | ConvertFrom-Json).version
+          gh release download "server-$previous" --dir _previous --repo $env:GITHUB_REPOSITORY
+          if ($LASTEXITCODE) { throw 'Cannot download the immutable previous release.' }
+          if (Test-Path _previous/migration-registry.zip) {
+            Expand-Archive _previous/migration-registry.zip -DestinationPath migration-registry -Force
+          }
+          & $tool archive-migrations --package _previous --registry migration-registry
+          if ($LASTEXITCODE) { throw 'Published migration history is inconsistent.' }
       - name: Apply release SQL on an isolated database and capture the expected schema
         shell: pwsh
         run: |
@@ -120,7 +134,7 @@ jobs:
           if ($LASTEXITCODE) { throw "Preparing the isolated database failed." }
           & coa-schema-fixture-build/Runtime/python/python.exe -I -c "import runpy,sys;runpy.run_path(sys.argv[1]);import squid_playerbots" _tree/Scripts/manage.py
           if ($LASTEXITCODE) { throw "The release launcher cannot load its helper with the bundled Python runtime." }
-          & $tool schema-contract --repack coa-schema-fixture-build --tree _tree --core _core --bots _bots --repairs database-repairs
+          & $tool schema-contract --repack coa-schema-fixture-build --tree _tree --core _core --bots _bots --repairs database-repairs --registry migration-registry
           if ($LASTEXITCODE) { throw "Database acceptance failed; this release will not be published." }
           if (-not (Test-Path _tree/Scripts/database-schema.json)) { throw "The database schema contract was not produced." }
       - name: Pack, sign, verify
@@ -133,29 +147,54 @@ jobs:
           $version = $env:RELEASE_VERSION
           if (-not $version) { $version = "0.$((Get-Date).ToString('yyMMdd')).${{ github.run_number }}" }
           if ($version -notmatch '^0\.[0-9]{6}\.[0-9]+$') { throw "Invalid release version: $version" }
-          gh release download stable --pattern manifest.json --dir _stable-version --repo $env:GITHUB_REPOSITORY
-          if ($LASTEXITCODE) { throw "Cannot determine the current stable version; refusing to publish." }
-          $stableVersion = (Get-Content _stable-version/manifest.json -Raw | ConvertFrom-Json).version
+          $stableVersion = (Get-Content _previous-manifest.json -Raw | ConvertFrom-Json).version
           if ([version]$version -le [version]$stableVersion) { throw "Release $version must be newer than stable $stableVersion." }
           "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           $tool = "_manager/target/release/coa-release.exe"
           & $tool pack-update --tree _tree --base-manifest base-manifest.json --core _core --bots _bots --out _out `
-            --version $version --core-commit $env:CORE_SHA --bots-commit $env:BOTS_SHA --repairs database-repairs
+            --version $version --core-commit $env:CORE_SHA --bots-commit $env:BOTS_SHA --repairs database-repairs --registry migration-registry
           if ($LASTEXITCODE) { throw "pack-update failed" }
           $manifestPath = '_out/manifest.json'
           $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
-          $manifest.minManagerVersion = '0.6.4'
+          $manifest.minManagerVersion = (Get-Content _manager/package.json -Raw | ConvertFrom-Json).version
           $manifest | ConvertTo-Json -Depth 100 | Set-Content $manifestPath -Encoding utf8NoBOM
           & $tool sign --dir _out;   if ($LASTEXITCODE) { throw "sign failed" }
           & $tool verify --dir _out; if ($LASTEXITCODE) { throw "verify failed" }
-      - name: Publish to the edge release
+      - name: Windows upgrade and interrupted recovery acceptance
         shell: pwsh
         run: |
-          gh release view edge --repo $env:GITHUB_REPOSITORY 2>$null
-          if ($LASTEXITCODE -ne 0) { gh release create edge --prerelease --title "Edge builds" --notes "Latest nightly build. Not promoted to stable yet." --repo $env:GITHUB_REPOSITORY }
-          $old = gh release view edge --json assets --jq '.assets[].name' --repo $env:GITHUB_REPOSITORY
+          & _manager/tools/update-chaos-matrix.ps1 -BasePackage _schema-base -CandidatePackage _out -PreviousPackage _previous
+          if ($LASTEXITCODE) { throw 'Windows update acceptance failed.' }
+          python scripts/verify-acceptance.py _out
+          if ($LASTEXITCODE) { throw 'Acceptance does not match the package.' }
+      - name: Preserve cumulative migration provenance and sign the channel
+        shell: pwsh
+        env:
+          COA_SIGNING_KEY: ${{ secrets.COA_SIGNING_KEY }}
+        run: |
+          $tool = '_manager/target/release/coa-release.exe'
+          & $tool archive-migrations --package _out --registry migration-registry
+          if ($LASTEXITCODE) { throw 'Could not archive new migrations.' }
+          Compress-Archive -Path migration-registry/* -DestinationPath _out/migration-registry.zip
+          & $tool channel --dir _out --out _channel/channel.json
+          if ($LASTEXITCODE) { throw 'Could not sign the channel.' }
+      - name: Publish immutable release, then switch edge
+        shell: pwsh
+        run: |
+          $tag = "server-$env:VERSION"
+          gh release view $tag --repo $env:GITHUB_REPOSITORY 2>$null
+          if ($LASTEXITCODE -eq 0) { throw "Immutable release $tag already exists; choose a new version." }
+          gh release create $tag --draft --prerelease --title "Server $env:VERSION" --repo $env:GITHUB_REPOSITORY
+          if ($LASTEXITCODE) { throw 'Could not create the immutable draft.' }
           $files = Get-ChildItem _out -File
-          $files | ForEach-Object { gh release upload edge $_.FullName --clobber --repo $env:GITHUB_REPOSITORY }
-          $keep = $files.Name
-          foreach ($n in $old) { if ($keep -notcontains $n) { gh release delete-asset edge $n --yes --repo $env:GITHUB_REPOSITORY } }
-          gh release edit edge --notes "Version $env:VERSION`ncore $env:CORE_SHA`nbots $env:BOTS_SHA`nscaling $env:SCALING_SHA`nsquid $env:SQUID_SHA" --repo $env:GITHUB_REPOSITORY
+          foreach ($file in $files) {
+            gh release upload $tag $file.FullName --repo $env:GITHUB_REPOSITORY
+            if ($LASTEXITCODE) { throw 'Immutable asset upload failed.' }
+          }
+          gh release edit $tag --draft=false --repo $env:GITHUB_REPOSITORY
+          if ($LASTEXITCODE) { throw 'Could not publish the immutable release.' }
+          gh release view edge --repo $env:GITHUB_REPOSITORY 2>$null
+          if ($LASTEXITCODE) { gh release create edge --prerelease --title 'Edge channel' --repo $env:GITHUB_REPOSITORY }
+          gh release upload edge _channel/channel.json --clobber --repo $env:GITHUB_REPOSITORY
+          if ($LASTEXITCODE) { throw 'Channel switch failed; the previous release remains available.' }
+          gh release edit edge --notes "Version $env:VERSION; immutable release $tag" --repo $env:GITHUB_REPOSITORY

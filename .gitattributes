@@ -1,0 +1,3 @@
+*.sql text eol=lf
+# Published bytes are evidence; never let checkout rewrite their hashes.
+migration-registry/** -text
