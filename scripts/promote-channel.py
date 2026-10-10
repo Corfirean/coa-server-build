@@ -22,7 +22,7 @@ def api(path, method='GET', body=None):
     return json.loads(result.stdout)
 
 
-def validate_report(report, snapshot, version):
+def validate_report(report, snapshot, version, source_versions=None, source_databases=None):
     if report.get('schema') != 1 or report.get('snapshot') != snapshot or report.get('version') != version:
         raise RuntimeError('Qualification report does not match the candidate')
     for platform in ('windows-x86_64', 'linux-x86_64'):
@@ -31,6 +31,17 @@ def validate_report(report, snapshot, version):
             check = checks.get(name, {})
             if check.get('result') != 'passed' or not re.fullmatch(r'https://github\.com/[^/]+/[^/]+/actions/runs/\d+(?:/.*)?', check.get('evidence', '')):
                 raise RuntimeError(f'Mandatory qualification missing or unsuccessful: {platform}/{name}')
+        if source_versions is not None:
+            if len(source_versions) != 3:
+                raise RuntimeError('Three upgrade sources must qualify')
+            for name, source in zip(('upgrade-base', 'upgrade-stable-1', 'upgrade-stable-2'), source_versions):
+                if checks[name].get('fromVersion') != source:
+                    raise RuntimeError(f'Upgrade qualification differs from compatibility matrix: {platform}/{name}')
+                if source_databases is not None:
+                    expected = source_databases[source]
+                    if (checks[name].get('fromManifestSha256') != expected['manifestSha256']
+                            or checks[name].get('fromSchemaSha256') != expected['schemaSha256']):
+                        raise RuntimeError(f'Upgrade tested a different signed source: {platform}/{name}')
 
 
 def publish(repo, expected, envelope):
@@ -68,7 +79,11 @@ def main():
         raise RuntimeError('Stable requires a signed Windows package')
     if manifest['compatibility']['coreCommit'] != lock['components']['core']['sha']:
         raise RuntimeError('Compatibility matrix differs from the source lock')
-    validate_report(json.loads((folder / 'qualification.json').read_text()), lock['snapshot'], args.version)
+    for name in ('bots', 'scaling', 'squid', 'races'):
+        if manifest['compatibility']['moduleCommits'].get(name) != lock['components'][name]['sha']:
+            raise RuntimeError(f'Module compatibility differs from source lock: {name}')
+    validate_report(json.loads((folder / 'qualification.json').read_text()), lock['snapshot'], args.version,
+                    manifest['compatibility']['sourceVersions'], manifest['compatibility']['sourceDatabases'])
     subprocess.run([args.tool, 'verify', '--dir', str(folder)], check=True)
     pointer = folder / 'stable-pointer.json'
     subprocess.run([args.tool, 'sign-channel', '--channel', 'stable', '--version', args.version,

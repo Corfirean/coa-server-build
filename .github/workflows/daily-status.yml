@@ -51,6 +51,7 @@ jobs:
         id: snapshot
         run: |
           python3 scripts/daily-release.py --check-integration --core-ref '${{ steps.integration.outputs.core }}'
+          python3 scripts/upgrade-sources.py --lock release-lock.json
           python3 - <<'PY'
           import json, os, subprocess
           from datetime import datetime, timezone
@@ -109,3 +110,26 @@ jobs:
       squid_ref: ${{ needs.resolve.outputs.squid }}
       manager_ref: ${{ needs.resolve.outputs.manager }}
       release_version: ${{ needs.resolve.outputs.version }}
+  report-failure:
+    needs: [resolve, windows, linux]
+    if: always() && (needs.resolve.result == 'failure' || needs.windows.result == 'failure' || needs.linux.result == 'failure' || needs.windows.result == 'cancelled' || needs.linux.result == 'cancelled')
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RESULTS: ${{ toJSON(needs) }}
+    steps:
+      - name: Update the candidate failure diagnostic
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib, subprocess
+          repo = os.environ['GITHUB_REPOSITORY']
+          results = json.loads(os.environ['RESULTS'])
+          title = 'Daily release blocked'
+          issues = json.loads(subprocess.check_output(['gh','issue','list','--repo',repo,'--state','open','--search',title+' in:title','--json','number,title'], text=True))
+          issue = next((i for i in issues if i['title'] == title), None)
+          body = pathlib.Path('/tmp/daily-candidate-failure.md')
+          status = '\n'.join('- '+name+': '+job['result'] for name,job in results.items())
+          body.write_text('The daily candidate failed. Previous stable remains unchanged.\n\n'+status+'\n\nRun: https://github.com/'+repo+'/actions/runs/'+os.environ['GITHUB_RUN_ID']+'\n')
+          command = ['gh','issue','edit',str(issue['number'])] if issue else ['gh','issue','create','--title',title]
+          subprocess.run(command+['--repo',repo,'--body-file',str(body)], check=True)
+          PY

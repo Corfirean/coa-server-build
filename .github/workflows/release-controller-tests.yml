@@ -7,6 +7,8 @@ on:
       - 'scripts/*candidate*.py'
       - 'scripts/*health*.py'
       - 'scripts/*channel*.py'
+      - 'scripts/*compatibility*.py'
+      - 'scripts/*sources*.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -21,3 +23,5 @@ jobs:
           python3 -B -m unittest discover -s scripts -p test_publish_candidate.py
           python3 -B -m unittest discover -s scripts -p test_daily_health.py
           python3 -B -m unittest discover -s scripts -p test_promote_channel.py
+          python3 -B -m unittest discover -s scripts -p test_release_compatibility.py
+          python3 -B -m unittest discover -s scripts -p test_upgrade_sources.py

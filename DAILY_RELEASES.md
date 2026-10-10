@@ -18,8 +18,8 @@ downloaded asset matches the locally verified package.
 These are draft implementation branches, not a production stable cutover.
 Do not merge the pipeline changes until the following remaining stages are ready:
 
-- Populate compatibility matrices and generate mandatory gameplay/update
-  integration qualification reports from real test runs.
+- Generate mandatory gameplay/update integration qualification reports from real
+  test runs, using the exact signed upgrade fixtures in the lock.
 - Run Manager recovery and login isolation against live disposable server fixtures.
 - Connect independent Manager, Bots and Server changelog histories to successful
   publications, including external module release notes.
@@ -40,3 +40,14 @@ The hourly daily-health workflow only checks scheduled reconciliation status.
 Missing or unsuccessful reconciliations for over 30 hours update one diagnostic
 issue, which closes after a successful scheduled reconciliation. An active-build
 skip is not counted as a successful source reconciliation. It launches no builds.
+
+Daily packaging now binds compatibility metadata to the locked core, Companions,
+Scaling, SQUID and races revisions and the race release version. Upgrade source
+manifests and signatures are frozen before compilation. Packaging verifies their
+exact hashes and embedded-key signatures before recording the base and two
+stable source versions and database contract hashes. Signed channels history is
+used after cutover; initial legacy history uses the latest earlier non-prerelease
+immutable server release as the previous-version fixture. The legacy base has no
+full schema contract and is identified by its signed manifest; its actual database
+still requires integration qualification. Publishing requires upgrade evidence for
+each declared version and signed manifest, not merely a green generic test run.

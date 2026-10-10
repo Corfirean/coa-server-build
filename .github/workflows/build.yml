@@ -188,6 +188,12 @@ jobs:
           $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
           $manifest.minManagerVersion = '0.6.12'
           $manifest | ConvertTo-Json -Depth 100 | Set-Content $manifestPath -Encoding utf8NoBOM
+          if (Test-Path _release-lock/release-lock.json) {
+            python scripts/upgrade-sources.py --lock _release-lock/release-lock.json --download _upgrade-sources
+            if ($LASTEXITCODE) { throw "Locked upgrade fixture download failed" }
+            python scripts/release-compatibility.py --dir _out --lock _release-lock/release-lock.json --sources _upgrade-sources --schema-base _schema-base --platform windows-x86_64 --tool $tool
+            if ($LASTEXITCODE) { throw "Release compatibility validation failed" }
+          }
           & $tool sign --dir _out;   if ($LASTEXITCODE) { throw "sign failed" }
           & $tool verify --dir _out; if ($LASTEXITCODE) { throw "verify failed" }
       - name: Publish immutable Windows candidate
