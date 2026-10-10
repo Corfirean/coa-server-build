@@ -95,14 +95,82 @@ def download(lock, folder):
             (package / name).write_bytes(raw)
 
 
+def download_part(url, target, size, digest):
+    if not url.startswith(f'https://github.com/{REPO}/releases/download/'):
+        raise RuntimeError('Upgrade archive must come from the server release repository')
+    if target.exists():
+        actual = hashlib.sha256()
+        with target.open('rb') as stream:
+            for block in iter(lambda: stream.read(1024 * 1024), b''):
+                actual.update(block)
+        if target.stat().st_size == size and actual.hexdigest() == digest:
+            return
+        raise RuntimeError(f'Existing upgrade archive failed verification: {target.name}')
+    temporary = target.with_name(target.name + '.partial')
+    created = False
+    try:
+        checksum = hashlib.sha256()
+        count = 0
+        with urllib.request.urlopen(url, timeout=120) as response, temporary.open('xb') as output:
+            created = True
+            while block := response.read(1024 * 1024):
+                count += len(block)
+                if count > size:
+                    raise RuntimeError(f'Upgrade archive exceeds signed size: {target.name}')
+                checksum.update(block)
+                output.write(block)
+        if count != size or checksum.hexdigest() != digest:
+            raise RuntimeError(f'Upgrade archive failed verification: {target.name}')
+        temporary.replace(target)
+    finally:
+        if created:
+            temporary.unlink(missing_ok=True)
+
+
+def download_packages(lock, folder, tool):
+    download(lock, folder)
+    for item in lock['upgradeSources']:
+        package = folder / item['role']
+        # Parse archive paths only after the Manager validates the manifest signature and structure.
+        subprocess.run([str(tool), 'verify-manifest', '--dir', str(package)], check=True)
+        manifest = json.loads((package / 'manifest.json').read_text(encoding='utf-8-sig'))
+        if manifest['version'] != item['version']:
+            raise RuntimeError('Locked upgrade version does not match its signed manifest')
+        expected_kind = 'base' if item['role'] == 'base' else 'update'
+        if manifest['kind'] != expected_kind or not manifest.get('archive', {}).get('parts'):
+            raise RuntimeError('Upgrade fixture has the wrong package kind or no archives')
+        parts = manifest['archive']['parts']
+        names = set()
+        for part in parts:
+            name = part['name']
+            if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]*', name) or name in names:
+                raise RuntimeError('Invalid upgrade archive name')
+            names.add(name)
+            if not isinstance(part['size'], int) or part['size'] <= 0 or not re.fullmatch(r'[0-9a-f]{64}', part['sha256']):
+                raise RuntimeError('Invalid signed upgrade archive size or hash')
+        base_url = item['assets']['manifest.json']['url'].rsplit('/', 1)[0] + '/'
+        for part in parts:
+            download_part(base_url + part['name'], package / part['name'], part['size'], part['sha256'])
+        subprocess.run([str(tool), 'verify-upgrade-fixture', '--dir', str(package)], check=True)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--lock', type=Path, required=True)
     parser.add_argument('--download', type=Path)
+    parser.add_argument('--packages', action='store_true')
+    parser.add_argument('--tool', type=Path)
     args = parser.parse_args()
     lock = json.loads(args.lock.read_text(encoding='utf-8-sig'))
     if args.download:
-        download(lock, args.download)
+        if args.packages:
+            if not args.tool:
+                parser.error('--packages requires --tool')
+            download_packages(lock, args.download, args.tool.resolve())
+        else:
+            download(lock, args.download)
     else:
+        if args.packages:
+            parser.error('--packages requires --download')
         lock['upgradeSources'] = resolve()
         args.lock.write_text(json.dumps(lock, indent=2) + '\n', encoding='utf-8')

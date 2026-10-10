@@ -1,4 +1,6 @@
 import hashlib
+import io
+import subprocess
 import importlib.util
 import tempfile
 import unittest
@@ -36,6 +38,47 @@ class SourceTests(unittest.TestCase):
         with patch.object(sources.subprocess, 'run', return_value=result):
             with self.assertRaises(RuntimeError):
                 sources.channel()
+
+    def test_archive_hash_and_size_are_required_before_installing_the_download(self):
+        url = 'https://github.com/Corfirean/coa-server-build/releases/download/stable/server.tar.zst.001'
+        for raw in (b'short', b'wrong!', b'too-long'):
+            with tempfile.TemporaryDirectory() as directory, patch.object(sources.urllib.request, 'urlopen', return_value=io.BytesIO(raw)):
+                target = Path(directory) / 'server.tar.zst.001'
+                with self.assertRaises(RuntimeError):
+                    sources.download_part(url, target, 6, hashlib.sha256(b'correct').hexdigest())
+                self.assertFalse(target.exists())
+                self.assertFalse(target.with_name(target.name + '.partial').exists())
+
+    def test_valid_archive_is_reused_only_after_verification(self):
+        url = 'https://github.com/Corfirean/coa-server-build/releases/download/stable/part'
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / 'part'
+            with patch.object(sources.urllib.request, 'urlopen', return_value=io.BytesIO(b'good')):
+                sources.download_part(url, target, 4, hashlib.sha256(b'good').hexdigest())
+            with patch.object(sources.urllib.request, 'urlopen') as fetch:
+                sources.download_part(url, target, 4, hashlib.sha256(b'good').hexdigest())
+                fetch.assert_not_called()
+            target.write_bytes(b'bad!')
+            with self.assertRaises(RuntimeError):
+                sources.download_part(url, target, 4, hashlib.sha256(b'good').hexdigest())
+
+    def test_an_existing_partial_download_is_not_deleted(self):
+        url = 'https://github.com/Corfirean/coa-server-build/releases/download/stable/part'
+        with tempfile.TemporaryDirectory() as directory, patch.object(sources.urllib.request, 'urlopen', return_value=io.BytesIO(b'good')):
+            target = Path(directory) / 'part'
+            partial = Path(directory) / 'part.partial'
+            partial.write_bytes(b'other download')
+            with self.assertRaises(FileExistsError):
+                sources.download_part(url, target, 4, hashlib.sha256(b'good').hexdigest())
+            self.assertEqual(partial.read_bytes(), b'other download')
+
+    def test_invalid_signature_stops_before_archive_download(self):
+        with tempfile.TemporaryDirectory() as directory, patch.object(sources, 'download'), \
+             patch.object(sources.subprocess, 'run', side_effect=subprocess.CalledProcessError(1, 'verify-manifest')), \
+             patch.object(sources, 'download_part') as fetch:
+            with self.assertRaises(subprocess.CalledProcessError):
+                sources.download_packages(self.lock(), Path(directory), Path('tool'))
+            fetch.assert_not_called()
 
 
 if __name__ == '__main__':

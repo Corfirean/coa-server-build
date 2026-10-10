@@ -69,3 +69,21 @@ or a concurrent winner causes a normal skip. API failures block acquisition.
 The lease does not expire while its Actions run is active and needs no unsafe ref
 deletion on cancellation. Manual packaging still has its existing root concurrency;
 the channel publisher has its separate publication mutex and CAS protection.
+
+Windows daily packaging prepares complete locked base/stable-1/stable-2 archives,
+verifying manifest signatures before streaming downloads, signed part sizes and
+hashes, and the complete package afterwards. The schema baseline is taken from
+that verified locked base rather than re-resolving a moving base asset. Preparing
+these fixtures is not an upgrade-test pass: actual Manager transaction qualification
+and its version/hash-bound report remain required before stable promotion.
+
+Windows packaging now runs `qualify-upgrade` for each of the three source
+packages before publishing an immutable candidate. It rebuilds the source from
+the signed base and, for stable sources, applies their signed update through the
+real Manager transaction. The candidate then uses the same transaction, full
+snapshot, SQL migration and private auth/world health checks. A user configuration
+file and the committed version/journal state are checked afterwards. Passing
+reports bind the source version and manifest/schema hashes; failed fixture logs
+and transaction journals are uploaded. Fixture success does not yet demonstrate
+existing-character preservation, login/relog or fault-injection coverage. Those
+separate required gates still block automatic stable promotion.
