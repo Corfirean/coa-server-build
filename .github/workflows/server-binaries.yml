@@ -29,7 +29,25 @@ on:
         value: ${{ jobs.build.outputs.scaling_sha }}
 
 jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          repository: Corfirean/azerothcore-wotlk-coa
+          ref: ${{ inputs.core_ref || 'coa-bots' }}
+          fetch-depth: 0
+      - name: Verify source and harness infrastructure on POSIX
+        run: python3 -B tools/verify_all.py --stages source --base origin/coa-bots
+      - name: Upload source verification diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-verification-diagnostics
+          path: .cache/verify-all/
   build:
+    needs: source
     runs-on: windows-latest
     timeout-minutes: 240
     outputs:
@@ -256,7 +274,7 @@ jobs:
           SCCACHE_IGNORE_SERVER_IO_ERROR: '1'
         shell: pwsh
         run: |
-          & ./_pipeline/scripts/run-core-verification.ps1 -CoreRoot . -BaseRef origin/coa-bots -Jobs 4
+          & ./_pipeline/scripts/run-core-verification.ps1 -CoreRoot . -BaseRef origin/coa-bots -Jobs 4 -Stages build,unit
           if ($LASTEXITCODE) {
             $report = Get-ChildItem .cache/verify-all -Recurse -Filter build.log | Sort-Object LastWriteTime -Descending | Select-Object -First 1
             if ($report) { Get-Content $report.FullName -Tail 100 }

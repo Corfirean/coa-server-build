@@ -1,4 +1,5 @@
 param(
+    [ValidateSet('source,build,unit', 'build,unit')] [string] $Stages = 'source,build,unit',
     [string]$CoreRoot = '_core',
     [ValidateRange(1,64)][int]$Jobs = 4,
     [ValidatePattern('^[A-Za-z0-9_./-]+$')][string]$BaseRef = 'origin/coa-bots'
@@ -39,7 +40,7 @@ function Write-VerificationProgress {
 $started = Get-Date
 $python = (Get-Command python -ErrorAction Stop).Source
 $process = Start-Process -FilePath $python -WorkingDirectory $core -WindowStyle Hidden -PassThru `
-    -ArgumentList @('-B', 'tools/verify_all.py', '--stages', 'source,build,unit', '--base', $BaseRef, '--jobs', "$Jobs") `
+    -ArgumentList @('-B', 'tools/verify_all.py', '--stages', $Stages, '--base', $BaseRef, '--jobs', "$Jobs") `
     -RedirectStandardOutput $stdout -RedirectStandardError $stderr
 try {
     do {
