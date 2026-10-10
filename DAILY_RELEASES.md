@@ -62,3 +62,10 @@ column with no default. It preserves rows and custom defaults. Manager keeps all
 schema differences in its metadata diagnostics directory across rollback, with
 readable defaults. Other legacy schema differences remain blocking until reviewed
 and covered by upgrade qualification; no generic automatic ALTER is performed.
+
+Daily resolution also acquires a lease through a non-forced Git ref update on
+automation/daily-lease. A completed owner permits a new candidate; an active owner
+or a concurrent winner causes a normal skip. API failures block acquisition.
+The lease does not expire while its Actions run is active and needs no unsafe ref
+deletion on cancellation. Manual packaging still has its existing root concurrency;
+the channel publisher has its separate publication mutex and CAS protection.

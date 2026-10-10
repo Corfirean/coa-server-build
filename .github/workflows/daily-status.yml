@@ -33,6 +33,9 @@ jobs:
             echo 'skip=true' >> "$GITHUB_OUTPUT"
             echo 'Skipped: another release is still running.' >> "$GITHUB_STEP_SUMMARY"
           fi
+          if [ "$count" -eq 0 ]; then
+            python3 scripts/daily-lease.py
+          fi
       - name: Integration checkout
         if: steps.active.outputs.skip != 'true'
         uses: actions/checkout@v7
