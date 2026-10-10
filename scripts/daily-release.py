@@ -2,6 +2,7 @@
 import argparse
 import hashlib
 import json
+import os
 import subprocess
 from pathlib import Path
 
@@ -31,6 +32,8 @@ def resolve(core_ref="coa-bots"):
         "races": {"repository": "ilusixn/azerothcore-wotlk-coa", "ref": races["tag_name"]},
         "squid": {"repository": "Zyth45/mod-playerbots", "ref": squid["name"]},
     }
+    pipeline_sha = os.environ.get('GITHUB_SHA') or subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+    components['build'] = {'repository': 'Corfirean/coa-server-build', 'ref': pipeline_sha}
     for component in components.values():
         component["sha"] = revision(component["repository"], component["ref"])
     components["races"]["assets"] = [

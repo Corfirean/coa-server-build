@@ -1,30 +1,41 @@
 name: promote
-# Copy the current edge build to the "stable" release that players' Managers follow.
 on:
   workflow_dispatch:
-
+    inputs:
+      version:
+        description: Immutable server version to promote
+        required: true
+      expected_channels_sha:
+        description: Previous channels branch commit (compare-and-swap)
+        required: true
 permissions:
   contents: write
-
+concurrency:
+  group: signed-channel-publication
+  cancel-in-progress: false
 jobs:
   promote:
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
+      COA_SIGNING_KEY: ${{ secrets.COA_SIGNING_KEY }}
+      VERSION: ${{ inputs.version }}
+      EXPECTED: ${{ inputs.expected_channels_sha }}
     steps:
-      - name: Download edge
-        run: gh release download edge --dir edge --repo "$GITHUB_REPOSITORY"
-      - name: Manager release verification tools
-        uses: actions/checkout@v7
+      - uses: actions/checkout@v7
+      - name: Resolve released Manager tools
+        id: manager
+        run: |
+          tag=$(gh api repos/Corfirean/coa-server-manager/releases/latest --jq '.tag_name')
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v7
         with:
           repository: Corfirean/coa-server-manager
+          ref: ${{ steps.manager.outputs.tag }}
           path: _manager
-      - name: Verify signature, every archive file and the full database schema contract
-        run: cargo run --release -p coa-release --manifest-path _manager/Cargo.toml -- verify --dir edge
-      - name: Publish to stable
-        run: |
-          gh release view stable --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || gh release create stable --title "Stable" --notes "Promoted builds" --latest --repo "$GITHUB_REPOSITORY"
-          old=$(gh release view stable --json assets --jq '.assets[].name' --repo "$GITHUB_REPOSITORY")
-          gh release upload stable edge/* --clobber --repo "$GITHUB_REPOSITORY"
-          for n in $old; do [ -f "edge/$n" ] || gh release delete-asset stable "$n" --yes --repo "$GITHUB_REPOSITORY"; done
-          gh release edit stable --notes "$(gh release view edge --json body --jq .body)" --repo "$GITHUB_REPOSITORY"
+      - name: Build verification tools from the released Manager
+        run: cargo build --release -p coa-release --manifest-path _manager/Cargo.toml
+      - name: Download immutable candidate
+        run: gh release download "server-$VERSION" --dir candidate --repo "$GITHUB_REPOSITORY"
+      - name: Verify qualification and atomically switch the signed pointer
+        run: python3 -B scripts/promote-channel.py --repo "$GITHUB_REPOSITORY" --version "$VERSION" --expected "$EXPECTED" --dir candidate --tool _manager/target/release/coa-release

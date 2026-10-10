@@ -9,9 +9,9 @@
 # The build context is a checkout of the core with the bots module already placed at modules/mod-coa-playerbots
 # (module/src -> src, module/conf -> conf), exactly like the Windows job does. The core's own .git is mounted at build
 # time only because the version banner reads it.
-ARG UBUNTU_VERSION=26.04
+ARG UBUNTU_IMAGE=ubuntu:26.04@sha256:f144425ff09be612d6d9ad965196e9cdc23dae1f42110a8a11a3e9a8198759f7
 
-FROM ubuntu:${UBUNTU_VERSION} AS build
+FROM ${UBUNTU_IMAGE} AS build
 ARG DEBIAN_FRONTEND=noninteractive
 ARG BUILD_TYPE=RelWithDebInfo
 # Parallel compile jobs. Defaults to the number of CPUs; lower it on a machine with little memory.

@@ -162,8 +162,8 @@ jobs:
         uses: actions/cache@v6
         with:
           path: .ccache
-          key: trusted-linux-clang-ubuntu26-${{ github.run_id }}
-          restore-keys: trusted-linux-clang-ubuntu26-
+          key: trusted-linux-clang-ubuntu26-${{ hashFiles('docker/Dockerfile.linux') }}-${{ github.run_id }}
+          restore-keys: trusted-linux-clang-ubuntu26-${{ hashFiles('docker/Dockerfile.linux') }}-
       - name: Seed compiler cache
         run: |
           mkdir -p .ccache
