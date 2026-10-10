@@ -46,29 +46,31 @@ jobs:
         if: steps.active.outputs.skip != 'true'
         id: integration
         run: python3 scripts/integrate-candidate.py
+      - name: Checkout Manager used by the snapshot verifier
+        if: steps.active.outputs.skip != 'true'
+        uses: actions/checkout@v7
+        with:
+          repository: Corfirean/coa-server-manager
+          ref: master
+          path: _manager
+      - name: Cache daily channel verifier dependencies
+        if: steps.active.outputs.skip != 'true'
+        uses: actions/cache@v6
+        continue-on-error: true
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: trusted-daily-cargo-${{ runner.os }}-${{ hashFiles('_manager/Cargo.lock') }}-${{ github.run_id }}
+          restore-keys: |
+            trusted-daily-cargo-${{ runner.os }}-${{ hashFiles('_manager/Cargo.lock') }}-
       - name: Resolve and check daily snapshot
         if: steps.active.outputs.skip != 'true'
         id: snapshot
         run: |
-          python3 scripts/daily-release.py --check-integration --core-ref '${{ steps.integration.outputs.core }}'
+          python3 scripts/daily-release.py --check-integration --core-ref '${{ steps.integration.outputs.core }}' --manager-ref "$(git -C _manager rev-parse HEAD)"
           python3 scripts/upgrade-sources.py --lock release-lock.json
-          python3 - <<'PY'
-          import json, os, subprocess
-          from datetime import datetime, timezone
-          lock=json.load(open('release-lock.json'))
-          result=subprocess.run(['gh','api','repos/Corfirean/coa-server-build/contents/stable.json?ref=channels','--jq','.content'],capture_output=True,text=True)
-          previous=''
-          if result.returncode==0:
-              import base64
-              envelope=json.loads(base64.b64decode(result.stdout))
-              previous=json.loads(envelope['payload'])['snapshot']
-          with open(os.environ['GITHUB_OUTPUT'],'a') as out:
-              for name in ('core','bots','scaling','squid','manager'):
-                  out.write(name+'='+lock['components'][name]['sha']+'\n')
-              out.write('snapshot='+lock['snapshot']+'\n')
-              out.write('changed='+str(previous!=lock['snapshot']).lower()+'\n')
-              out.write('version=0.'+datetime.now(timezone.utc).strftime('%y%m%d')+'.'+str(100000+int(os.environ['GITHUB_RUN_NUMBER']))+'\n')
-          PY
+          python3 scripts/daily-decision.py --manager _manager
       - uses: actions/upload-artifact@v4
         if: always() && steps.active.outputs.skip != 'true'
         with:

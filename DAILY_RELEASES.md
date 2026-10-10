@@ -51,3 +51,14 @@ immutable server release as the previous-version fixture. The legacy base has no
 full schema contract and is identified by its signed manifest; its actual database
 still requires integration qualification. Publishing requires upgrade evidence for
 each declared version and signed manifest, not merely a green generic test run.
+
+The unchanged-snapshot decision now verifies the previous stable pointer with the
+embedded Manager public key. Only an explicit GitHub 404 permits legacy bootstrap;
+network, permission and signature errors block reconciliation. The verifier is
+built from the same exact Manager revision recorded in the candidate lock.
+
+The display preset default repair targets only the known legacy unsigned NOT NULL
+column with no default. It preserves rows and custom defaults. Manager keeps all
+schema differences in its metadata diagnostics directory across rollback, with
+readable defaults. Other legacy schema differences remain blocking until reviewed
+and covered by upgrade qualification; no generic automatic ALTER is performed.

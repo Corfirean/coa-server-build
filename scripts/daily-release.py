@@ -15,7 +15,7 @@ def revision(repo, ref):
     return gh(f"repos/{repo}/commits/{ref}")["sha"]
 
 
-def resolve(core_ref="coa-bots"):
+def resolve(core_ref="coa-bots", manager_ref="master"):
     races = gh("repos/ilusixn/azerothcore-wotlk-coa/releases/latest")
     tags = gh("repos/Zyth45/mod-playerbots/tags?per_page=100")
     import re
@@ -28,7 +28,7 @@ def resolve(core_ref="coa-bots"):
         "core": {"repository": "Corfirean/azerothcore-wotlk-coa", "ref": core_ref},
         "bots": {"repository": "Corfirean/mod-coa-playerbots", "ref": "master"},
         "scaling": {"repository": "Corfirean/mod-coa-content-scaling", "ref": "main"},
-        "manager": {"repository": "Corfirean/coa-server-manager", "ref": "master"},
+        "manager": {"repository": "Corfirean/coa-server-manager", "ref": manager_ref},
         "races": {"repository": "ilusixn/azerothcore-wotlk-coa", "ref": races["tag_name"]},
         "squid": {"repository": "Zyth45/mod-playerbots", "ref": squid["name"]},
     }
@@ -65,8 +65,9 @@ def main():
     parser.add_argument("--out", default="release-lock.json")
     parser.add_argument("--check-integration", action="store_true")
     parser.add_argument("--core-ref", default="coa-bots")
+    parser.add_argument("--manager-ref", default="master")
     args = parser.parse_args()
-    lock = resolve(args.core_ref)
+    lock = resolve(args.core_ref, args.manager_ref)
     Path(args.out).write_text(json.dumps(lock, indent=2) + "\n", encoding="utf-8")
     if args.check_integration:
         check_integration(lock)
