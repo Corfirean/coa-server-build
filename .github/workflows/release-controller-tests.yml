@@ -1,0 +1,19 @@
+name: release-controller-tests
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/**'
+      - 'scripts/*release*.py'
+      - 'scripts/*candidate*.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Controller and immutable publication tests
+        run: |
+          python3 -B -m unittest discover -s scripts -p test_daily_release.py
+          python3 -B -m unittest discover -s scripts -p test_publish_candidate.py
