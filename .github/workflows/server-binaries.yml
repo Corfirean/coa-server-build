@@ -221,7 +221,8 @@ jobs:
           $identity = (Get-Item $compiler).VersionInfo.FileVersion + '-RelWithDebInfo-Z7-PCH'
           "identity=$identity" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
       - name: Restore compiler cache
-        uses: actions/cache@v6
+        id: compiler-cache
+        uses: actions/cache/restore@v6
         continue-on-error: true
         with:
           path: ${{ runner.temp }}/sccache
@@ -266,6 +267,13 @@ jobs:
         continue-on-error: true
         shell: pwsh
         run: sccache --show-stats
+      - name: Preserve reusable compiler objects even when qualification fails
+        if: always() && steps.sccache.outcome == 'success' && steps.compiler-cache.outputs.cache-primary-key != '' && steps.compiler-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        continue-on-error: true
+        with:
+          path: ${{ runner.temp }}/sccache
+          key: ${{ steps.compiler-cache.outputs.cache-primary-key }}
       - name: Upload source, compilation and unit diagnostics
         if: always()
         uses: actions/upload-artifact@v4

@@ -179,6 +179,7 @@ jobs:
           path: |
             coa-schema-fixture-build/Core/Logs
             coa-schema-fixture-build.manager/updates
+            coa-schema-fixture-build.manager/diagnostics
             coa-schema-fixture-build.manager/validation-configs.json
           if-no-files-found: ignore
       - name: Pack, sign, verify
