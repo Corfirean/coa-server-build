@@ -256,7 +256,7 @@ jobs:
           SCCACHE_IGNORE_SERVER_IO_ERROR: '1'
         shell: pwsh
         run: |
-          python -B tools/verify_all.py --stages source,build,unit --base origin/coa-bots --jobs 4
+          & ./_pipeline/scripts/run-core-verification.ps1 -CoreRoot . -BaseRef origin/coa-bots -Jobs 4
           if ($LASTEXITCODE) {
             $report = Get-ChildItem .cache/verify-all -Recurse -Filter build.log | Sort-Object LastWriteTime -Descending | Select-Object -First 1
             if ($report) { Get-Content $report.FullName -Tail 100 }

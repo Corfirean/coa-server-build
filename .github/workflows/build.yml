@@ -173,6 +173,12 @@ jobs:
           $tool = "_manager/target/release/coa-release.exe"
           & $tool extract-schema-base --package _schema-base --fixture coa-schema-fixture-build
           if ($LASTEXITCODE) { throw "Preparing the isolated database failed." }
+          $env:COA_MYSQL_TEST_BIN = (Resolve-Path coa-schema-fixture-build/mysql/bin).Path
+          $testName = "real_mysql_restores_objects_users_rows_and_missing_defaults"
+          $testList = & cargo test -p coa-core --manifest-path _manager/Cargo.toml $testName -- --ignored --list | Out-String
+          if ($LASTEXITCODE -or $testList -notmatch $testName) { throw "The pinned Manager does not provide the required database recovery test." }
+          & cargo test -p coa-core --manifest-path _manager/Cargo.toml $testName -- --ignored --test-threads=1
+          if ($LASTEXITCODE) { throw "Recovery of database objects or legacy defaults failed; this release will not be published." }
           & coa-schema-fixture-build/Runtime/python/python.exe -I -c "import runpy,sys;runpy.run_path(sys.argv[1]);import squid_playerbots" _tree/Scripts/manage.py
           if ($LASTEXITCODE) { throw "The release launcher cannot load its helper with the bundled Python runtime." }
           & $tool schema-contract --repack coa-schema-fixture-build --tree _tree --core _core --bots _bots --repairs database-repairs
