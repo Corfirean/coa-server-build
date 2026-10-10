@@ -1,10 +1,15 @@
 name: build-linux
-# EXPERIMENTAL. Compiles the fork + bots module on Linux inside Docker and publishes an UNSIGNED update package to the
-# "linux-unsigned" prerelease. This workflow has no access to the signing key: the package is signed and promoted
-# separately by the repository owner. Windows releases (edge, stable, base) are not touched.
+# EXPERIMENTAL. Compiles the fork + bots module + SQUID + Content Scaling on Linux inside Docker, validates the release
+# database the way the Windows pipeline does (on the data directory of the signed `base` package, in a MySQL container),
+# and publishes an UNSIGNED update package to the "linux-unsigned" prerelease. The package carries the prepared databases
+# (Database/baseline) that the Manager's Docker installer imports. This workflow has no access to the signing key: the
+# package is signed and promoted separately by the repository owner. Windows releases (edge, stable, base) are not touched.
 on:
   workflow_dispatch:
     inputs:
+      release_version:
+        description: Optional release version (0.yyMMdd.build)
+        default: ''
       core_ref:
         description: Fork ref (branch, tag or SHA)
         default: coa-bots
@@ -14,6 +19,18 @@ on:
       scaling_ref:
         description: mod-coa-content-scaling ref (branch, tag or SHA)
         default: main
+      squid_ref:
+        description: 'SQUID source: latest-release selects the newest stable v* tag; explicit refs override'
+        default: latest-release
+      manager_ref:
+        description: Manager release-tool ref (must support release schema validation on Linux)
+        default: master
+      manager_repo:
+        description: Manager repository (change it only to try an unmerged branch)
+        default: Corfirean/coa-server-manager
+      base_repo:
+        description: Repository whose `base` release holds the signed base package
+        default: Corfirean/coa-server-build
 
 concurrency:
   group: build-linux
@@ -25,7 +42,7 @@ permissions:
 jobs:
   linux:
     runs-on: ubuntu-latest
-    timeout-minutes: 240
+    timeout-minutes: 300
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
@@ -33,7 +50,8 @@ jobs:
       - name: Manager tools (coa-release)
         uses: actions/checkout@v7
         with:
-          repository: Corfirean/coa-server-manager
+          repository: ${{ inputs.manager_repo }}
+          ref: ${{ inputs.manager_ref }}
           path: _manager
       - name: Core sources
         uses: actions/checkout@v7
@@ -54,11 +72,26 @@ jobs:
           repository: Corfirean/mod-coa-content-scaling
           ref: ${{ inputs.scaling_ref }}
           path: _scaling
+      - name: Resolve the SQUID release tag to an exact commit
+        id: squid
+        env:
+          SQUID_REF: ${{ inputs.squid_ref }}
+        run: ./scripts/resolve-squid.sh "$SQUID_REF"
+      - name: Fetch unchanged SQUID Playerbots
+        uses: actions/checkout@v7
+        with:
+          repository: Zyth45/mod-playerbots
+          ref: ${{ steps.squid.outputs.squid_sha }}
+          path: _core/modules/mod-playerbots
       - name: Record the exact commits
+        env:
+          SQUID_RESOLVED_TAG: ${{ steps.squid.outputs.squid_tag }}
         run: |
           echo "CORE_SHA=$(git -C _core rev-parse HEAD)" >> "$GITHUB_ENV"
           echo "BOTS_SHA=$(git -C _bots rev-parse HEAD)" >> "$GITHUB_ENV"
           echo "SCALING_SHA=$(git -C _scaling rev-parse HEAD)" >> "$GITHUB_ENV"
+          echo "SQUID_SHA=$(git -C _core/modules/mod-playerbots rev-parse HEAD)" >> "$GITHUB_ENV"
+          echo "SQUID_TAG=$SQUID_RESOLVED_TAG" >> "$GITHUB_ENV"
       - name: Place the modules where the core expects them
         run: |
           dst=_core/modules/mod-coa-playerbots
@@ -80,31 +113,76 @@ jobs:
           file _binaries/worldserver _binaries/authserver
           docker run --rm -v "$PWD/_binaries:/b:ro" ubuntu:26.04 sh -c \
             'apt-get update -qq && apt-get install -y -qq --no-install-recommends libmysqlclient24 libicu78 libncurses6 libreadline8t64 >/dev/null && /b/worldserver --version && /b/authserver --version'
+      - name: Read the SQL and the package files with Windows line endings
+        # The migration checksums in the signed base are those of files checked out on Windows (CRLF). The compile above
+        # used the untouched LF checkout; from here on only SQL and package files are read.
+        run: |
+          ./scripts/crlf-checkout.sh _core _bots _scaling _core/modules/mod-playerbots
+          rm -rf _core/modules/mod-coa-content-scaling _core/modules/mod-coa-tbc-content _core/modules/mod-coa-wotlk-content
+          mkdir -p _core/modules/mod-coa-content-scaling
+          tar -C _scaling --exclude=.git --exclude=artifacts --exclude=docs --exclude=tools -cf - . | tar -C _core/modules/mod-coa-content-scaling -xf -
+          for pack in mod-coa-tbc-content mod-coa-wotlk-content; do
+            cp -r "_scaling/content-packs/$pack" "_core/modules/$pack"
+          done
       - name: Build coa-release
         run: cargo build --release -p coa-release --manifest-path _manager/Cargo.toml
       - name: Assemble the release tree
-        run: ./scripts/assemble-tree.sh --binaries _binaries --core _core --bots _bots --out _tree --manager _manager --core-sha "$CORE_SHA" --bots-sha "$BOTS_SHA" --scaling-sha "$SCALING_SHA"
-      - name: Pack (every file, there is no Linux base package yet)
+        run: ./scripts/assemble-tree.sh --binaries _binaries --core _core --bots _bots --out _tree --manager _manager --core-sha "$CORE_SHA" --bots-sha "$BOTS_SHA" --scaling-sha "$SCALING_SHA" --squid-sha "$SQUID_SHA" --squid-tag "$SQUID_TAG"
+      - name: Fetch the signed base package for database acceptance
+        env:
+          BASE_REPO: ${{ inputs.base_repo }}
+        run: gh release download base --pattern manifest.json --pattern manifest.json.sig --pattern '*.tar.zst.*' --dir _schema-base --repo "$BASE_REPO"
+      - name: Apply release SQL on an isolated database and capture the expected schema
         run: |
-          version="0.$(date +%y%m%d).${{ github.run_number }}"
+          tool=_manager/target/release/coa-release
+          "$tool" extract-schema-base --package _schema-base --fixture coa-schema-fixture-build
+          # The launcher (manage.py) is a Windows program, so it can only be compiled here; its SQUID helper is plain Python and
+          # must load, as it does for the Windows job.
+          python3 -I -m py_compile _tree/Scripts/manage.py _tree/Scripts/squid_playerbots.py
+          PYTHONDONTWRITEBYTECODE=1 python3 -I -c 'import sys; sys.path.insert(0, sys.argv[1]); import squid_playerbots' "$PWD/_tree/Scripts"
+          "$tool" schema-contract --repack coa-schema-fixture-build --tree _tree --core _core --bots _bots --repairs database-repairs
+          test -f _tree/Scripts/database-schema.json
+          # The fixture now holds the databases of this release with every migration applied: they are the baseline.
+          "$tool" export-baseline --server coa-schema-fixture-build --out _tree/Database/baseline
+      - name: Pack (every file, there is no Linux base package yet)
+        env:
+          RELEASE_VERSION: ${{ inputs.release_version }}
+        run: |
+          version=$RELEASE_VERSION
+          if [ -z "$version" ]; then version="0.$(date +%y%m%d).${{ github.run_number }}"; fi
+          [[ "$version" =~ ^0\.[0-9]{6}\.[0-9]+$ ]] || { echo "Invalid release version: $version" >&2; exit 1; }
           echo "VERSION=$version" >> "$GITHUB_ENV"
           echo '{"schema":1,"kind":"base","version":"0.0.0","core":{"commit":null},"builtAt":"none","minManagerVersion":"0.1.0","files":[]}' > base-manifest.json
           _manager/target/release/coa-release pack-update --tree _tree --base-manifest base-manifest.json --core _core --bots _bots --out _out \
-            --version "$version" --core-commit "$CORE_SHA" --bots-commit "$BOTS_SHA"
+            --version "$version" --core-commit "$CORE_SHA" --bots-commit "$BOTS_SHA" --repairs database-repairs
+          # Same minimum as the Windows release job.
+          jq '.minManagerVersion = "0.6.4"' _out/manifest.json > _out/manifest.json.new && mv _out/manifest.json.new _out/manifest.json
       - name: Smoke test the final archive, configuration is read from the package layout
         run: |
           # Extract exactly what will be published, then start the server from it.
           mkdir _extracted
           cat _out/*.tar.zst.* | zstd -dc | tar -x -C _extracted
+          test -s _extracted/Database/baseline/world.sql.zst
+          test -s _extracted/Scripts/database-schema.json
           ./scripts/smoke-test-linux.sh _extracted
+      - name: Keep the package as a workflow artifact too
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-package
+          path: _out
+          retention-days: 7
+          compression-level: 0
       - name: Publish to the linux-unsigned release
         run: |
           gh release view linux-unsigned >/dev/null 2>&1 || gh release create linux-unsigned --prerelease --title "Linux builds (unsigned, experimental)" --notes "Not signed. Not usable by the Manager until signed."
           old=$(gh release view linux-unsigned --json assets --jq '.assets[].name')
-          for f in _out/*; do gh release upload linux-unsigned "$f" --clobber; done
-          for n in $old; do [ -f "_out/$n" ] || gh release delete-asset linux-unsigned "$n" --yes; done
+          # GitHub answers an upload now and then with a 500; the upload is repeatable, so try again.
+          retry() { for i in 1 2 3 4; do "$@" && return 0; sleep $((i * 15)); done; return 1; }
+          for f in _out/*; do retry gh release upload linux-unsigned "$f" --clobber; done
+          for n in $old; do [ -f "_out/$n" ] || retry gh release delete-asset linux-unsigned "$n" --yes; done
           gh release edit linux-unsigned --notes "Version $VERSION
           core $CORE_SHA
           bots $BOTS_SHA
           scaling $SCALING_SHA
+          squid $SQUID_SHA
           UNSIGNED: the Manager refuses it until it is signed."
