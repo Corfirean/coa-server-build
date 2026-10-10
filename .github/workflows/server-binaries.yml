@@ -210,12 +210,19 @@ jobs:
         uses: mozilla-actions/sccache-action@d651010b8da762cde178750d8eda7b5febfe147a # v0.0.9
         with:
           version: v0.10.0
+      - name: Identify compiler cache compatibility
+        id: toolchain
+        shell: pwsh
+        run: |
+          $compiler = (Get-Command cl.exe).Source
+          $identity = (Get-Item $compiler).VersionInfo.FileVersion + '-RelWithDebInfo-Z7-PCH'
+          "identity=$identity" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
       - name: Restore compiler cache
         uses: actions/cache@v6
         with:
           path: ${{ runner.temp }}/sccache
-          key: trusted-msvc-${{ runner.os }}-${{ runner.arch }}-boost187-mysql849-${{ github.run_id }}
-          restore-keys: trusted-msvc-${{ runner.os }}-${{ runner.arch }}-boost187-mysql849-
+          key: trusted-msvc-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.identity }}-boost187-mysql849-${{ github.run_id }}
+          restore-keys: trusted-msvc-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.identity }}-boost187-mysql849-
       - name: Configure
         env:
           SCCACHE_IGNORE_SERVER_IO_ERROR: '1'

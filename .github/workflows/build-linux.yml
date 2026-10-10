@@ -96,6 +96,15 @@ jobs:
           repository: ${{ inputs.manager_repo }}
           ref: ${{ inputs.manager_ref }}
           path: _manager
+      - name: Cache release-tool dependencies
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            _manager/target
+          key: trusted-release-cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('_manager/Cargo.lock') }}-${{ github.run_id }}
+          restore-keys: trusted-release-cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('_manager/Cargo.lock') }}-
       - name: Core sources
         uses: actions/checkout@v7
         with:

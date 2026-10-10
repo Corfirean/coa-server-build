@@ -93,6 +93,15 @@ jobs:
           repository: Corfirean/coa-server-manager
           ref: ${{ inputs.manager_ref || 'master' }}
           path: _manager
+      - name: Cache release-tool dependencies
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            _manager/target
+          key: trusted-release-cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('_manager/Cargo.lock') }}-${{ github.run_id }}
+          restore-keys: trusted-release-cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('_manager/Cargo.lock') }}-
       - name: Build coa-release
         shell: pwsh
         run: cargo build --release -p coa-release --manifest-path _manager/Cargo.toml
