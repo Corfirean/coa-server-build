@@ -51,6 +51,7 @@ jobs:
       # "Configure OS" short-circuit the install work when these are restored.
       - name: Cache Boost & MySQL
         uses: actions/cache@v6
+        continue-on-error: true
         with:
           path: |
             C:\local\boost_1_87_0
@@ -207,6 +208,8 @@ jobs:
         with:
           arch: x64
       - name: Install pinned sccache
+        id: sccache
+        continue-on-error: true
         uses: mozilla-actions/sccache-action@d651010b8da762cde178750d8eda7b5febfe147a # v0.0.9
         with:
           version: v0.10.0
@@ -219,6 +222,7 @@ jobs:
           "identity=$identity" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
       - name: Restore compiler cache
         uses: actions/cache@v6
+        continue-on-error: true
         with:
           path: ${{ runner.temp }}/sccache
           key: trusted-msvc-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.identity }}-boost187-mysql849-${{ github.run_id }}
@@ -230,13 +234,15 @@ jobs:
         run: |
           "SCCACHE_DIR=$env:RUNNER_TEMP/sccache" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           $env:SCCACHE_DIR = "$env:RUNNER_TEMP/sccache"
+          $launcher = if (Get-Command sccache.exe -ErrorAction SilentlyContinue) { 'sccache' } else { '' }
+          if (-not $launcher) { Write-Warning 'sccache unavailable; compiling directly with MSVC.' }
           cmake -S . -B build -G Ninja `
             -DCMAKE_BUILD_TYPE=RelWithDebInfo `
             -DBUILD_TESTING=ON `
             -DCMAKE_POLICY_DEFAULT_CMP0141=NEW `
             -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded `
-            -DCMAKE_C_COMPILER_LAUNCHER=sccache `
-            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache `
+            -DCMAKE_C_COMPILER_LAUNCHER="$launcher" `
+            -DCMAKE_CXX_COMPILER_LAUNCHER="$launcher" `
             -DAPPS_BUILD=all -DTOOLS_BUILD=none `
             -DSCRIPTS=static -DMODULES=static `
             -DUSE_COREPCH=1 -DUSE_SCRIPTPCH=1 `
@@ -252,7 +258,8 @@ jobs:
           python -B tools/verify_all.py --stages source,build,unit --base origin/coa-bots --jobs 4
           if ($LASTEXITCODE) { throw 'Source, build or unit verification failed.' }
       - name: Compiler cache statistics
-        if: always()
+        if: always() && steps.sccache.outcome == 'success'
+        continue-on-error: true
         shell: pwsh
         run: sccache --show-stats
       - name: Smoke test (binaries start and report their revision)

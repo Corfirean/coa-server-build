@@ -95,6 +95,7 @@ jobs:
           path: _manager
       - name: Cache release-tool dependencies
         uses: actions/cache@v6
+        continue-on-error: true
         with:
           path: |
             ~/.cargo/registry

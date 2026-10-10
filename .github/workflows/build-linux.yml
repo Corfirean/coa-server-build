@@ -98,6 +98,7 @@ jobs:
           path: _manager
       - name: Cache release-tool dependencies
         uses: actions/cache@v6
+        continue-on-error: true
         with:
           path: |
             ~/.cargo/registry
@@ -160,6 +161,7 @@ jobs:
       - uses: docker/setup-buildx-action@v3
       - name: Restore compiler cache
         uses: actions/cache@v6
+        continue-on-error: true
         with:
           path: .ccache
           key: trusted-linux-clang-ubuntu26-${{ hashFiles('docker/Dockerfile.linux') }}-${{ github.run_id }}
