@@ -144,7 +144,7 @@ jobs:
           if ($LASTEXITCODE) { throw "pack-update failed" }
           $manifestPath = '_out/manifest.json'
           $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
-          $manifest.minManagerVersion = '0.6.4'
+          $manifest.minManagerVersion = '0.6.9'
           $manifest | ConvertTo-Json -Depth 100 | Set-Content $manifestPath -Encoding utf8NoBOM
           & $tool sign --dir _out;   if ($LASTEXITCODE) { throw "sign failed" }
           & $tool verify --dir _out; if ($LASTEXITCODE) { throw "verify failed" }
