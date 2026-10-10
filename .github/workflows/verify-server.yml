@@ -1,0 +1,29 @@
+name: verify-server
+on:
+  workflow_dispatch:
+    inputs:
+      core_ref:
+        description: Exact core commit
+        required: true
+      bots_ref:
+        description: Exact companion module commit
+        required: true
+      scaling_ref:
+        description: Exact scaling module commit
+        required: true
+      squid_ref:
+        description: Exact SQUID commit
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: verify-server
+  cancel-in-progress: false
+jobs:
+  binaries:
+    uses: ./.github/workflows/server-binaries.yml
+    with:
+      core_ref: ${{ inputs.core_ref }}
+      bots_ref: ${{ inputs.bots_ref }}
+      scaling_ref: ${{ inputs.scaling_ref }}
+      squid_ref: ${{ inputs.squid_ref }}
