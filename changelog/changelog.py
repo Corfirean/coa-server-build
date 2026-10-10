@@ -50,7 +50,12 @@ TYPES = ["added", "changed", "fixed", "removed", "known-issue"]
 TYPE_LABEL = {"added": "Added", "changed": "Changed", "fixed": "Fixed", "removed": "Removed", "known-issue": "Known issue"}
 AUDIENCES = ["players", "admins"]
 AUDIENCE_LABEL = {"players": "For players", "admins": "For server owners"}
-VERSION_KEYS = [("server", "Server"), ("manager", "Manager"), ("addon", "Addon"), ("renderer", "Renderer")]
+VERSION_KEYS = [("server", "Server"), ("manager", "Manager"), ("bots", "Bots"), ("addon", "Addon"), ("renderer", "Renderer")]
+COMPONENT_AREAS = {
+    "manager": {"manager"},
+    "bots": {"bots", "addon"},
+    "server": {"server", "bots", "scaling", "modules", "addon", "client"},
+}
 
 FILENAME_RE = re.compile(r"^(\d{8})-([a-z0-9][a-z0-9-]{1,60})\.md$")
 ALLOWED_KEYS = {"area", "type", "audience", "title", "refs"}
@@ -234,6 +239,22 @@ def collect(remote: bool, overrides: dict[str, Path]) -> list[Fragment]:
     return frags
 
 
+def collect_locked(path: Path) -> list[Fragment]:
+    lock = json.loads(path.read_text(encoding="utf-8"))
+    components = lock["components"]
+    aliases = {"server": "core", "bots": "bots", "scaling": "scaling", "manager": "manager", "build": "build"}
+    fragments = []
+    for name, key in aliases.items():
+        if key not in components:
+            continue
+        component = components[key]
+        sha = component["sha"]
+        if not re.fullmatch(r"[0-9a-f]{40}", sha):
+            raise ValueError(f"{key}: changelog source is not pinned")
+        fragments.extend(fetch_remote({"name": name, "repo": component["repository"], "branch": sha}))
+    return fragments
+
+
 # ------------------------------------------------------------------------------------------------------------ releases
 def load_releases() -> list[dict]:
     if not RELEASES_DIR.is_dir():
@@ -241,8 +262,9 @@ def load_releases() -> list[dict]:
     return [json.loads(p.read_text(encoding="utf-8")) for p in sorted(RELEASES_DIR.glob("*.json"))]
 
 
-def released_ids(releases: list[dict]) -> set[str]:
-    return {e["id"] for r in releases for e in r["entries"]}
+def released_ids(releases: list[dict], component: str | None = None) -> set[str]:
+    return {e["id"] for r in releases if component is None or r.get("component") in (None, component)
+            for e in r["entries"]}
 
 
 def sort_entries(entries: list[dict]) -> list[dict]:
@@ -385,7 +407,11 @@ def cmd_status(a) -> int:
 
 
 def cmd_release(a) -> int:
-    frags = collect(a.remote or not a.source, parse_overrides(a.source))
+    lock = getattr(a, "lock", None)
+    frags = collect_locked(Path(lock)) if lock else collect(a.remote or not a.source, parse_overrides(a.source))
+    component = getattr(a, "component", None)
+    if component:
+        frags = [f for f in frags if f.area in COMPONENT_AREAS[component]]
     if report(frags):
         print("Fix the errors above first; nothing was released.")
         return 1
@@ -393,13 +419,18 @@ def cmd_release(a) -> int:
     if any(r["id"] == a.id for r in releases):
         print(f"release {a.id} already exists")
         return 1
-    done = released_ids(releases)
-    fresh = [f for f in frags if f.id not in done]
+    done = released_ids(releases, component)
+    fresh = [f for f in frags if f.id not in done and (component is None or f.area in COMPONENT_AREAS[component])]
     if not fresh:
         print("Nothing unreleased.")
         return 1
-    versions = {k: getattr(a, k) for k, _ in VERSION_KEYS if getattr(a, k)}
-    record = {"id": a.id, "date": a.date or a.id[:10], "versions": versions, "entries": [f.as_entry() for f in sort_entries_frag(fresh)]}
+    versions = {k: getattr(a, k) for k, _ in VERSION_KEYS if getattr(a, k, None)}
+    date = a.date or (re.search(r"\d{4}-\d{2}-\d{2}", a.id).group() if re.search(r"\d{4}-\d{2}-\d{2}", a.id) else dt.date.today().isoformat())
+    record = {"id": a.id, "date": date, "versions": versions, "entries": [f.as_entry() for f in sort_entries_frag(fresh)]}
+    if lock:
+        record["snapshot"] = json.loads(Path(lock).read_text(encoding="utf-8"))["snapshot"]
+    if component:
+        record["component"] = component
     if a.dry_run:
         print(render_release_md(record))
         print("--- Discord ---")
@@ -535,6 +566,8 @@ def main(argv: list[str] | None = None) -> int:
         p.set_defaults(fn=fn)
 
     p = sub.add_parser("release")
+    p.add_argument("--lock", type=Path, help="Collect only revisions from this release-lock.json")
+    p.add_argument("--component", choices=list(COMPONENT_AREAS), help="Release only this component's changes")
     p.add_argument("--id", required=True, help="release id, usually the date: 2026-10-03 (add -2 for a second one the same day)")
     p.add_argument("--date")
     for k, _ in VERSION_KEYS:

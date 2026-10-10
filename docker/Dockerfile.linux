@@ -9,9 +9,9 @@
 # The build context is a checkout of the core with the bots module already placed at modules/mod-coa-playerbots
 # (module/src -> src, module/conf -> conf), exactly like the Windows job does. The core's own .git is mounted at build
 # time only because the version banner reads it.
-ARG UBUNTU_VERSION=26.04
+ARG UBUNTU_IMAGE=ubuntu:26.04@sha256:f144425ff09be612d6d9ad965196e9cdc23dae1f42110a8a11a3e9a8198759f7
 
-FROM ubuntu:${UBUNTU_VERSION} AS build
+FROM ${UBUNTU_IMAGE} AS build
 ARG DEBIAN_FRONTEND=noninteractive
 ARG BUILD_TYPE=RelWithDebInfo
 # Parallel compile jobs. Defaults to the number of CPUs; lower it on a machine with little memory.
@@ -30,12 +30,14 @@ COPY conf conf
 COPY deps deps
 COPY src src
 COPY modules modules
+COPY .ccache /ccache-seed
 
 WORKDIR /azerothcore/build
 RUN --mount=type=cache,id=coa-ccache,target=/ccache,sharing=locked \
     --mount=type=bind,target=/azerothcore/.git,source=.git \
     git config --global --add safe.directory /azerothcore \
     && export CCACHE_DIR=/ccache CCACHE_MAXSIZE=2G \
+    && cp -an /ccache-seed/. /ccache/ \
     && cmake /azerothcore -G Ninja \
         -DCMAKE_INSTALL_PREFIX=/azerothcore/env/dist \
         -DCONF_DIR=configs \
@@ -45,8 +47,11 @@ RUN --mount=type=cache,id=coa-ccache,target=/ccache,sharing=locked \
         -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
         -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
         -DBoost_USE_STATIC_LIBS=ON \
-    && cmake --build . --target worldserver authserver -j "$([ "${JOBS}" -gt 0 ] && echo "${JOBS}" || nproc)"
+    && cmake --build . --target worldserver authserver -j "$([ "${JOBS}" -gt 0 ] && echo "${JOBS}" || nproc)" \
+    && ccache --show-stats \
+    && mkdir -p /ccache-export && cp -a /ccache/. /ccache-export/
 
 FROM scratch AS binaries
 COPY --from=build /azerothcore/build/src/server/apps/worldserver /worldserver
 COPY --from=build /azerothcore/build/src/server/apps/authserver /authserver
+COPY --from=build /ccache-export /ccache

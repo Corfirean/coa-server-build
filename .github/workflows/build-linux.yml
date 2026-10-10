@@ -5,6 +5,43 @@ name: build-linux
 # (Database/baseline) that the Manager's Docker installer imports. This workflow has no access to the signing key: the
 # package is signed and promoted separately by the repository owner. Windows releases (edge, stable, base) are not touched.
 on:
+  workflow_call:
+    inputs:
+      release_version:
+        type: string
+        description: Optional release version (0.yyMMdd.build)
+        default: ''
+      core_ref:
+        type: string
+        description: Fork ref (branch, tag or SHA)
+        default: coa-bots
+      bots_ref:
+        type: string
+        description: mod-coa-playerbots ref (branch, tag or SHA)
+        default: master
+      scaling_ref:
+        type: string
+        description: mod-coa-content-scaling ref (branch, tag or SHA)
+        default: main
+      squid_ref:
+        type: string
+        description: 'SQUID source: latest-release selects the newest stable v* tag; explicit refs override'
+        default: latest-release
+      manager_ref:
+        type: string
+        description: Manager release-tool ref (must support release schema validation on Linux)
+        default: master
+      manager_repo:
+        type: string
+        description: Manager repository (change it only to try an unmerged branch)
+        default: Corfirean/coa-server-manager
+      base_repo:
+        type: string
+        description: Repository whose `base` release holds the signed base package
+        default: Corfirean/coa-server-build
+    secrets:
+      COA_SIGNING_KEY:
+        required: false
   workflow_dispatch:
     inputs:
       release_version:
@@ -47,12 +84,28 @@ jobs:
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v7
+      - name: Load daily source lock
+        if: github.workflow == 'daily-release'
+        uses: actions/download-artifact@v4
+        with:
+          name: release-lock
+          path: _release-lock
       - name: Manager tools (coa-release)
         uses: actions/checkout@v7
         with:
           repository: ${{ inputs.manager_repo }}
           ref: ${{ inputs.manager_ref }}
           path: _manager
+      - name: Cache release-tool dependencies
+        uses: actions/cache@v6
+        continue-on-error: true
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            _manager/target
+          key: trusted-release-cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('_manager/Cargo.lock') }}-${{ github.run_id }}
+          restore-keys: trusted-release-cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('_manager/Cargo.lock') }}-
       - name: Core sources
         uses: actions/checkout@v7
         with:
@@ -106,8 +159,29 @@ jobs:
             cp -r "_scaling/content-packs/$pack" "_core/modules/$pack"
           done
       - uses: docker/setup-buildx-action@v3
+      - name: Restore compiler cache
+        uses: actions/cache@v6
+        continue-on-error: true
+        with:
+          path: .ccache
+          key: trusted-linux-clang-ubuntu26-${{ hashFiles('docker/Dockerfile.linux') }}-${{ github.run_id }}
+          restore-keys: trusted-linux-clang-ubuntu26-${{ hashFiles('docker/Dockerfile.linux') }}-
+      - name: Seed compiler cache
+        run: |
+          mkdir -p .ccache
+          cp -a .ccache _core/.ccache
       - name: Compile in Docker
-        run: docker buildx build -f docker/Dockerfile.linux --target binaries --output type=local,dest=_binaries _core
+        uses: docker/build-push-action@v6
+        with:
+          context: _core
+          file: docker/Dockerfile.linux
+          target: binaries
+          outputs: type=local,dest=_binaries
+          cache-from: type=gha,scope=trusted-linux26
+          cache-to: type=gha,scope=trusted-linux26,mode=max,ignore-error=true
+      - name: Preserve compiler cache
+        run: |
+          cp -a _binaries/ccache/. .ccache/
       - name: Smoke test the binaries (in a clean Ubuntu 26.04 with only the runtime libraries)
         run: |
           file _binaries/worldserver _binaries/authserver
@@ -157,6 +231,11 @@ jobs:
             --version "$version" --core-commit "$CORE_SHA" --bots-commit "$BOTS_SHA" --repairs database-repairs
           # Same minimum as the Windows release job.
           jq '.minManagerVersion = "0.6.12"' _out/manifest.json > _out/manifest.json.new && mv _out/manifest.json.new _out/manifest.json
+      - name: Bind compatibility to the daily snapshot and signed upgrade sources
+        if: github.workflow == 'daily-release'
+        run: |
+          python3 scripts/upgrade-sources.py --lock _release-lock/release-lock.json --download _upgrade-sources
+          python3 scripts/release-compatibility.py --dir _out --lock _release-lock/release-lock.json --sources _upgrade-sources --schema-base _schema-base --platform linux-x86_64 --tool _manager/target/release/coa-release
       - name: Smoke test the final archive, configuration is read from the package layout
         run: |
           # Extract exactly what will be published, then start the server from it.
@@ -172,17 +251,7 @@ jobs:
           path: _out
           retention-days: 7
           compression-level: 0
-      - name: Publish to the linux-unsigned release
+      - name: Publish immutable Linux candidate
         run: |
-          gh release view linux-unsigned >/dev/null 2>&1 || gh release create linux-unsigned --prerelease --title "Linux builds (unsigned, experimental)" --notes "Not signed. Not usable by the Manager until signed."
-          old=$(gh release view linux-unsigned --json assets --jq '.assets[].name')
-          # GitHub answers an upload now and then with a 500; the upload is repeatable, so try again.
-          retry() { for i in 1 2 3 4; do "$@" && return 0; sleep $((i * 15)); done; return 1; }
-          for f in _out/*; do retry gh release upload linux-unsigned "$f" --clobber; done
-          for n in $old; do [ -f "_out/$n" ] || retry gh release delete-asset linux-unsigned "$n" --yes; done
-          gh release edit linux-unsigned --notes "Version $VERSION
-          core $CORE_SHA
-          bots $BOTS_SHA
-          scaling $SCALING_SHA
-          squid $SQUID_SHA
-          UNSIGNED: the Manager refuses it until it is signed."
+          if [ -f _release-lock/release-lock.json ]; then cp _release-lock/release-lock.json _out/; fi
+          python3 scripts/publish-candidate.py --dir _out --repo "$GITHUB_REPOSITORY" --tool _manager/target/release/coa-release --unsigned

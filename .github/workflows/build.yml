@@ -2,8 +2,35 @@ name: build
 # Nightly (and on demand): compile the fork + bots module, assemble a signed cumulative update package
 # and publish it to the moving "edge" release. Promote a good build with the "promote" workflow.
 on:
-  schedule:
-    - cron: '30 1 * * *'
+  workflow_call:
+    inputs:
+      release_version:
+        type: string
+        description: Optional release version (0.yyMMdd.build); must be newer than stable
+        default: ''
+      core_ref:
+        type: string
+        description: Fork ref (branch, tag or SHA)
+        default: coa-bots
+      bots_ref:
+        type: string
+        description: mod-coa-playerbots ref (branch, tag or SHA)
+        default: master
+      scaling_ref:
+        type: string
+        description: mod-coa-content-scaling ref (branch, tag or SHA)
+        default: main
+      squid_ref:
+        type: string
+        description: 'SQUID source: latest-release selects the newest stable v* tag; explicit refs override'
+        default: latest-release
+      manager_ref:
+        type: string
+        description: Manager release-tool ref (must support release schema validation)
+        default: master
+    secrets:
+      COA_SIGNING_KEY:
+        required: false
   workflow_dispatch:
     inputs:
       release_version:
@@ -54,12 +81,28 @@ jobs:
       SCALING_SHA: ${{ needs.binaries.outputs.scaling_sha }}
     steps:
       - uses: actions/checkout@v7
+      - name: Load daily source lock
+        if: github.workflow == 'daily-release'
+        uses: actions/download-artifact@v4
+        with:
+          name: release-lock
+          path: _release-lock
       - name: Manager tools (coa-release)
         uses: actions/checkout@v7
         with:
           repository: Corfirean/coa-server-manager
           ref: ${{ inputs.manager_ref || 'master' }}
           path: _manager
+      - name: Cache release-tool dependencies
+        uses: actions/cache@v6
+        continue-on-error: true
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            _manager/target
+          key: trusted-release-cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('_manager/Cargo.lock') }}-${{ github.run_id }}
+          restore-keys: trusted-release-cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('_manager/Cargo.lock') }}-
       - name: Build coa-release
         shell: pwsh
         run: cargo build --release -p coa-release --manifest-path _manager/Cargo.toml
@@ -109,8 +152,20 @@ jobs:
       - name: Fetch the signed base package for database acceptance
         shell: pwsh
         run: |
-          gh release download base --pattern manifest.json --pattern manifest.json.sig --pattern '*.tar.zst.*' --dir _schema-base --repo $env:GITHUB_REPOSITORY
-          if ($LASTEXITCODE) { throw "A signed base package is required for database acceptance." }
+          if (Test-Path _release-lock/release-lock.json) {
+            python scripts/upgrade-sources.py --lock _release-lock/release-lock.json --download _upgrade-sources --packages --tool _manager/target/release/coa-release.exe
+            if ($LASTEXITCODE) { throw "Full locked upgrade fixture verification failed." }
+            New-Item -ItemType Directory -Force _schema-base | Out-Null
+            Copy-Item _upgrade-sources/base/* _schema-base
+          } else {
+            '{}' | Set-Content _manual-upgrade-lock.json -Encoding utf8NoBOM
+            python scripts/upgrade-sources.py --lock _manual-upgrade-lock.json
+            if ($LASTEXITCODE) { throw "Freezing the manual upgrade fixtures failed." }
+            python scripts/upgrade-sources.py --lock _manual-upgrade-lock.json --download _upgrade-sources --packages --tool _manager/target/release/coa-release.exe
+            if ($LASTEXITCODE) { throw "Full manual upgrade fixture verification failed." }
+            New-Item -ItemType Directory -Force _schema-base | Out-Null
+            Copy-Item _upgrade-sources/base/* _schema-base
+          }
           Copy-Item _schema-base/manifest.json base-manifest.json
       - name: Apply release SQL on an isolated database and capture the expected schema
         shell: pwsh
@@ -118,11 +173,33 @@ jobs:
           $tool = "_manager/target/release/coa-release.exe"
           & $tool extract-schema-base --package _schema-base --fixture coa-schema-fixture-build
           if ($LASTEXITCODE) { throw "Preparing the isolated database failed." }
+          $env:COA_MYSQL_TEST_BIN = (Resolve-Path coa-schema-fixture-build/mysql/bin).Path
+          $testName = "real_mysql_restores_objects_users_rows_and_missing_defaults"
+          $testList = & cargo test -p coa-core --manifest-path _manager/Cargo.toml $testName -- --ignored --list | Out-String
+          if ($LASTEXITCODE -or $testList -notmatch $testName) { throw "The pinned Manager does not provide the required database recovery test." }
+          & cargo test -p coa-core --manifest-path _manager/Cargo.toml $testName -- --ignored --test-threads=1
+          if ($LASTEXITCODE) { throw "Recovery of database objects or legacy defaults failed; this release will not be published." }
           & coa-schema-fixture-build/Runtime/python/python.exe -I -c "import runpy,sys;runpy.run_path(sys.argv[1]);import squid_playerbots" _tree/Scripts/manage.py
           if ($LASTEXITCODE) { throw "The release launcher cannot load its helper with the bundled Python runtime." }
           & $tool schema-contract --repack coa-schema-fixture-build --tree _tree --core _core --bots _bots --repairs database-repairs
           if ($LASTEXITCODE) { throw "Database acceptance failed; this release will not be published." }
           if (-not (Test-Path _tree/Scripts/database-schema.json)) { throw "The database schema contract was not produced." }
+      - name: Start auth and world from the candidate in a disposable isolated server
+        shell: pwsh
+        run: |
+          & _manager/target/release/coa-release.exe qualify-startup --fixture coa-schema-fixture-build --tree _tree --base _schema-base
+          if ($LASTEXITCODE) { throw "Full isolated server startup failed; the candidate will not be published." }
+      - name: Preserve server acceptance diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-server-acceptance-failure
+          path: |
+            coa-schema-fixture-build/Core/Logs
+            coa-schema-fixture-build.manager/updates
+            coa-schema-fixture-build.manager/diagnostics
+            coa-schema-fixture-build.manager/validation-configs.json
+          if-no-files-found: ignore
       - name: Pack, sign, verify
         shell: pwsh
         env:
@@ -146,16 +223,43 @@ jobs:
           $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
           $manifest.minManagerVersion = '0.6.12'
           $manifest | ConvertTo-Json -Depth 100 | Set-Content $manifestPath -Encoding utf8NoBOM
+          if (Test-Path _release-lock/release-lock.json) {
+            python scripts/upgrade-sources.py --lock _release-lock/release-lock.json --download _upgrade-sources
+            if ($LASTEXITCODE) { throw "Locked upgrade fixture download failed" }
+            python scripts/release-compatibility.py --dir _out --lock _release-lock/release-lock.json --sources _upgrade-sources --schema-base _schema-base --platform windows-x86_64 --tool $tool
+            if ($LASTEXITCODE) { throw "Release compatibility validation failed" }
+          }
           & $tool sign --dir _out;   if ($LASTEXITCODE) { throw "sign failed" }
           & $tool verify --dir _out; if ($LASTEXITCODE) { throw "verify failed" }
-      - name: Publish to the edge release
+      - name: Qualify Manager upgrades from the base and two stable releases
         shell: pwsh
         run: |
-          gh release view edge --repo $env:GITHUB_REPOSITORY 2>$null
-          if ($LASTEXITCODE -ne 0) { gh release create edge --prerelease --title "Edge builds" --notes "Latest nightly build. Not promoted to stable yet." --repo $env:GITHUB_REPOSITORY }
-          $old = gh release view edge --json assets --jq '.assets[].name' --repo $env:GITHUB_REPOSITORY
-          $files = Get-ChildItem _out -File
-          $files | ForEach-Object { gh release upload edge $_.FullName --clobber --repo $env:GITHUB_REPOSITORY }
-          $keep = $files.Name
-          foreach ($n in $old) { if ($keep -notcontains $n) { gh release delete-asset edge $n --yes --repo $env:GITHUB_REPOSITORY } }
-          gh release edit edge --notes "Version $env:VERSION`ncore $env:CORE_SHA`nbots $env:BOTS_SHA`nscaling $env:SCALING_SHA`nsquid $env:SQUID_SHA" --repo $env:GITHUB_REPOSITORY
+          New-Item -ItemType Directory -Force _upgrade-reports | Out-Null
+          foreach ($role in 'base', 'stable-1', 'stable-2') {
+            $fixture = "coa-schema-fixture-upgrade-$role"
+            & _manager/target/release/coa-release.exe qualify-upgrade --base _schema-base --source "_upgrade-sources/$role" --candidate _out --fixture $fixture --report "_upgrade-reports/$role.json"
+            if ($LASTEXITCODE) { throw "Manager upgrade from $role failed; candidate publication is blocked." }
+            $workspace = [IO.Path]::GetFullPath((Get-Location).Path).TrimEnd('\') + '\'
+            foreach ($owned in $fixture, "$fixture.manager") {
+              $absolute = [IO.Path]::GetFullPath((Join-Path (Get-Location) $owned))
+              if (-not $absolute.StartsWith($workspace, [StringComparison]::OrdinalIgnoreCase)) { throw 'Fixture cleanup escaped the workspace.' }
+              Remove-Item -LiteralPath $absolute -Recurse -Force
+            }
+          }
+      - name: Preserve Manager upgrade qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-manager-upgrade-qualification
+          path: |
+            _upgrade-reports
+            coa-schema-fixture-upgrade-*/Core/Logs
+            coa-schema-fixture-upgrade-*.manager/diagnostics
+            coa-schema-fixture-upgrade-*.manager/updates/*/txn.json
+            coa-schema-fixture-upgrade-*.manager/validation-configs.json
+          if-no-files-found: ignore
+      - name: Publish immutable Windows candidate
+        shell: pwsh
+        run: |
+          if (Test-Path _release-lock/release-lock.json) { Copy-Item _release-lock/release-lock.json _out/release-lock.json }
+          python scripts/publish-candidate.py --dir _out --repo $env:GITHUB_REPOSITORY --tool _manager/target/release/coa-release.exe

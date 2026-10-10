@@ -28,10 +28,6 @@ on:
       scaling_sha:
         value: ${{ jobs.build.outputs.scaling_sha }}
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   build:
     runs-on: windows-latest
@@ -49,12 +45,13 @@ jobs:
         with:
           repository: Corfirean/azerothcore-wotlk-coa
           ref: ${{ inputs.core_ref || 'coa-bots' }}
-          fetch-depth: 1
+          fetch-depth: 0
       # Cache the fetched Boost + MySQL client so we don't re-download ~350 MB
       # and re-run the Boost installer on every run. The Test-Path guards in
       # "Configure OS" short-circuit the install work when these are restored.
       - name: Cache Boost & MySQL
         uses: actions/cache@v6
+        continue-on-error: true
         with:
           path: |
             C:\local\boost_1_87_0
@@ -210,11 +207,43 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
-      - name: Configure
+      - name: Install pinned sccache
+        id: sccache
+        continue-on-error: true
+        uses: mozilla-actions/sccache-action@d651010b8da762cde178750d8eda7b5febfe147a # v0.0.9
+        with:
+          version: v0.10.0
+      - name: Identify compiler cache compatibility
+        id: toolchain
         shell: pwsh
         run: |
+          $compiler = (Get-Command cl.exe).Source
+          $identity = (Get-Item $compiler).VersionInfo.FileVersion + '-RelWithDebInfo-Z7-PCH'
+          "identity=$identity" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+      - name: Restore compiler cache
+        id: compiler-cache
+        uses: actions/cache/restore@v6
+        continue-on-error: true
+        with:
+          path: ${{ runner.temp }}/sccache
+          key: trusted-msvc-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.identity }}-boost187-mysql849-${{ github.run_id }}
+          restore-keys: trusted-msvc-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.identity }}-boost187-mysql849-
+      - name: Configure
+        env:
+          SCCACHE_IGNORE_SERVER_IO_ERROR: '1'
+        shell: pwsh
+        run: |
+          "SCCACHE_DIR=$env:RUNNER_TEMP/sccache" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          $env:SCCACHE_DIR = "$env:RUNNER_TEMP/sccache"
+          $launcher = if (Get-Command sccache.exe -ErrorAction SilentlyContinue) { 'sccache' } else { '' }
+          if (-not $launcher) { Write-Warning 'sccache unavailable; compiling directly with MSVC.' }
           cmake -S . -B build -G Ninja `
             -DCMAKE_BUILD_TYPE=RelWithDebInfo `
+            -DBUILD_TESTING=ON `
+            -DCMAKE_POLICY_DEFAULT_CMP0141=NEW `
+            -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded `
+            -DCMAKE_C_COMPILER_LAUNCHER="$launcher" `
+            -DCMAKE_CXX_COMPILER_LAUNCHER="$launcher" `
             -DAPPS_BUILD=all -DTOOLS_BUILD=none `
             -DSCRIPTS=static -DMODULES=static `
             -DUSE_COREPCH=1 -DUSE_SCRIPTPCH=1 `
@@ -223,9 +252,38 @@ jobs:
             -DMYSQL_LIBRARY=C:/tools/mysql/current/lib/mysqlclient.lib `
             -DOPENSSL_ROOT_DIR="$env:OPENSSL_ROOT_DIR"
       - name: Build worldserver and authserver
+        env:
+          SCCACHE_IGNORE_SERVER_IO_ERROR: '1'
         shell: pwsh
-        run: cmake --build build --target worldserver authserver -j 4
+        run: |
+          & ./_pipeline/scripts/run-core-verification.ps1 -CoreRoot . -BaseRef origin/coa-bots -Jobs 4
+          if ($LASTEXITCODE) {
+            $report = Get-ChildItem .cache/verify-all -Recurse -Filter build.log | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+            if ($report) { Get-Content $report.FullName -Tail 100 }
+            throw 'Source, build or unit verification failed. See windows-verification-diagnostics for the complete logs.'
+          }
+      - name: Compiler cache statistics
+        if: always() && steps.sccache.outcome == 'success'
+        continue-on-error: true
+        shell: pwsh
+        run: sccache --show-stats
+      - name: Preserve reusable compiler objects even when qualification fails
+        if: always() && steps.sccache.outcome == 'success' && steps.compiler-cache.outputs.cache-primary-key != '' && steps.compiler-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        continue-on-error: true
+        with:
+          path: ${{ runner.temp }}/sccache
+          key: ${{ steps.compiler-cache.outputs.cache-primary-key }}
+      - name: Upload source, compilation and unit diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-verification-diagnostics
+          path: .cache/verify-all/
+          include-hidden-files: true
+          retention-days: 14
       - name: Smoke test (binaries start and report their revision)
+        if: success()
         shell: pwsh
         run: |
           $bin = (Get-ChildItem build -Recurse -Filter worldserver.exe | Select-Object -First 1).DirectoryName
