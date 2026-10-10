@@ -17,9 +17,12 @@ and the archive parts (`*.tar.zst.NNN`, below GitHub's 2 GiB asset limit).
   [mod-coa-playerbots](https://github.com/Corfirean/mod-coa-playerbots) and unchanged
   [SQUID Playerbots](https://github.com/Zyth45/mod-playerbots/tree/coa) on Windows, builds a cumulative update against the
   `base` manifest, signs it, publishes it to `edge`. Versions are `0.YYMMDD.<run>`.
-* **build-linux** - manual, **experimental**. Compiles the same fork and bots module on Linux inside Docker
-  (`docker/Dockerfile.linux`, Ubuntu 26.04), lays the files out with `scripts/assemble-tree.sh` and publishes an
-  **unsigned** package to `linux-unsigned`. It has no access to the signing key and does not touch `edge`, `stable` or
+* **build-linux** - manual, **experimental**. Compiles the same fork, bots module, SQUID and Content Scaling on Linux inside
+  Docker (`docker/Dockerfile.linux`, Ubuntu 26.04), lays the files out with `scripts/assemble-tree.sh`, applies the release
+  SQL to the data directory of the signed `base` package in a MySQL container (the Manager's `coa-release`, same checks as
+  the Windows job), adds the resulting databases as `Database/baseline` and publishes an
+  **unsigned** package to `linux-unsigned`. The SQL is read from checkouts with Windows line endings
+  (`scripts/crlf-checkout.sh`): the checksums recorded in the base are those of CRLF files. It has no access to the signing key and does not touch `edge`, `stable` or
   `base`. Signing and promoting it is a separate, manual step for the repository owner.
 * **promote** - manual. Copies `edge` to `stable`.
 * **sync-fork** - hourly. Mirrors upstream `main` into the fork and merges it into `coa-bots`; a conflict opens an issue.
