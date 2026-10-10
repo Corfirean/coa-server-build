@@ -165,6 +165,21 @@ jobs:
           & $tool schema-contract --repack coa-schema-fixture-build --tree _tree --core _core --bots _bots --repairs database-repairs
           if ($LASTEXITCODE) { throw "Database acceptance failed; this release will not be published." }
           if (-not (Test-Path _tree/Scripts/database-schema.json)) { throw "The database schema contract was not produced." }
+      - name: Start auth and world from the candidate in a disposable isolated server
+        shell: pwsh
+        run: |
+          & _manager/target/release/coa-release.exe qualify-startup --fixture coa-schema-fixture-build --tree _tree --base _schema-base
+          if ($LASTEXITCODE) { throw "Full isolated server startup failed; the candidate will not be published." }
+      - name: Preserve server acceptance diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-server-acceptance-failure
+          path: |
+            coa-schema-fixture-build/Core/Logs
+            coa-schema-fixture-build.manager/updates
+            coa-schema-fixture-build.manager/validation-configs.json
+          if-no-files-found: ignore
       - name: Pack, sign, verify
         shell: pwsh
         env:
