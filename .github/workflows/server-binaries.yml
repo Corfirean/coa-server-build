@@ -274,7 +274,7 @@ jobs:
           SCCACHE_IGNORE_SERVER_IO_ERROR: '1'
         shell: pwsh
         run: |
-          & ./_pipeline/scripts/run-core-verification.ps1 -CoreRoot . -BaseRef origin/coa-bots -Jobs 4 -Stages build,unit
+          & ./_pipeline/scripts/run-core-verification.ps1 -CoreRoot . -BaseRef origin/coa-bots -Jobs 4 -Stages 'build,unit'
           if ($LASTEXITCODE) {
             $report = Get-ChildItem .cache/verify-all -Recurse -Filter build.log | Sort-Object LastWriteTime -Descending | Select-Object -First 1
             if ($report) { Get-Content $report.FullName -Tail 100 }
