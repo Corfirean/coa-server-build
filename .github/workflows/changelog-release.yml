@@ -14,6 +14,17 @@ on:
       manager:
         description: Manager version (optional, e.g. 0.4.0)
         required: false
+      bots:
+        description: Bots source release version
+        required: false
+      component:
+        description: Independent release history
+        type: choice
+        options:
+          - server
+          - manager
+          - bots
+        default: server
       addon:
         description: Bot UI addon version (optional)
         required: false
@@ -45,13 +56,16 @@ jobs:
           REL_ID: ${{ inputs.id }}
           REL_SERVER: ${{ inputs.server }}
           REL_MANAGER: ${{ inputs.manager }}
+          REL_BOTS: ${{ inputs.bots }}
+          REL_COMPONENT: ${{ inputs.component }}
           REL_ADDON: ${{ inputs.addon }}
           REL_RENDERER: ${{ inputs.renderer }}
           REL_DRY: ${{ inputs.dry_run }}
         run: |
-          args=(release --remote --id "$REL_ID")
+          args=(release --remote --id "$REL_ID" --component "$REL_COMPONENT")
           [ -n "$REL_SERVER" ]   && args+=(--server "$REL_SERVER")
           [ -n "$REL_MANAGER" ]  && args+=(--manager "$REL_MANAGER")
+          [ -n "$REL_BOTS" ]     && args+=(--bots "$REL_BOTS")
           [ -n "$REL_ADDON" ]    && args+=(--addon "$REL_ADDON")
           [ -n "$REL_RENDERER" ] && args+=(--renderer "$REL_RENDERER")
           [ "$REL_DRY" = "true" ] && args+=(--dry-run)
