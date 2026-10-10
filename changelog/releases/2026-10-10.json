@@ -1,0 +1,152 @@
+{
+  "id": "2026-10-10",
+  "date": "2026-10-10",
+  "versions": {
+    "server": "0.261010.32"
+  },
+  "entries": [
+    {
+      "id": "server:20261010-custom-races-update.md",
+      "source": "server",
+      "repo": "Corfirean/azerothcore-wotlk-coa",
+      "date": "2026-10-10",
+      "area": "server",
+      "type": "added",
+      "audience": "players",
+      "title": "Custom races gain Jinyu, Sethrak, Gnoll and Saberon with updated appearances",
+      "body": "Added races receive four racials, improved armor and extra customization. Existing Saberon characters migrate to the Alliance race ID."
+    },
+    {
+      "id": "server:20261010-custom-races.md",
+      "source": "server",
+      "repo": "Corfirean/azerothcore-wotlk-coa",
+      "date": "2026-10-10",
+      "area": "server",
+      "type": "added",
+      "audience": "players",
+      "title": "Optional custom races support extended character appearances",
+      "body": "Server owners can enable custom races when players have installed the matching client patches."
+    },
+    {
+      "id": "build:20261008-custom-races-integration.md",
+      "source": "build",
+      "repo": "Corfirean/coa-server-build",
+      "date": "2026-10-08",
+      "area": "server",
+      "type": "added",
+      "audience": "admins",
+      "title": "Optional custom playable races support (mod-coa-custom-races)",
+      "body": "Added optional custom playable races support with isolated DBC overlays in Data/dbc_races/, extended appearances protocol support, and configuration toggle via CoACustomRaces.Enable (disabled by default)."
+    },
+    {
+      "id": "build:20261010-custom-races.md",
+      "source": "build",
+      "repo": "Corfirean/coa-server-build",
+      "date": "2026-10-10",
+      "area": "server",
+      "type": "added",
+      "audience": "admins",
+      "title": "Server packages include the optional custom race module and its game data",
+      "body": "Custom races require the matching client patches and can be switched on in the Manager."
+    },
+    {
+      "id": "build:20261007-linux-build-release-parity.md",
+      "source": "build",
+      "repo": "Corfirean/coa-server-build",
+      "date": "2026-10-07",
+      "area": "server",
+      "type": "changed",
+      "audience": "admins",
+      "title": "The experimental Linux server build matches the Windows release contents",
+      "body": "Experimental. The Linux package now includes SQUID Playerbots, the launcher scripts and the release database checks, and carries the prepared databases the Docker installer imports."
+    },
+    {
+      "id": "build:20261010-custom-races-update.md",
+      "source": "build",
+      "repo": "Corfirean/coa-server-build",
+      "date": "2026-10-10",
+      "area": "server",
+      "type": "changed",
+      "audience": "admins",
+      "title": "Server packages include the updated custom race game data",
+      "body": "Install the matching client patches through the Manager before enabling custom races."
+    },
+    {
+      "id": "manager:20261005-linux-install-screen-and-client.md",
+      "source": "manager",
+      "repo": "Corfirean/coa-server-manager",
+      "date": "2026-10-05",
+      "area": "manager",
+      "type": "added",
+      "audience": "admins",
+      "title": "Linux: install from the install screen, play with Wine or Proton (experimental)",
+      "body": "Experimental. The install screen offers Docker installs on Linux, realm profiles and the Play button work on a Docker server, and updates are not offered for it."
+    },
+    {
+      "id": "manager:20261010-custom-races.md",
+      "source": "manager",
+      "repo": "Corfirean/coa-server-manager",
+      "date": "2026-10-10",
+      "area": "manager",
+      "type": "added",
+      "audience": "admins",
+      "title": "Custom races can be enabled and their client patches installed from Modules",
+      "body": "Install the custom race client assets from the module card, then enable the module and restart the server."
+    },
+    {
+      "id": "manager:20261010-unsaved-changes-and-crash-recovery.md",
+      "source": "manager",
+      "repo": "Corfirean/coa-server-manager",
+      "date": "2026-10-10",
+      "area": "manager",
+      "type": "added",
+      "audience": "admins",
+      "title": "Unsaved settings are protected and crashed servers can restart automatically",
+      "body": "The Manager asks before leaving unsaved settings. Optional automatic restart pauses after repeated crashes, and crash history explains common failures."
+    },
+    {
+      "id": "manager:20261010-custom-races-update.md",
+      "source": "manager",
+      "repo": "Corfirean/coa-server-manager",
+      "date": "2026-10-10",
+      "area": "manager",
+      "type": "changed",
+      "audience": "admins",
+      "title": "Custom race client patches update to the latest races and appearances",
+      "body": "The module card offers an upgrade for older patches. Archive downloads are verified before installation."
+    },
+    {
+      "id": "manager:20261008-database-error-not-misread.md",
+      "source": "manager",
+      "repo": "Corfirean/coa-server-manager",
+      "date": "2026-10-08",
+      "area": "manager",
+      "type": "fixed",
+      "audience": "admins",
+      "title": "A failing database update is no longer reported as \"database not running",
+      "body": "An SQL error whose message contained the number 2003, such as an out-of-range value, was shown as \"The database is not running\". The real error is now shown."
+    },
+    {
+      "id": "manager:20261010-headless-world-startup.md",
+      "source": "manager",
+      "repo": "Corfirean/coa-server-manager",
+      "date": "2026-10-10",
+      "area": "manager",
+      "type": "fixed",
+      "audience": "admins",
+      "title": "Background world servers no longer stop because the local console is closed",
+      "body": "The Manager automatically disables the local interactive console before starting the world server. Its remote console remains available, and no manual configuration changes are needed."
+    },
+    {
+      "id": "manager:20261010-settings-blank-window.md",
+      "source": "manager",
+      "repo": "Corfirean/coa-server-manager",
+      "date": "2026-10-10",
+      "area": "manager",
+      "type": "fixed",
+      "audience": "admins",
+      "title": "Server and Bots settings open without a blank window",
+      "body": "Opening settings no longer crashes the interface after loading. Unsaved changes can still be saved or discarded before leaving the page."
+    }
+  ]
+}

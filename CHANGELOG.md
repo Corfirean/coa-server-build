@@ -3,6 +3,34 @@
 Everything that changed for players and server owners across the CoA server, bots, Content Scaling, the Manager and the renderer, newest first.
 Written from the `changelog.d/` fragments of each repository (see `changelog/GUIDE.md`).
 
+## 2026-10-10 - Server 0.261010.32
+
+### For players
+
+**Server**
+
+- Added: Custom races gain Jinyu, Sethrak, Gnoll and Saberon with updated appearances. Added races receive four racials, improved armor and extra customization. Existing Saberon characters migrate to the Alliance race ID.
+- Added: Optional custom races support extended character appearances. Server owners can enable custom races when players have installed the matching client patches.
+
+### For server owners
+
+**Server**
+
+- Added: Optional custom playable races support (mod-coa-custom-races). Added optional custom playable races support with isolated DBC overlays in Data/dbc_races/, extended appearances protocol support, and configuration toggle via CoACustomRaces.Enable (disabled by default).
+- Added: Server packages include the optional custom race module and its game data. Custom races require the matching client patches and can be switched on in the Manager.
+- Changed: The experimental Linux server build matches the Windows release contents. Experimental. The Linux package now includes SQUID Playerbots, the launcher scripts and the release database checks, and carries the prepared databases the Docker installer imports.
+- Changed: Server packages include the updated custom race game data. Install the matching client patches through the Manager before enabling custom races.
+
+**Manager**
+
+- Added: Linux: install from the install screen, play with Wine or Proton (experimental). Experimental. The install screen offers Docker installs on Linux, realm profiles and the Play button work on a Docker server, and updates are not offered for it.
+- Added: Custom races can be enabled and their client patches installed from Modules. Install the custom race client assets from the module card, then enable the module and restart the server.
+- Added: Unsaved settings are protected and crashed servers can restart automatically. The Manager asks before leaving unsaved settings. Optional automatic restart pauses after repeated crashes, and crash history explains common failures.
+- Changed: Custom race client patches update to the latest races and appearances. The module card offers an upgrade for older patches. Archive downloads are verified before installation.
+- Fixed: A failing database update is no longer reported as "database not running. An SQL error whose message contained the number 2003, such as an out-of-range value, was shown as "The database is not running". The real error is now shown.
+- Fixed: Background world servers no longer stop because the local console is closed. The Manager automatically disables the local interactive console before starting the world server. Its remote console remains available, and no manual configuration changes are needed.
+- Fixed: Server and Bots settings open without a blank window. Opening settings no longer crashes the interface after loading. Unsaved changes can still be saved or discarded before leaving the page.
+
 ## 2026-10-08-2 - Server 0.261008.27 · Manager 0.6.7
 
 ### For players
