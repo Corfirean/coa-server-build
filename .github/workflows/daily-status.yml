@@ -1,0 +1,111 @@
+name: daily-release
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '30 1 * * *'
+permissions:
+  contents: write
+  issues: write
+concurrency:
+  group: daily-release-${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    outputs:
+      core: ${{ steps.snapshot.outputs.core }}
+      bots: ${{ steps.snapshot.outputs.bots }}
+      scaling: ${{ steps.snapshot.outputs.scaling }}
+      squid: ${{ steps.snapshot.outputs.squid }}
+      manager: ${{ steps.snapshot.outputs.manager }}
+      version: ${{ steps.snapshot.outputs.version }}
+      snapshot: ${{ steps.snapshot.outputs.snapshot }}
+      changed: ${{ steps.snapshot.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Skip when a release is already running
+        id: active
+        run: |
+          count=$(gh run list --repo "$GITHUB_REPOSITORY" --status in_progress --limit 100 --json databaseId,workflowName --jq "[.[] | select(.databaseId != $GITHUB_RUN_ID and (.workflowName == \"daily-release\" or .workflowName == \"build\" or .workflowName == \"build-linux\"))] | length")
+          if [ "$count" -gt 0 ]; then
+            echo 'skip=true' >> "$GITHUB_OUTPUT"
+            echo 'Skipped: another release is still running.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Integration checkout
+        if: steps.active.outputs.skip != 'true'
+        uses: actions/checkout@v7
+        with:
+          repository: Corfirean/azerothcore-wotlk-coa
+          ref: coa-bots
+          fetch-depth: 0
+          path: _integration
+          token: ${{ secrets.FORK_PUSH_TOKEN }}
+      - name: Integrate upstream and race release
+        if: steps.active.outputs.skip != 'true'
+        id: integration
+        run: python3 scripts/integrate-candidate.py
+      - name: Resolve and check daily snapshot
+        if: steps.active.outputs.skip != 'true'
+        id: snapshot
+        run: |
+          python3 scripts/daily-release.py --check-integration --core-ref '${{ steps.integration.outputs.core }}'
+          python3 - <<'PY'
+          import json, os, subprocess
+          from datetime import datetime, timezone
+          lock=json.load(open('release-lock.json'))
+          result=subprocess.run(['gh','api','repos/Corfirean/coa-server-build/contents/stable.json?ref=channels','--jq','.content'],capture_output=True,text=True)
+          previous=''
+          if result.returncode==0:
+              import base64
+              envelope=json.loads(base64.b64decode(result.stdout))
+              previous=json.loads(envelope['payload'])['snapshot']
+          with open(os.environ['GITHUB_OUTPUT'],'a') as out:
+              for name in ('core','bots','scaling','squid','manager'):
+                  out.write(name+'='+lock['components'][name]['sha']+'\n')
+              out.write('snapshot='+lock['snapshot']+'\n')
+              out.write('changed='+str(previous!=lock['snapshot']).lower()+'\n')
+              out.write('version=0.'+datetime.now(timezone.utc).strftime('%y%m%d')+'.'+str(100000+int(os.environ['GITHUB_RUN_NUMBER']))+'\n')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.active.outputs.skip != 'true'
+        with:
+          name: release-lock
+          path: release-lock.json
+          if-no-files-found: error
+      - name: Report blocked integration
+        if: failure()
+        run: |
+          title='Daily release blocked'
+          number=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "$title in:title" --json number --jq '.[0].number // empty')
+          printf 'Daily snapshot could not pass integration checks. Previous stable is unchanged.\n\nRun: https://github.com/%s/actions/runs/%s\n' "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" > /tmp/daily-failure.md
+          if [ -n "$number" ]; then
+            gh issue edit "$number" --repo "$GITHUB_REPOSITORY" --body-file /tmp/daily-failure.md
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body-file /tmp/daily-failure.md
+          fi
+  windows:
+    needs: resolve
+    if: needs.resolve.outputs.changed == 'true'
+    uses: ./.github/workflows/build.yml
+    secrets: inherit
+    with:
+      core_ref: ${{ needs.resolve.outputs.core }}
+      bots_ref: ${{ needs.resolve.outputs.bots }}
+      scaling_ref: ${{ needs.resolve.outputs.scaling }}
+      squid_ref: ${{ needs.resolve.outputs.squid }}
+      manager_ref: ${{ needs.resolve.outputs.manager }}
+      release_version: ${{ needs.resolve.outputs.version }}
+  linux:
+    needs: resolve
+    if: needs.resolve.outputs.changed == 'true'
+    uses: ./.github/workflows/build-linux.yml
+    secrets: inherit
+    with:
+      core_ref: ${{ needs.resolve.outputs.core }}
+      bots_ref: ${{ needs.resolve.outputs.bots }}
+      scaling_ref: ${{ needs.resolve.outputs.scaling }}
+      squid_ref: ${{ needs.resolve.outputs.squid }}
+      manager_ref: ${{ needs.resolve.outputs.manager }}
+      release_version: ${{ needs.resolve.outputs.version }}

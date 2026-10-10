@@ -28,10 +28,6 @@ on:
       scaling_sha:
         value: ${{ jobs.build.outputs.scaling_sha }}
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   build:
     runs-on: windows-latest
@@ -49,7 +45,7 @@ jobs:
         with:
           repository: Corfirean/azerothcore-wotlk-coa
           ref: ${{ inputs.core_ref || 'coa-bots' }}
-          fetch-depth: 1
+          fetch-depth: 0
       # Cache the fetched Boost + MySQL client so we don't re-download ~350 MB
       # and re-run the Boost installer on every run. The Test-Path guards in
       # "Configure OS" short-circuit the install work when these are restored.
@@ -210,11 +206,30 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
+      - name: Install pinned sccache
+        uses: mozilla-actions/sccache-action@d651010b8da762cde178750d8eda7b5febfe147a # v0.0.9
+        with:
+          version: v0.10.0
+      - name: Restore compiler cache
+        uses: actions/cache@v6
+        with:
+          path: ${{ runner.temp }}/sccache
+          key: trusted-msvc-${{ runner.os }}-${{ runner.arch }}-boost187-mysql849-${{ github.run_id }}
+          restore-keys: trusted-msvc-${{ runner.os }}-${{ runner.arch }}-boost187-mysql849-
       - name: Configure
+        env:
+          SCCACHE_IGNORE_SERVER_IO_ERROR: '1'
         shell: pwsh
         run: |
+          "SCCACHE_DIR=$env:RUNNER_TEMP/sccache" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          $env:SCCACHE_DIR = "$env:RUNNER_TEMP/sccache"
           cmake -S . -B build -G Ninja `
             -DCMAKE_BUILD_TYPE=RelWithDebInfo `
+            -DBUILD_TESTING=ON `
+            -DCMAKE_POLICY_DEFAULT_CMP0141=NEW `
+            -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded `
+            -DCMAKE_C_COMPILER_LAUNCHER=sccache `
+            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache `
             -DAPPS_BUILD=all -DTOOLS_BUILD=none `
             -DSCRIPTS=static -DMODULES=static `
             -DUSE_COREPCH=1 -DUSE_SCRIPTPCH=1 `
@@ -223,9 +238,18 @@ jobs:
             -DMYSQL_LIBRARY=C:/tools/mysql/current/lib/mysqlclient.lib `
             -DOPENSSL_ROOT_DIR="$env:OPENSSL_ROOT_DIR"
       - name: Build worldserver and authserver
+        env:
+          SCCACHE_IGNORE_SERVER_IO_ERROR: '1'
         shell: pwsh
-        run: cmake --build build --target worldserver authserver -j 4
+        run: |
+          python -B tools/verify_all.py --stages source,build,unit --base origin/coa-bots --jobs 4
+          if ($LASTEXITCODE) { throw 'Source, build or unit verification failed.' }
+      - name: Compiler cache statistics
+        if: always()
+        shell: pwsh
+        run: sccache --show-stats
       - name: Smoke test (binaries start and report their revision)
+        if: success()
         shell: pwsh
         run: |
           $bin = (Get-ChildItem build -Recurse -Filter worldserver.exe | Select-Object -First 1).DirectoryName

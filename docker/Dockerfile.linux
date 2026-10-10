@@ -30,12 +30,14 @@ COPY conf conf
 COPY deps deps
 COPY src src
 COPY modules modules
+COPY .ccache /ccache-seed
 
 WORKDIR /azerothcore/build
 RUN --mount=type=cache,id=coa-ccache,target=/ccache,sharing=locked \
     --mount=type=bind,target=/azerothcore/.git,source=.git \
     git config --global --add safe.directory /azerothcore \
     && export CCACHE_DIR=/ccache CCACHE_MAXSIZE=2G \
+    && cp -an /ccache-seed/. /ccache/ \
     && cmake /azerothcore -G Ninja \
         -DCMAKE_INSTALL_PREFIX=/azerothcore/env/dist \
         -DCONF_DIR=configs \
@@ -45,8 +47,11 @@ RUN --mount=type=cache,id=coa-ccache,target=/ccache,sharing=locked \
         -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
         -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
         -DBoost_USE_STATIC_LIBS=ON \
-    && cmake --build . --target worldserver authserver -j "$([ "${JOBS}" -gt 0 ] && echo "${JOBS}" || nproc)"
+    && cmake --build . --target worldserver authserver -j "$([ "${JOBS}" -gt 0 ] && echo "${JOBS}" || nproc)" \
+    && ccache --show-stats \
+    && mkdir -p /ccache-export && cp -a /ccache/. /ccache-export/
 
 FROM scratch AS binaries
 COPY --from=build /azerothcore/build/src/server/apps/worldserver /worldserver
 COPY --from=build /azerothcore/build/src/server/apps/authserver /authserver
+COPY --from=build /ccache-export /ccache

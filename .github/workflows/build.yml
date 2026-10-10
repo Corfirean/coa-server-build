@@ -2,8 +2,35 @@ name: build
 # Nightly (and on demand): compile the fork + bots module, assemble a signed cumulative update package
 # and publish it to the moving "edge" release. Promote a good build with the "promote" workflow.
 on:
-  schedule:
-    - cron: '30 1 * * *'
+  workflow_call:
+    inputs:
+      release_version:
+        type: string
+        description: Optional release version (0.yyMMdd.build); must be newer than stable
+        default: ''
+      core_ref:
+        type: string
+        description: Fork ref (branch, tag or SHA)
+        default: coa-bots
+      bots_ref:
+        type: string
+        description: mod-coa-playerbots ref (branch, tag or SHA)
+        default: master
+      scaling_ref:
+        type: string
+        description: mod-coa-content-scaling ref (branch, tag or SHA)
+        default: main
+      squid_ref:
+        type: string
+        description: 'SQUID source: latest-release selects the newest stable v* tag; explicit refs override'
+        default: latest-release
+      manager_ref:
+        type: string
+        description: Manager release-tool ref (must support release schema validation)
+        default: master
+    secrets:
+      COA_SIGNING_KEY:
+        required: false
   workflow_dispatch:
     inputs:
       release_version:
@@ -54,6 +81,12 @@ jobs:
       SCALING_SHA: ${{ needs.binaries.outputs.scaling_sha }}
     steps:
       - uses: actions/checkout@v7
+      - name: Load daily source lock
+        if: github.workflow == 'daily-release'
+        uses: actions/download-artifact@v4
+        with:
+          name: release-lock
+          path: _release-lock
       - name: Manager tools (coa-release)
         uses: actions/checkout@v7
         with:
@@ -148,14 +181,8 @@ jobs:
           $manifest | ConvertTo-Json -Depth 100 | Set-Content $manifestPath -Encoding utf8NoBOM
           & $tool sign --dir _out;   if ($LASTEXITCODE) { throw "sign failed" }
           & $tool verify --dir _out; if ($LASTEXITCODE) { throw "verify failed" }
-      - name: Publish to the edge release
+      - name: Publish immutable Windows candidate
         shell: pwsh
         run: |
-          gh release view edge --repo $env:GITHUB_REPOSITORY 2>$null
-          if ($LASTEXITCODE -ne 0) { gh release create edge --prerelease --title "Edge builds" --notes "Latest nightly build. Not promoted to stable yet." --repo $env:GITHUB_REPOSITORY }
-          $old = gh release view edge --json assets --jq '.assets[].name' --repo $env:GITHUB_REPOSITORY
-          $files = Get-ChildItem _out -File
-          $files | ForEach-Object { gh release upload edge $_.FullName --clobber --repo $env:GITHUB_REPOSITORY }
-          $keep = $files.Name
-          foreach ($n in $old) { if ($keep -notcontains $n) { gh release delete-asset edge $n --yes --repo $env:GITHUB_REPOSITORY } }
-          gh release edit edge --notes "Version $env:VERSION`ncore $env:CORE_SHA`nbots $env:BOTS_SHA`nscaling $env:SCALING_SHA`nsquid $env:SQUID_SHA" --repo $env:GITHUB_REPOSITORY
+          if (Test-Path _release-lock/release-lock.json) { Copy-Item _release-lock/release-lock.json _out/release-lock.json }
+          python scripts/publish-candidate.py --dir _out --repo $env:GITHUB_REPOSITORY --tool _manager/target/release/coa-release.exe
