@@ -22,15 +22,18 @@ foreach ($file in $archives) { $inputs[$file.FullName] = (Get-FileHash -LiteralP
 New-Item -ItemType Directory -Path $Out | Out-Null
 foreach ($name in $names) { Copy-Item -LiteralPath (Join-Path $Tools $name) -Destination $Out }
 Get-ChildItem -LiteralPath $Tools -Filter '*.dll' | Copy-Item -Destination $Out
+$recordedInputs = @{}
+foreach ($path in $inputs.Keys) { $recordedInputs[[IO.Path]::GetRelativePath($Client, $path).Replace('\', '/')] = $inputs[$path] }
+@{ schema = 1; core = $CoreSha; inputs = $recordedInputs; startedUtc = [DateTime]::UtcNow.ToString('o') } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $Out 'generation-inputs.json') -Encoding utf8
 Push-Location $Out
 try {
-    & ./map_extractor.exe -i $Client -o $Out -e 1 2>&1 | Tee-Object -FilePath maps.log
+    & ./map_extractor.exe -i $Client -o $Out -e 1 *> maps.log
     if ($LASTEXITCODE) { throw 'Map extraction failed.' }
-    & ./vmap4_extractor.exe -d (Join-Path $Client 'Data') 2>&1 | Tee-Object -FilePath vmap-extraction.log
+    & ./vmap4_extractor.exe -d (Join-Path $Client 'Data') *> vmap-extraction.log
     if ($LASTEXITCODE) { throw 'VMap extraction failed.' }
-    & ./vmap4_assembler.exe Buildings vmaps 2>&1 | Tee-Object -FilePath vmap-assembly.log
+    & ./vmap4_assembler.exe Buildings vmaps *> vmap-assembly.log
     if ($LASTEXITCODE) { throw 'VMap assembly failed.' }
-    & ./mmaps_generator.exe --config mmaps-config.yaml --threads $Threads --silent 2>&1 | Tee-Object -FilePath mmaps.log
+    & ./mmaps_generator.exe --config mmaps-config.yaml --threads $Threads --silent *> mmaps.log
     if ($LASTEXITCODE) { throw 'MMap generation failed.' }
     $files = @{}
     foreach ($directory in 'maps', 'vmaps', 'mmaps') {
@@ -48,5 +51,5 @@ try {
     }
     $toolHashes = @{}
     foreach ($name in $names) { $toolHashes[$name] = (Get-FileHash -LiteralPath $name -Algorithm SHA256).Hash.ToLowerInvariant() }
-    @{ schema = 1; core = $CoreSha; inputs = $inputs; tools = $toolHashes; files = $files; generatedUtc = [DateTime]::UtcNow.ToString('o'); status = 'generated-not-gameplay-qualified' } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath navigation-manifest.json -Encoding utf8
+    @{ schema = 1; core = $CoreSha; inputs = $recordedInputs; tools = $toolHashes; files = $files; generatedUtc = [DateTime]::UtcNow.ToString('o'); status = 'generated-not-gameplay-qualified' } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath navigation-manifest.json -Encoding utf8
 } finally { Pop-Location }
