@@ -156,7 +156,7 @@ jobs:
           _manager/target/release/coa-release pack-update --tree _tree --base-manifest base-manifest.json --core _core --bots _bots --out _out \
             --version "$version" --core-commit "$CORE_SHA" --bots-commit "$BOTS_SHA" --repairs database-repairs
           # Same minimum as the Windows release job.
-          jq '.minManagerVersion = "0.6.10"' _out/manifest.json > _out/manifest.json.new && mv _out/manifest.json.new _out/manifest.json
+          jq '.minManagerVersion = "0.6.12"' _out/manifest.json > _out/manifest.json.new && mv _out/manifest.json.new _out/manifest.json
       - name: Smoke test the final archive, configuration is read from the package layout
         run: |
           # Extract exactly what will be published, then start the server from it.
