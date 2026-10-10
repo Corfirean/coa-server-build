@@ -1,56 +1,30 @@
 name: promote
-# Runs automatically after every successful nightly build (called from build.yml) and can be run by hand.
+# Copy the current edge build to the "stable" release that players' Managers follow.
 on:
   workflow_dispatch:
-  workflow_call:
-concurrency:
-  group: stable-promotion
-  cancel-in-progress: false
+
 permissions:
   contents: write
+
 jobs:
   promote:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/checkout@v7
+      - name: Download edge
+        run: gh release download edge --dir edge --repo "$GITHUB_REPOSITORY"
+      - name: Manager release verification tools
+        uses: actions/checkout@v7
         with:
           repository: Corfirean/coa-server-manager
           path: _manager
-      - name: Build pinned verification tools
-        run: cargo build --release -p coa-release --locked --manifest-path _manager/Cargo.toml
-      - name: Resolve and verify immutable candidate
-        shell: pwsh
+      - name: Verify signature, every archive file and the full database schema contract
+        run: cargo run --release -p coa-release --manifest-path _manager/Cargo.toml -- verify --dir edge
+      - name: Publish to stable
         run: |
-          $tool = '_manager/target/release/coa-release.exe'
-          & $tool resolve --source https://github.com/Corfirean/coa-server-build/releases/download/edge --out candidate.json
-          if ($LASTEXITCODE) { throw 'Edge signature or immutable release mismatch.' }
-          $version = (Get-Content candidate.json -Raw | ConvertFrom-Json).version
-          gh release download "server-$version" --dir candidate --repo $env:GITHUB_REPOSITORY
-          if ($LASTEXITCODE) { throw 'Immutable release could not be downloaded.' }
-          & $tool verify --dir candidate
-          if ($LASTEXITCODE) { throw 'Package verification failed.' }
-          python scripts/verify-acceptance.py candidate
-          if ($LASTEXITCODE) { throw 'Missing or mismatched Windows acceptance.' }
-          $manifest = Get-Content candidate/manifest.json -Raw | ConvertFrom-Json
-          $acceptance = Get-Content candidate/acceptance.json -Raw | ConvertFrom-Json
-          gh release download "v$($manifest.minManagerVersion)" --repo Corfirean/coa-server-manager --dir manager-installer --pattern '*-setup.exe' --pattern installer-acceptance.json
-          if ($LASTEXITCODE) { throw 'The required tested manager installer has not been published.' }
-          $installerReport = Get-Content manager-installer/installer-acceptance.json -Raw | ConvertFrom-Json
-          $installer = Get-ChildItem manager-installer/*-setup.exe | Select-Object -First 1
-          if (-not $installer -or $installerReport.result -ne 'passed' -or $installerReport.source -ne $acceptance.managerSource -or (Get-FileHash $installer.FullName).Hash.ToLower() -ne $installerReport.installerSha256) { throw 'Published manager installer does not match the tested source or installer hash.' }
-          gh release download edge --pattern channel.json --dir channel --repo $env:GITHUB_REPOSITORY
-          if ($LASTEXITCODE) { throw 'Edge is not an atomic channel.' }
-          & $tool verify-channel --file channel/channel.json --dir candidate
-          if ($LASTEXITCODE) { throw 'Downloaded channel signature or acceptance hash is invalid.' }
-          # Validate the exact envelope we will upload; a concurrent edge switch cannot mix versions.
-          & $tool resolve --source https://github.com/Corfirean/coa-server-build/releases/download/edge --out edge-now.json
-          if ($LASTEXITCODE -or (Get-FileHash candidate.json).Hash -ne (Get-FileHash edge-now.json).Hash) { throw 'Edge changed during promotion; retry.' }
-          $envelope = Get-Content channel/channel.json -Raw | ConvertFrom-Json
-          $pointer = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($envelope.payload)) | ConvertFrom-Json
-          if ($pointer.version -ne $version -or $pointer.manifest_sha256 -ne (Get-FileHash candidate/manifest.json -Algorithm SHA256).Hash.ToLower()) { throw 'Downloaded pointer differs from tested candidate.' }
-          gh release upload stable channel/channel.json --clobber --repo $env:GITHUB_REPOSITORY
-          if ($LASTEXITCODE) { throw 'Stable channel switch failed.' }
-          gh release edit stable --notes "Version $version; validated immutable release server-$version" --repo $env:GITHUB_REPOSITORY
+          gh release view stable --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || gh release create stable --title "Stable" --notes "Promoted builds" --latest --repo "$GITHUB_REPOSITORY"
+          old=$(gh release view stable --json assets --jq '.assets[].name' --repo "$GITHUB_REPOSITORY")
+          gh release upload stable edge/* --clobber --repo "$GITHUB_REPOSITORY"
+          for n in $old; do [ -f "edge/$n" ] || gh release delete-asset stable "$n" --yes --repo "$GITHUB_REPOSITORY"; done
+          gh release edit stable --notes "$(gh release view edge --json body --jq .body)" --repo "$GITHUB_REPOSITORY"
