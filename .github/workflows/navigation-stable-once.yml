@@ -22,7 +22,7 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       COA_SIGNING_KEY: ${{ secrets.COA_SIGNING_KEY }}
-      MANAGER_SHA: 58c976a388215bea8bbf232503810c6519a33562
+      MANAGER_SHA: 53a05820c82198058068045661f6b51bc5ce1cbf
       TOOL: ${{ github.workspace }}\_manager\target\release\coa-release.exe
     steps:
       - uses: actions/checkout@v7

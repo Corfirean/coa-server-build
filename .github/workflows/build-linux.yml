@@ -274,7 +274,7 @@ jobs:
           _manager/target/release/coa-release pack-update --tree _tree --base-manifest base-manifest.json --core _core --bots _bots --out _out \
             --version "$version" --core-commit "$CORE_SHA" --bots-commit "$BOTS_SHA" --repairs database-repairs
           # Same minimum as the Windows release job.
-          jq '.minManagerVersion = "0.6.12"' _out/manifest.json > _out/manifest.json.new && mv _out/manifest.json.new _out/manifest.json
+          jq '.minManagerVersion = "0.6.15"' _out/manifest.json > _out/manifest.json.new && mv _out/manifest.json.new _out/manifest.json
       - name: Bind compatibility to the frozen snapshot and signed upgrade sources
         run: |
           python3 scripts/upgrade-sources.py --lock _release-lock/release-lock.json --download _upgrade-sources
