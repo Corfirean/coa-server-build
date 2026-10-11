@@ -6,6 +6,7 @@ import json
 import os
 import subprocess
 import tarfile
+import time
 from pathlib import Path, PurePosixPath
 
 REPO = 'Corfirean/coa-server-build'
@@ -104,7 +105,7 @@ def prepare(tool):
     run(tool, 'pack-base', '--tree', tree, '--out', '_out', '--version', VERSION,
         '--core-commit', manifest['core']['commit'], '--bots-commit', manifest['bots']['commit'])
     packed = read('_out/manifest.json')
-    packed.update(kind='update', migrations=manifest['migrations'], minManagerVersion='0.6.13')
+    packed.update(kind='update', migrations=manifest['migrations'], minManagerVersion='0.6.15')
     # Preserve all existing policies and compatible migration checksums, not just the SQL text.
     policies = {f['path']: f for f in manifest['files']}
     for entry in packed['files']:
@@ -167,6 +168,19 @@ def promote(tool, expected):
     if report['version'] != VERSION or approved.get('previousManifestSha256') != PREVIOUS_MANIFEST or approved.get('navigationManifestSha256') != NAVIGATION_MANIFEST or not approved.get('binariesAndSqlUnchanged'):
         raise RuntimeError('One-time navigation promotion authorization does not match')
     run(tool, 'verify', '--dir', folder)
+    # Do not offer 49k-file updates until the optimized Manager is publicly available.
+    for attempt in range(90):
+        manager = subprocess.run(['gh', 'release', 'view', 'v0.6.15', '--repo', 'Corfirean/coa-server-manager',
+                                  '--json', 'isDraft,isPrerelease,assets'], capture_output=True, text=True)
+        if manager.returncode == 0:
+            release = json.loads(manager.stdout)
+            names = {asset['name'] for asset in release['assets']}
+            if not release['isDraft'] and not release['isPrerelease'] and 'latest.json' in names and any(name.endswith('.exe.sig') for name in names) and any(name.endswith('.exe') for name in names):
+                break
+        print('Waiting for the signed Manager 0.6.15 release', flush=True)
+        time.sleep(20)
+    else:
+        raise RuntimeError('Manager 0.6.15 is not published; stable remains unchanged')
     current = module('upgrade-sources').channel()
     if current[1]['version'] != PREVIOUS:
         raise RuntimeError('Stable has advanced; do not overwrite it')
