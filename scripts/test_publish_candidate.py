@@ -16,7 +16,7 @@ class PublicationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
             (root / "manifest.json").write_text(json.dumps({"version": "0.261010.40"}))
-            with patch.object(module, "run") as run, patch.object(module.subprocess, "run", return_value=CompletedProcess([], 0, '{"isDraft":false}', '')):
+            with patch.object(module.metadata, 'validate'), patch.object(module, "run") as run, patch.object(module.subprocess, "run", return_value=CompletedProcess([], 0, '{"isDraft":false}', '')):
                 with self.assertRaisesRegex(RuntimeError, "already exists"):
                     module.publish(root, "owner/repo", "tool")
                 self.assertEqual(run.call_count, 1)

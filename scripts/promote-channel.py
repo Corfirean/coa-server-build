@@ -3,6 +3,7 @@ import base64
 import json
 import re
 import subprocess
+import importlib.util
 from pathlib import Path
 
 GATES = {'source', 'unit', 'auth-startup', 'world-startup', 'schema-contract',
@@ -70,7 +71,11 @@ def main():
     parser.add_argument('--dir', required=True, type=Path)
     parser.add_argument('--tool', required=True)
     args = parser.parse_args()
-    folder = args.dir
+    folder = args.dir.resolve()
+    spec = importlib.util.spec_from_file_location('metadata', Path(__file__).with_name('release-metadata.py'))
+    metadata = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(metadata)
+    metadata.validate(folder)
     manifest = json.loads((folder / 'manifest.json').read_text(encoding='utf-8-sig'))
     lock = json.loads((folder / 'release-lock.json').read_text(encoding='utf-8-sig'))
     if manifest['version'] != args.version or not manifest.get('compatibility'):

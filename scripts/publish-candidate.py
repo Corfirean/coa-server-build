@@ -5,6 +5,11 @@ import json
 import subprocess
 import tempfile
 from pathlib import Path
+import importlib.util
+
+spec = importlib.util.spec_from_file_location('metadata', Path(__file__).with_name('release-metadata.py'))
+metadata = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(metadata)
 
 
 def run(*args):
@@ -29,6 +34,7 @@ def publish(folder, repo, tool, unsigned=False):
     import re
     if not re.fullmatch(r"0\.\d{6}\.\d+", version):
         raise RuntimeError("Invalid release version")
+    metadata.validate(folder)
     if not unsigned:
         run(tool, "verify", "--dir", str(folder))
     tag = ("linux-unsigned-" if unsigned else "server-") + version
@@ -53,6 +59,7 @@ def publish(folder, repo, tool, unsigned=False):
         run("gh", "release", "download", tag, "--repo", repo, "--dir", temp)
         if hashes(folder) != hashes(downloaded):
             raise RuntimeError("Remote release is incomplete or differs from the verified package")
+        metadata.validate(downloaded)
         if not unsigned:
             run(tool, "verify", "--dir", temp)
     run("gh", "release", "edit", tag, "--repo", repo, "--draft=false")

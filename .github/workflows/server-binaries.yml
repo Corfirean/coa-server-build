@@ -58,6 +58,8 @@ jobs:
       scaling_sha: ${{ steps.shas.outputs.scaling_sha }}
     env:
       BOOST_ROOT: C:\local\boost_1_87_0
+      SCCACHE_CACHE_SIZE: 6G
+      SCCACHE_IGNORE_SERVER_IO_ERROR: '1'
     steps:
       - uses: actions/checkout@v7
         with:
@@ -225,6 +227,9 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
+      - name: Set compiler cache directory before starting sccache
+        shell: pwsh
+        run: '"SCCACHE_DIR=$env:RUNNER_TEMP/sccache" | Out-File $env:GITHUB_ENV -Append -Encoding utf8'
       - name: Install pinned sccache
         id: sccache
         continue-on-error: true
@@ -236,7 +241,7 @@ jobs:
         shell: pwsh
         run: |
           $compiler = (Get-Command cl.exe).Source
-          $identity = (Get-Item $compiler).VersionInfo.FileVersion + '-RelWithDebInfo-Z7-PCH'
+          $identity = (Get-Item $compiler).VersionInfo.FileVersion + '-RelWithDebInfo-Z7-noPCH-sccache0100'
           "identity=$identity" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
       - name: Restore compiler cache
         id: compiler-cache
@@ -244,8 +249,8 @@ jobs:
         continue-on-error: true
         with:
           path: ${{ runner.temp }}/sccache
-          key: trusted-msvc-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.identity }}-boost187-mysql849-${{ github.run_id }}
-          restore-keys: trusted-msvc-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.identity }}-boost187-mysql849-
+          key: trusted-msvc-v2-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.identity }}-boost187-mysql849-${{ hashFiles('_pipeline/.github/workflows/server-binaries.yml') }}-${{ github.run_id }}
+          restore-keys: trusted-msvc-v2-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.identity }}-boost187-mysql849-${{ hashFiles('_pipeline/.github/workflows/server-binaries.yml') }}-
       - name: Configure
         env:
           SCCACHE_IGNORE_SERVER_IO_ERROR: '1'
@@ -264,11 +269,21 @@ jobs:
             -DCMAKE_CXX_COMPILER_LAUNCHER="$launcher" `
             -DAPPS_BUILD=all -DTOOLS_BUILD=none `
             -DSCRIPTS=static -DMODULES=static `
-            -DUSE_COREPCH=1 -DUSE_SCRIPTPCH=1 `
+            -DUSE_COREPCH=0 -DUSE_SCRIPTPCH=0 `
             -DBOOST_ROOT=$env:BOOST_ROOT `
             -DMYSQL_INCLUDE_DIR=C:/tools/mysql/current/include `
             -DMYSQL_LIBRARY=C:/tools/mysql/current/lib/mysqlclient.lib `
             -DOPENSSL_ROOT_DIR="$env:OPENSSL_ROOT_DIR"
+      - name: Verify generated MSVC commands can be cached
+        shell: pwsh
+        run: |
+          ninja -C build -t commands | python _pipeline/scripts/validate-msvc-cache.py
+          if ($LASTEXITCODE) { throw 'Generated compiler flags violate the cache configuration.' }
+      - name: Reset compiler cache counters
+        if: steps.sccache.outcome == 'success'
+        continue-on-error: true
+        shell: pwsh
+        run: sccache --zero-stats
       - name: Build worldserver and authserver
         env:
           SCCACHE_IGNORE_SERVER_IO_ERROR: '1'
@@ -284,7 +299,10 @@ jobs:
         if: always() && steps.sccache.outcome == 'success'
         continue-on-error: true
         shell: pwsh
-        run: sccache --show-stats
+        run: |
+          sccache --show-stats
+          sccache --show-stats --stats-format json | Set-Content cache-statistics.json -Encoding utf8NoBOM
+          python _pipeline/scripts/cache-summary.py cache-statistics.json
       - name: Preserve reusable compiler objects even when qualification fails
         if: always() && steps.sccache.outcome == 'success' && steps.compiler-cache.outputs.cache-primary-key != '' && steps.compiler-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v6
@@ -292,6 +310,12 @@ jobs:
         with:
           path: ${{ runner.temp }}/sccache
           key: ${{ steps.compiler-cache.outputs.cache-primary-key }}
+      - name: Upload compiler cache statistics
+        if: always() && steps.sccache.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-compiler-cache-statistics
+          path: cache-statistics.json
       - name: Upload source, compilation and unit diagnostics
         if: always()
         uses: actions/upload-artifact@v4

@@ -4,6 +4,7 @@ on:
   schedule:
     - cron: '30 1 * * *'
 permissions:
+  actions: read
   contents: write
   issues: write
 concurrency:

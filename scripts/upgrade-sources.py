@@ -74,6 +74,11 @@ def resolve():
     older = [r for r in releases if not r['draft'] and not r['prerelease']
              and re.fullmatch(r'server-\d+\.\d+\.\d+', r['tag_name'])
              and tuple(map(int, r['tag_name'].removeprefix('server-').split('.'))) < version]
+    legacy = source(api(f'repos/{REPO}/releases/tags/stable'), 'stable-2')
+    legacy_version = tuple(map(int, legacy['version'].split('.')))
+    if legacy_version < version and (not older or legacy_version > max(
+            tuple(map(int, r['tag_name'].removeprefix('server-').split('.'))) for r in older)):
+        return [base, stable, legacy]
     if not older:
         raise RuntimeError('Previous published stable fixture is unavailable')
     previous = max(older, key=lambda r: tuple(map(int, r['tag_name'].removeprefix('server-').split('.'))))
