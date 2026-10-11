@@ -75,26 +75,58 @@ concurrency:
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      CORE_REF: ${{ inputs.core_ref }}
+      BOTS_REF: ${{ inputs.bots_ref }}
+      SCALING_REF: ${{ inputs.scaling_ref }}
+      SQUID_REF: ${{ inputs.squid_ref }}
+      MANAGER_REF: ${{ inputs.manager_ref }}
+    outputs:
+      core: ${{ steps.lock.outputs.core }}
+      bots: ${{ steps.lock.outputs.bots }}
+      scaling: ${{ steps.lock.outputs.scaling }}
+      squid: ${{ steps.lock.outputs.squid }}
+      manager: ${{ steps.lock.outputs.manager }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Load shared daily snapshot
+        if: github.workflow == 'daily-release'
+        uses: actions/download-artifact@v4
+        with:
+          name: release-lock
+          path: _release-lock
+      - name: Freeze all sources before compilation
+        id: lock
+        run: python3 scripts/candidate-lock.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-lock-linux
+          path: _release-lock/release-lock.json
+          if-no-files-found: error
   linux:
+    needs: resolve
     runs-on: ubuntu-latest
     timeout-minutes: 300
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v7
-      - name: Load daily source lock
-        if: github.workflow == 'daily-release'
+      - name: Load frozen source lock
         uses: actions/download-artifact@v4
         with:
-          name: release-lock
+          name: release-lock-linux
           path: _release-lock
       - name: Manager tools (coa-release)
         uses: actions/checkout@v7
         with:
           repository: ${{ inputs.manager_repo }}
-          ref: ${{ inputs.manager_ref }}
+          ref: ${{ needs.resolve.outputs.manager }}
           path: _manager
       - name: Cache release-tool dependencies
         uses: actions/cache@v6
@@ -110,25 +142,25 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: Corfirean/azerothcore-wotlk-coa
-          ref: ${{ inputs.core_ref }}
+          ref: ${{ needs.resolve.outputs.core }}
           path: _core
           fetch-depth: 0
       - name: Bots module
         uses: actions/checkout@v7
         with:
           repository: Corfirean/mod-coa-playerbots
-          ref: ${{ inputs.bots_ref }}
+          ref: ${{ needs.resolve.outputs.bots }}
           path: _bots
       - name: Content Scaling module
         uses: actions/checkout@v7
         with:
           repository: Corfirean/mod-coa-content-scaling
-          ref: ${{ inputs.scaling_ref }}
+          ref: ${{ needs.resolve.outputs.scaling }}
           path: _scaling
       - name: Resolve the SQUID release tag to an exact commit
         id: squid
         env:
-          SQUID_REF: ${{ inputs.squid_ref }}
+          SQUID_REF: ${{ needs.resolve.outputs.squid }}
         run: ./scripts/resolve-squid.sh "$SQUID_REF"
       - name: Fetch unchanged SQUID Playerbots
         uses: actions/checkout@v7
@@ -144,7 +176,7 @@ jobs:
           echo "BOTS_SHA=$(git -C _bots rev-parse HEAD)" >> "$GITHUB_ENV"
           echo "SCALING_SHA=$(git -C _scaling rev-parse HEAD)" >> "$GITHUB_ENV"
           echo "SQUID_SHA=$(git -C _core/modules/mod-playerbots rev-parse HEAD)" >> "$GITHUB_ENV"
-          echo "SQUID_TAG=$SQUID_RESOLVED_TAG" >> "$GITHUB_ENV"
+          echo "SQUID_TAG=$(jq -r .components.squid.ref _release-lock/release-lock.json)" >> "$GITHUB_ENV"
       - name: Place the modules where the core expects them
         run: |
           dst=_core/modules/mod-coa-playerbots
@@ -160,12 +192,13 @@ jobs:
           done
       - uses: docker/setup-buildx-action@v3
       - name: Restore compiler cache
-        uses: actions/cache@v6
+        id: compiler-cache
+        uses: actions/cache/restore@v6
         continue-on-error: true
         with:
           path: .ccache
-          key: trusted-linux-clang-ubuntu26-${{ hashFiles('docker/Dockerfile.linux') }}-${{ github.run_id }}
-          restore-keys: trusted-linux-clang-ubuntu26-${{ hashFiles('docker/Dockerfile.linux') }}-
+          key: trusted-linux-v2-${{ runner.arch }}-clang-ubuntu26-${{ hashFiles('docker/Dockerfile.linux') }}-${{ github.run_id }}
+          restore-keys: trusted-linux-v2-${{ runner.arch }}-clang-ubuntu26-${{ hashFiles('docker/Dockerfile.linux') }}-
       - name: Seed compiler cache
         run: |
           mkdir -p .ccache
@@ -177,11 +210,19 @@ jobs:
           file: docker/Dockerfile.linux
           target: binaries
           outputs: type=local,dest=_binaries
-          cache-from: type=gha,scope=trusted-linux26
-          cache-to: type=gha,scope=trusted-linux26,mode=max,ignore-error=true
+          cache-from: type=gha,scope=trusted-linux26-${{ runner.arch }}
+          cache-to: type=gha,scope=trusted-linux26-${{ runner.arch }},mode=max,ignore-error=true
       - name: Preserve compiler cache
         run: |
           cp -a _binaries/ccache/. .ccache/
+          cat _binaries/cache-statistics.txt >> "$GITHUB_STEP_SUMMARY"
+      - name: Save compiler cache before database qualification
+        if: steps.compiler-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        continue-on-error: true
+        with:
+          path: .ccache
+          key: ${{ steps.compiler-cache.outputs.cache-primary-key }}
       - name: Smoke test the binaries (in a clean Ubuntu 26.04 with only the runtime libraries)
         run: |
           file _binaries/worldserver _binaries/authserver
@@ -203,9 +244,10 @@ jobs:
       - name: Assemble the release tree
         run: ./scripts/assemble-tree.sh --binaries _binaries --core _core --bots _bots --out _tree --manager _manager --core-sha "$CORE_SHA" --bots-sha "$BOTS_SHA" --scaling-sha "$SCALING_SHA" --squid-sha "$SQUID_SHA" --squid-tag "$SQUID_TAG"
       - name: Fetch the signed base package for database acceptance
-        env:
-          BASE_REPO: ${{ inputs.base_repo }}
-        run: gh release download base --pattern manifest.json --pattern manifest.json.sig --pattern '*.tar.zst.*' --dir _schema-base --repo "$BASE_REPO"
+        run: |
+          python3 scripts/upgrade-sources.py --lock _release-lock/release-lock.json --download _upgrade-sources --packages --tool _manager/target/release/coa-release
+          mkdir -p _schema-base
+          cp _upgrade-sources/base/* _schema-base/
       - name: Apply release SQL on an isolated database and capture the expected schema
         run: |
           tool=_manager/target/release/coa-release
@@ -231,8 +273,7 @@ jobs:
             --version "$version" --core-commit "$CORE_SHA" --bots-commit "$BOTS_SHA" --repairs database-repairs
           # Same minimum as the Windows release job.
           jq '.minManagerVersion = "0.6.12"' _out/manifest.json > _out/manifest.json.new && mv _out/manifest.json.new _out/manifest.json
-      - name: Bind compatibility to the daily snapshot and signed upgrade sources
-        if: github.workflow == 'daily-release'
+      - name: Bind compatibility to the frozen snapshot and signed upgrade sources
         run: |
           python3 scripts/upgrade-sources.py --lock _release-lock/release-lock.json --download _upgrade-sources
           python3 scripts/release-compatibility.py --dir _out --lock _release-lock/release-lock.json --sources _upgrade-sources --schema-base _schema-base --platform linux-x86_64 --tool _manager/target/release/coa-release
@@ -244,6 +285,8 @@ jobs:
           test -s _extracted/Database/baseline/world.sql.zst
           test -s _extracted/Scripts/database-schema.json
           ./scripts/smoke-test-linux.sh _extracted
+      - name: Bind actual Linux qualification and release metadata
+        run: python3 scripts/release-metadata.py --dir _out --lock _release-lock/release-lock.json --platform linux-x86_64
       - name: Keep the package as a workflow artifact too
         uses: actions/upload-artifact@v4
         with:
@@ -253,5 +296,4 @@ jobs:
           compression-level: 0
       - name: Publish immutable Linux candidate
         run: |
-          if [ -f _release-lock/release-lock.json ]; then cp _release-lock/release-lock.json _out/; fi
           python3 scripts/publish-candidate.py --dir _out --repo "$GITHUB_REPOSITORY" --tool _manager/target/release/coa-release --unsigned

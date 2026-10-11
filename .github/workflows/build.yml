@@ -1,6 +1,5 @@
 name: build
-# Nightly (and on demand): compile the fork + bots module, assemble a signed cumulative update package
-# and publish it to the moving "edge" release. Promote a good build with the "promote" workflow.
+# Build a frozen candidate and publish complete immutable assets; promotion has separate gates.
 on:
   workflow_call:
     inputs:
@@ -73,26 +72,59 @@ permissions:
   contents: write
 
 jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      CORE_REF: ${{ inputs.core_ref || 'coa-bots' }}
+      BOTS_REF: ${{ inputs.bots_ref || 'master' }}
+      SCALING_REF: ${{ inputs.scaling_ref || 'main' }}
+      SQUID_REF: ${{ inputs.squid_ref || 'latest-release' }}
+      MANAGER_REF: ${{ inputs.manager_ref || 'master' }}
+    outputs:
+      core: ${{ steps.lock.outputs.core }}
+      bots: ${{ steps.lock.outputs.bots }}
+      scaling: ${{ steps.lock.outputs.scaling }}
+      squid: ${{ steps.lock.outputs.squid }}
+      manager: ${{ steps.lock.outputs.manager }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Load shared daily snapshot
+        if: github.workflow == 'daily-release'
+        uses: actions/download-artifact@v4
+        with:
+          name: release-lock
+          path: _release-lock
+      - name: Freeze all sources before compilation
+        id: lock
+        run: python3 scripts/candidate-lock.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-lock-windows
+          path: _release-lock/release-lock.json
+          if-no-files-found: error
   binaries:
+    needs: resolve
     if: inputs.binaries_run_id == ''
     uses: ./.github/workflows/server-binaries.yml
     with:
-      core_ref: ${{ inputs.core_ref || 'coa-bots' }}
-      bots_ref: ${{ inputs.bots_ref || 'master' }}
-      scaling_ref: ${{ inputs.scaling_ref || 'main' }}
-      squid_ref: ${{ inputs.squid_ref || 'latest-release' }}
+      core_ref: ${{ needs.resolve.outputs.core }}
+      bots_ref: ${{ needs.resolve.outputs.bots }}
+      scaling_ref: ${{ needs.resolve.outputs.scaling }}
+      squid_ref: ${{ needs.resolve.outputs.squid }}
 
   reuse:
+    needs: resolve
     if: inputs.binaries_run_id != ''
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
       RUN_ID: ${{ inputs.binaries_run_id }}
       OLD_CORE: ${{ inputs.binary_core_ref }}
-      NEW_CORE: ${{ inputs.core_ref }}
-      BOTS: ${{ inputs.bots_ref }}
-      SCALING: ${{ inputs.scaling_ref }}
-      SQUID: ${{ inputs.squid_ref }}
+      NEW_CORE: ${{ needs.resolve.outputs.core }}
+      BOTS: ${{ needs.resolve.outputs.bots }}
+      SCALING: ${{ needs.resolve.outputs.scaling }}
+      SQUID: ${{ needs.resolve.outputs.squid }}
     outputs:
       core_sha: ${{ steps.pins.outputs.core_sha }}
       bots_sha: ${{ steps.pins.outputs.bots_sha }}
@@ -106,7 +138,7 @@ jobs:
         run: python3 scripts/validate-binary-reuse.py
   package:
     if: always() && (needs.binaries.result == 'success' || needs.reuse.result == 'success')
-    needs: [binaries, reuse]
+    needs: [resolve, binaries, reuse]
     runs-on: windows-latest
     timeout-minutes: 90
     env:
@@ -118,17 +150,16 @@ jobs:
       SCALING_SHA: ${{ needs.binaries.outputs.scaling_sha || needs.reuse.outputs.scaling_sha }}
     steps:
       - uses: actions/checkout@v7
-      - name: Load daily source lock
-        if: github.workflow == 'daily-release'
+      - name: Load frozen source lock
         uses: actions/download-artifact@v4
         with:
-          name: release-lock
+          name: release-lock-windows
           path: _release-lock
       - name: Manager tools (coa-release)
         uses: actions/checkout@v7
         with:
           repository: Corfirean/coa-server-manager
-          ref: ${{ inputs.manager_ref || 'master' }}
+          ref: ${{ needs.resolve.outputs.manager }}
           path: _manager
       - name: Cache release-tool dependencies
         uses: actions/cache@v6
@@ -185,6 +216,11 @@ jobs:
           path: _binaries
           run-id: ${{ inputs.binaries_run_id || github.run_id }}
           github-token: ${{ github.token }}
+      - name: Restore SQUID release identity from the source lock
+        shell: pwsh
+        run: |
+          $lock = Get-Content _release-lock/release-lock.json -Raw | ConvertFrom-Json
+          "SQUID_TAG=$($lock.components.squid.ref)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       - name: Assemble the release tree
         shell: pwsh
         run: ./scripts/assemble-tree.ps1 -Binaries _binaries -Core _core -Bots _bots -Out _tree -Manager _manager -CoreSha $env:CORE_SHA -BotsSha $env:BOTS_SHA -ScalingSha $env:SCALING_SHA -SquidSha $env:SQUID_SHA -SquidTag $env:SQUID_TAG
@@ -199,20 +235,10 @@ jobs:
       - name: Fetch the signed base package for database acceptance
         shell: pwsh
         run: |
-          if (Test-Path _release-lock/release-lock.json) {
-            python scripts/upgrade-sources.py --lock _release-lock/release-lock.json --download _upgrade-sources --packages --tool _manager/target/release/coa-release.exe
-            if ($LASTEXITCODE) { throw "Full locked upgrade fixture verification failed." }
-            New-Item -ItemType Directory -Force _schema-base | Out-Null
-            Copy-Item _upgrade-sources/base/* _schema-base
-          } else {
-            '{}' | Set-Content _manual-upgrade-lock.json -Encoding utf8NoBOM
-            python scripts/upgrade-sources.py --lock _manual-upgrade-lock.json
-            if ($LASTEXITCODE) { throw "Freezing the manual upgrade fixtures failed." }
-            python scripts/upgrade-sources.py --lock _manual-upgrade-lock.json --download _upgrade-sources --packages --tool _manager/target/release/coa-release.exe
-            if ($LASTEXITCODE) { throw "Full manual upgrade fixture verification failed." }
-            New-Item -ItemType Directory -Force _schema-base | Out-Null
-            Copy-Item _upgrade-sources/base/* _schema-base
-          }
+          python scripts/upgrade-sources.py --lock _release-lock/release-lock.json --download _upgrade-sources --packages --tool _manager/target/release/coa-release.exe
+          if ($LASTEXITCODE) { throw "Full locked upgrade fixture verification failed." }
+          New-Item -ItemType Directory -Force _schema-base | Out-Null
+          Copy-Item _upgrade-sources/base/* _schema-base
           Copy-Item _schema-base/manifest.json base-manifest.json
       - name: Apply release SQL on an isolated database and capture the expected schema
         shell: pwsh
@@ -267,9 +293,7 @@ jobs:
           $version = $env:RELEASE_VERSION
           if (-not $version) { $version = "0.$((Get-Date).ToString('yyMMdd')).${{ github.run_number }}" }
           if ($version -notmatch '^0\.[0-9]{6}\.[0-9]+$') { throw "Invalid release version: $version" }
-          gh release download stable --pattern manifest.json --dir _stable-version --repo $env:GITHUB_REPOSITORY
-          if ($LASTEXITCODE) { throw "Cannot determine the current stable version; refusing to publish." }
-          $stableVersion = (Get-Content _stable-version/manifest.json -Raw | ConvertFrom-Json).version
+          $stableVersion = (Get-Content _upgrade-sources/stable-1/manifest.json -Raw | ConvertFrom-Json).version
           if ([version]$version -le [version]$stableVersion) { throw "Release $version must be newer than stable $stableVersion." }
           "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           $tool = "_manager/target/release/coa-release.exe"
@@ -280,12 +304,8 @@ jobs:
           $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
           $manifest.minManagerVersion = '0.6.12'
           $manifest | ConvertTo-Json -Depth 100 | Set-Content $manifestPath -Encoding utf8NoBOM
-          if (Test-Path _release-lock/release-lock.json) {
-            python scripts/upgrade-sources.py --lock _release-lock/release-lock.json --download _upgrade-sources
-            if ($LASTEXITCODE) { throw "Locked upgrade fixture download failed" }
-            python scripts/release-compatibility.py --dir _out --lock _release-lock/release-lock.json --sources _upgrade-sources --schema-base _schema-base --platform windows-x86_64 --tool $tool
-            if ($LASTEXITCODE) { throw "Release compatibility validation failed" }
-          }
+          python scripts/release-compatibility.py --dir _out --lock _release-lock/release-lock.json --sources _upgrade-sources --schema-base _schema-base --platform windows-x86_64 --tool $tool
+          if ($LASTEXITCODE) { throw "Release compatibility validation failed" }
           & $tool sign --dir _out;   if ($LASTEXITCODE) { throw "sign failed" }
           & $tool verify --dir _out; if ($LASTEXITCODE) { throw "verify failed" }
       - name: Qualify Manager upgrades from the base and two stable releases
@@ -315,8 +335,18 @@ jobs:
             coa-schema-fixture-upgrade-*.manager/updates/*/txn.json
             coa-schema-fixture-upgrade-*.manager/validation-configs.json
           if-no-files-found: ignore
+      - name: Bind qualification and release metadata to the signed candidate
+        shell: pwsh
+        env:
+          COA_SIGNING_KEY: ${{ secrets.COA_SIGNING_KEY }}
+          BINARY_RUN: ${{ inputs.binaries_run_id }}
+          BINARY_CORE_SHA: ${{ inputs.binary_core_ref }}
+        run: |
+          python scripts/release-metadata.py --dir _out --lock _release-lock/release-lock.json --platform windows-x86_64 --binary-run "$env:BINARY_RUN"
+          if ($LASTEXITCODE) { throw 'Release evidence is missing or differs from the candidate.' }
+          & _manager/target/release/coa-release.exe sign --dir _out
+          if ($LASTEXITCODE) { throw 'Signing final metadata failed.' }
       - name: Publish immutable Windows candidate
         shell: pwsh
         run: |
-          if (Test-Path _release-lock/release-lock.json) { Copy-Item _release-lock/release-lock.json _out/release-lock.json }
           python scripts/publish-candidate.py --dir _out --repo $env:GITHUB_REPOSITORY --tool _manager/target/release/coa-release.exe

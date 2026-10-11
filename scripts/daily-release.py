@@ -15,7 +15,7 @@ def revision(repo, ref):
     return gh(f"repos/{repo}/commits/{ref}")["sha"]
 
 
-def resolve(core_ref="coa-bots", manager_ref="master"):
+def resolve(core_ref="coa-bots", manager_ref="master", bots_ref="master", scaling_ref="main", squid_ref="latest-release"):
     races = gh("repos/ilusixn/azerothcore-wotlk-coa/releases/latest")
     tags = gh("repos/Zyth45/mod-playerbots/tags?per_page=100")
     import re
@@ -26,16 +26,18 @@ def resolve(core_ref="coa-bots", manager_ref="master"):
     components = {
         "upstream": {"repository": "jealous-sound/azerothcore-wotlk-coa", "ref": "main"},
         "core": {"repository": "Corfirean/azerothcore-wotlk-coa", "ref": core_ref},
-        "bots": {"repository": "Corfirean/mod-coa-playerbots", "ref": "master"},
-        "scaling": {"repository": "Corfirean/mod-coa-content-scaling", "ref": "main"},
+        "bots": {"repository": "Corfirean/mod-coa-playerbots", "ref": bots_ref},
+        "scaling": {"repository": "Corfirean/mod-coa-content-scaling", "ref": scaling_ref},
         "manager": {"repository": "Corfirean/coa-server-manager", "ref": manager_ref},
         "races": {"repository": "ilusixn/azerothcore-wotlk-coa", "ref": races["tag_name"]},
-        "squid": {"repository": "Zyth45/mod-playerbots", "ref": squid["name"]},
+        "squid": {"repository": "Zyth45/mod-playerbots", "ref": squid["name"] if squid_ref == 'latest-release' else squid_ref},
     }
     pipeline_sha = os.environ.get('GITHUB_SHA') or subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
     components['build'] = {'repository': 'Corfirean/coa-server-build', 'ref': pipeline_sha}
     for component in components.values():
         component["sha"] = revision(component["repository"], component["ref"])
+    components['squid']['ref'] = next((t['name'] for t in stable
+                                     if t['commit']['sha'] == components['squid']['sha']), components['squid']['ref'])
     components["races"]["assets"] = [
         {"name": asset["name"], "size": asset["size"], "digest": asset.get("digest"),
          "url": asset["browser_download_url"]} for asset in races["assets"]
@@ -45,10 +47,14 @@ def resolve(core_ref="coa-bots", manager_ref="master"):
         raise RuntimeError("Custom race assets need SHA256 digests before release")
     lock = {"schema": 1, "components": components,
             "excludedBranches": ["feat/portable-characters", "feat/portable-session-bridge"]}
-    identity = {name: {k: v for k, v in component.items() if k != "ref"}
-                for name, component in components.items()}
-    lock["snapshot"] = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
+    lock["snapshot"] = snapshot(components)
     return lock
+
+
+def snapshot(components):
+    identity = {name: {k: v for k, v in component.items() if k != 'ref'}
+                for name, component in components.items()}
+    return hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
 
 
 def check_integration(lock):
@@ -66,8 +72,11 @@ def main():
     parser.add_argument("--check-integration", action="store_true")
     parser.add_argument("--core-ref", default="coa-bots")
     parser.add_argument("--manager-ref", default="master")
+    parser.add_argument("--bots-ref", default="master")
+    parser.add_argument("--scaling-ref", default="main")
+    parser.add_argument("--squid-ref", default="latest-release")
     args = parser.parse_args()
-    lock = resolve(args.core_ref, args.manager_ref)
+    lock = resolve(args.core_ref, args.manager_ref, args.bots_ref, args.scaling_ref, args.squid_ref)
     Path(args.out).write_text(json.dumps(lock, indent=2) + "\n", encoding="utf-8")
     if args.check_integration:
         check_integration(lock)
