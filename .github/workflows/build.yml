@@ -224,6 +224,9 @@ jobs:
       - name: Assemble the release tree
         shell: pwsh
         run: ./scripts/assemble-tree.ps1 -Binaries _binaries -Core _core -Bots _bots -Out _tree -Manager _manager -CoreSha $env:CORE_SHA -BotsSha $env:BOTS_SHA -ScalingSha $env:SCALING_SHA -SquidSha $env:SQUID_SHA -SquidTag $env:SQUID_TAG
+      - name: Restore frozen navigation data
+        shell: pwsh
+        run: python scripts/restore-navigation.py --lock _release-lock/release-lock.json --tree _tree --download _navigation-download
       - name: Record source and reused binary provenance
         if: inputs.binaries_run_id != ''
         shell: pwsh

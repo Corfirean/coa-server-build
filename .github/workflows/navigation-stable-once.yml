@@ -1,0 +1,113 @@
+name: navigation-stable-once
+on:
+  workflow_dispatch:
+    inputs:
+      expected_channels_sha:
+        description: Exact previous channels commit
+        required: true
+permissions:
+  actions: read
+  contents: write
+concurrency:
+  group: signed-channel-publication
+  cancel-in-progress: false
+jobs:
+  navigation:
+    runs-on: windows-2025
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: C:\coa-navigation-release
+    env:
+      GH_TOKEN: ${{ github.token }}
+      COA_SIGNING_KEY: ${{ secrets.COA_SIGNING_KEY }}
+      MANAGER_SHA: 58c976a388215bea8bbf232503810c6519a33562
+      TOOL: ${{ github.workspace }}\_manager\target\release\coa-release.exe
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Prepare isolated navigation release workspace
+        working-directory: ${{ github.workspace }}
+        run: |
+          if (Test-Path C:\coa-navigation-release) { throw 'Navigation workspace already exists.' }
+          if ((Get-PSDrive C).Free -lt 40GB) { throw 'Navigation qualification needs at least 40 GB free on C:.' }
+          New-Item -ItemType Directory C:\coa-navigation-release | Out-Null
+          Copy-Item scripts, navigation-source.json C:\coa-navigation-release -Recurse
+      - uses: actions/checkout@v7
+        with:
+          repository: Corfirean/coa-server-manager
+          ref: ${{ env.MANAGER_SHA }}
+          path: _manager
+      - uses: actions/cache@v6
+        continue-on-error: true
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            _manager/target
+          key: trusted-release-cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('_manager/Cargo.lock') }}-${{ github.run_id }}
+          restore-keys: trusted-release-cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('_manager/Cargo.lock') }}-
+      - name: Build released-format signing and qualification tools
+        run: |
+          cargo build --release -p coa-release --manifest-path "${{ github.workspace }}\_manager\Cargo.toml"
+          if ($LASTEXITCODE) { throw 'Building qualification tools failed.' }
+          python -m pip install zstandard==0.25.0
+          if ($LASTEXITCODE) { throw 'Installing archive reader failed.' }
+      - name: Freeze and verify the signed base and stable sources
+        run: |
+          New-Item -ItemType Directory _release-lock | Out-Null
+          '{"schema":1}' | Set-Content _release-lock/release-lock.json -Encoding utf8NoBOM
+          python scripts/upgrade-sources.py --lock _release-lock/release-lock.json
+          if ($LASTEXITCODE) { throw 'Freezing upgrade sources failed.' }
+          python scripts/upgrade-sources.py --lock _release-lock/release-lock.json --download _sources --packages --tool "$env:TOOL"
+          if ($LASTEXITCODE) { throw 'Signed upgrade sources failed verification.' }
+      - name: Build signed navigation-only cumulative update
+        run: |
+          python scripts/navigation-stable.py prepare --tool "$env:TOOL"
+          if ($LASTEXITCODE) { throw 'Navigation package construction failed.' }
+          $owned = [IO.Path]::GetFullPath('_tree')
+          if ($owned -ne 'C:\coa-navigation-release\_tree') { throw 'Unexpected staging cleanup target.' }
+          Remove-Item -LiteralPath $owned -Recurse -Force
+      - name: Qualify Manager upgrades with the new navigation set
+        run: |
+          New-Item -ItemType Directory _upgrade-reports | Out-Null
+          foreach ($role in 'base', 'stable-1', 'stable-2') {
+            $fixture = "coa-schema-fixture-navigation-$role"
+            & $env:TOOL qualify-upgrade --base _sources/base --source "_sources/$role" --candidate _out --fixture $fixture --report "_upgrade-reports/$role.json"
+            if ($LASTEXITCODE) { throw "Navigation update from $role failed; stable remains unchanged." }
+            foreach ($owned in $fixture, "$fixture.manager") {
+              $absolute = [IO.Path]::GetFullPath($owned)
+              if (-not $absolute.StartsWith('C:\coa-navigation-release\', [StringComparison]::OrdinalIgnoreCase)) { throw 'Fixture cleanup escaped workspace.' }
+              Remove-Item -LiteralPath $absolute -Recurse -Force
+            }
+          }
+      - name: Bind actual qualification and source metadata
+        run: |
+          python scripts/navigation-stable.py finalize --tool "$env:TOOL"
+          if ($LASTEXITCODE) { throw 'Binding signed metadata failed.' }
+      - name: Publish complete immutable candidate and download it back
+        run: |
+          python scripts/publish-candidate.py --dir _out --repo Corfirean/coa-server-build --tool "$env:TOOL"
+          if ($LASTEXITCODE) { throw 'Immutable publication verification failed.' }
+          gh release download server-0.261012.800007 --dir _downloaded --repo Corfirean/coa-server-build
+          if ($LASTEXITCODE) { throw 'Downloading published candidate failed.' }
+      - name: Promote the explicitly approved navigation-only stable
+        env:
+          EXPECTED_CHANNELS_SHA: ${{ inputs.expected_channels_sha }}
+        run: |
+          python scripts/navigation-stable.py promote --tool "$env:TOOL" --expected "$env:EXPECTED_CHANNELS_SHA"
+          if ($LASTEXITCODE) { throw 'Atomic stable promotion failed.' }
+      - name: Preserve qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: navigation-stable-qualification
+          path: |
+            C:/coa-navigation-release/_upgrade-reports
+            C:/coa-navigation-release/_out/*.json
+            C:/coa-navigation-release/coa-schema-fixture-navigation-*/Core/Logs
+            C:/coa-navigation-release/coa-schema-fixture-navigation-*.manager/diagnostics
+          if-no-files-found: ignore

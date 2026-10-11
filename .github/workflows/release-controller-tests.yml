@@ -12,6 +12,8 @@ on:
       - 'scripts/*metadata*.py'
       - 'scripts/*lock*.py'
       - 'scripts/*cache*.py'
+      - 'scripts/*navigation*.py'
+      - 'navigation-source.json'
       - 'docker/Dockerfile.linux'
   workflow_dispatch:
 permissions:
