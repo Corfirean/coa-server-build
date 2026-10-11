@@ -31,6 +31,13 @@ on:
       renderer:
         description: Renderer version (optional)
         required: false
+      lock_release:
+        description: Immutable release containing release-lock.json (required for server notes)
+        required: false
+      previous_release:
+        description: Previous published release with source lock or legacy manifest
+        default: stable
+        required: false
       dry_run:
         description: Only show what would be released
         type: boolean
@@ -50,6 +57,18 @@ jobs:
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v7
+      - name: Download pinned component snapshots
+        if: inputs.lock_release != ''
+        shell: bash
+        env:
+          LOCK_RELEASE: ${{ inputs.lock_release }}
+          PREVIOUS_RELEASE: ${{ inputs.previous_release }}
+        run: |
+          mkdir -p _changelog/current _changelog/previous
+          gh release download "$LOCK_RELEASE" --pattern release-lock.json --dir _changelog/current
+          if ! gh release download "$PREVIOUS_RELEASE" --pattern release-lock.json --dir _changelog/previous; then
+            gh release download "$PREVIOUS_RELEASE" --pattern manifest.json --dir _changelog/previous
+          fi
       - name: Collect and render
         shell: bash
         env:
@@ -60,6 +79,7 @@ jobs:
           REL_COMPONENT: ${{ inputs.component }}
           REL_ADDON: ${{ inputs.addon }}
           REL_RENDERER: ${{ inputs.renderer }}
+          REL_LOCK: ${{ inputs.lock_release }}
           REL_DRY: ${{ inputs.dry_run }}
         run: |
           args=(release --remote --id "$REL_ID" --component "$REL_COMPONENT")
@@ -69,6 +89,14 @@ jobs:
           [ -n "$REL_ADDON" ]    && args+=(--addon "$REL_ADDON")
           [ -n "$REL_RENDERER" ] && args+=(--renderer "$REL_RENDERER")
           [ "$REL_DRY" = "true" ] && args+=(--dry-run)
+          if [ -n "$REL_LOCK" ]; then
+            previous=_changelog/previous/release-lock.json
+            [ -f "$previous" ] || previous=_changelog/previous/manifest.json
+            args+=(--lock _changelog/current/release-lock.json --previous-lock "$previous")
+          elif [ "$REL_COMPONENT" = server ]; then
+            echo "Server changelog requires an immutable release lock" >&2
+            exit 1
+          fi
           python3 changelog/changelog.py "${args[@]}" | tee release.log
       - name: Show the Discord text
         if: ${{ !inputs.dry_run }}
