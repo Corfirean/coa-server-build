@@ -1,0 +1,27 @@
+name: promote-windows-800006
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: signed-channel-publication
+  cancel-in-progress: false
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      COA_SIGNING_KEY: ${{ secrets.COA_SIGNING_KEY }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7
+        with:
+          repository: Corfirean/coa-server-manager
+          ref: v0.6.13
+          path: _manager
+      - run: cargo build --release -p coa-release --manifest-path _manager/Cargo.toml
+      - run: gh release download server-0.261011.800006 --dir candidate --repo "$GITHUB_REPOSITORY"
+      - run: gh run download 38160121004 --name windows-manager-upgrade-qualification --dir qualification --repo "$GITHUB_REPOSITORY"
+      - name: Verify actual Windows evidence and publish authorized exception
+        run: python3 scripts/promote-windows-800006.py
