@@ -26,7 +26,7 @@ for role, expected in [('base', '0.2.0'), ('stable-1', '0.261010.32'), ('stable-
         raise RuntimeError('Incorrect upgrade evidence: ' + role)
 tool = '_manager/target/release/coa-release'
 subprocess.run([tool, 'verify', '--dir', 'candidate'], check=True)
-pointer = Path('stable-pointer.json')
+pointer = Path('stable-pointer.json').resolve()
 subprocess.run([tool, 'sign-channel', '--channel', 'stable', '--version', version,
                 '--snapshot', hashlib.sha256(manifest_bytes).hexdigest(), '--out', str(pointer)], check=True)
 subprocess.run([tool, 'verify-channel', '--channel', 'stable', '--file', str(pointer)], check=True)
