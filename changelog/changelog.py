@@ -421,14 +421,22 @@ def cmd_release(a) -> int:
         return 1
     done = released_ids(releases, component)
     fresh = [f for f in frags if f.id not in done and (component is None or f.area in COMPONENT_AREAS[component])]
-    if not fresh:
+    if not fresh and not (lock and component == "server"):
         print("Nothing unreleased.")
         return 1
     versions = {k: getattr(a, k) for k, _ in VERSION_KEYS if getattr(a, k, None)}
     date = a.date or (re.search(r"\d{4}-\d{2}-\d{2}", a.id).group() if re.search(r"\d{4}-\d{2}-\d{2}", a.id) else dt.date.today().isoformat())
     record = {"id": a.id, "date": date, "versions": versions, "entries": [f.as_entry() for f in sort_entries_frag(fresh)]}
     if lock:
-        record["snapshot"] = json.loads(Path(lock).read_text(encoding="utf-8"))["snapshot"]
+        locked = json.loads(Path(lock).read_text(encoding="utf-8"))
+        record["snapshot"] = locked["snapshot"]
+        record["components"] = locked["components"]
+        if component == "server":
+            from component_notes import component_notes
+            previous_path = getattr(a, "previous_lock", None)
+            previous = json.loads(Path(previous_path).read_text(encoding="utf-8")) if previous_path else next(
+                (r for r in reversed(releases) if r.get("component") == "server" and r.get("components")), {})
+            record["entries"].extend(component_notes(locked, previous))
     if component:
         record["component"] = component
     if a.dry_run:
@@ -566,6 +574,7 @@ def main(argv: list[str] | None = None) -> int:
         p.set_defaults(fn=fn)
 
     p = sub.add_parser("release")
+    p.add_argument("--previous-lock", type=Path, help="Previous published source lock or legacy manifest")
     p.add_argument("--lock", type=Path, help="Collect only revisions from this release-lock.json")
     p.add_argument("--component", choices=list(COMPONENT_AREAS), help="Release only this component's changes")
     p.add_argument("--id", required=True, help="release id, usually the date: 2026-10-03 (add -2 for a second one the same day)")
