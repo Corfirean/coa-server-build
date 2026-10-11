@@ -33,6 +33,19 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: |
           if (Test-Path C:\coa-navigation-release) { throw 'Navigation workspace already exists.' }
+          Get-PSDrive C, D | Select-Object Name, Free, Used | Format-Table
+          # This disposable runner only needs Rust/MSVC, Python and GitHub CLI.
+          # Leave those toolchains intact; reclaim unrelated preinstalled SDKs.
+          foreach ($unused in 'C:\hostedtoolcache\windows\CodeQL', 'C:\hostedtoolcache\windows\go', 'C:\hostedtoolcache\windows\Java', 'C:\hostedtoolcache\windows\Ruby', 'C:\hostedtoolcache\windows\PHP', 'C:\hostedtoolcache\windows\PyPy', 'C:\Program Files\dotnet', 'C:\Program Files\Android', 'C:\Android') {
+            if ((Get-PSDrive C).Free -ge 40GB) { break }
+            if (Test-Path -LiteralPath $unused) {
+              $resolved = (Resolve-Path -LiteralPath $unused).Path
+              if ($resolved -ne $unused) { throw 'Unexpected SDK cleanup target.' }
+              Write-Host "Removing unused runner SDK: $resolved"
+              Remove-Item -LiteralPath $resolved -Recurse -Force
+            }
+          }
+          Get-PSDrive C, D | Select-Object Name, Free, Used | Format-Table
           if ((Get-PSDrive C).Free -lt 40GB) { throw 'Navigation qualification needs at least 40 GB free on C:.' }
           New-Item -ItemType Directory C:\coa-navigation-release | Out-Null
           Copy-Item scripts, navigation-source.json C:\coa-navigation-release -Recurse
