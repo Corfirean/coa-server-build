@@ -18,7 +18,7 @@ jobs:
     defaults:
       run:
         shell: pwsh
-        working-directory: C:\coa-navigation-release
+        working-directory: D:\coa-navigation-release
     env:
       GH_TOKEN: ${{ github.token }}
       COA_SIGNING_KEY: ${{ secrets.COA_SIGNING_KEY }}
@@ -32,23 +32,11 @@ jobs:
       - name: Prepare isolated navigation release workspace
         working-directory: ${{ github.workspace }}
         run: |
-          if (Test-Path C:\coa-navigation-release) { throw 'Navigation workspace already exists.' }
+          if (Test-Path D:\coa-navigation-release) { throw 'Navigation workspace already exists.' }
           Get-PSDrive C, D | Select-Object Name, Free, Used | Format-Table
-          # This disposable runner only needs Rust/MSVC, Python and GitHub CLI.
-          # Leave those toolchains intact; reclaim unrelated preinstalled SDKs.
-          foreach ($unused in 'C:\hostedtoolcache\windows\CodeQL', 'C:\hostedtoolcache\windows\go', 'C:\hostedtoolcache\windows\Java', 'C:\hostedtoolcache\windows\Ruby', 'C:\hostedtoolcache\windows\PHP', 'C:\hostedtoolcache\windows\PyPy', 'C:\Program Files\dotnet', 'C:\Program Files\Android', 'C:\Android') {
-            if ((Get-PSDrive C).Free -ge 40GB) { break }
-            if (Test-Path -LiteralPath $unused) {
-              $resolved = (Resolve-Path -LiteralPath $unused).Path
-              if ($resolved -ne $unused) { throw 'Unexpected SDK cleanup target.' }
-              Write-Host "Removing unused runner SDK: $resolved"
-              Remove-Item -LiteralPath $resolved -Recurse -Force
-            }
-          }
-          Get-PSDrive C, D | Select-Object Name, Free, Used | Format-Table
-          if ((Get-PSDrive C).Free -lt 40GB) { throw 'Navigation qualification needs at least 40 GB free on C:.' }
-          New-Item -ItemType Directory C:\coa-navigation-release | Out-Null
-          Copy-Item scripts, navigation-source.json C:\coa-navigation-release -Recurse
+          if ((Get-PSDrive D).Free -lt 40GB) { throw 'Navigation qualification needs at least 40 GB free on D:.' }
+          New-Item -ItemType Directory D:\coa-navigation-release | Out-Null
+          Copy-Item scripts, navigation-source.json D:\coa-navigation-release -Recurse
       - uses: actions/checkout@v7
         with:
           repository: Corfirean/coa-server-manager
@@ -82,7 +70,7 @@ jobs:
           python scripts/navigation-stable.py prepare --tool "$env:TOOL"
           if ($LASTEXITCODE) { throw 'Navigation package construction failed.' }
           $owned = [IO.Path]::GetFullPath('_tree')
-          if ($owned -ne 'C:\coa-navigation-release\_tree') { throw 'Unexpected staging cleanup target.' }
+          if ($owned -ne 'D:\coa-navigation-release\_tree') { throw 'Unexpected staging cleanup target.' }
           Remove-Item -LiteralPath $owned -Recurse -Force
       - name: Qualify Manager upgrades with the new navigation set
         run: |
@@ -93,7 +81,7 @@ jobs:
             if ($LASTEXITCODE) { throw "Navigation update from $role failed; stable remains unchanged." }
             foreach ($owned in $fixture, "$fixture.manager") {
               $absolute = [IO.Path]::GetFullPath($owned)
-              if (-not $absolute.StartsWith('C:\coa-navigation-release\', [StringComparison]::OrdinalIgnoreCase)) { throw 'Fixture cleanup escaped workspace.' }
+              if (-not $absolute.StartsWith('D:\coa-navigation-release\', [StringComparison]::OrdinalIgnoreCase)) { throw 'Fixture cleanup escaped workspace.' }
               Remove-Item -LiteralPath $absolute -Recurse -Force
             }
           }
@@ -119,8 +107,9 @@ jobs:
         with:
           name: navigation-stable-qualification
           path: |
-            C:/coa-navigation-release/_upgrade-reports
-            C:/coa-navigation-release/_out/*.json
-            C:/coa-navigation-release/coa-schema-fixture-navigation-*/Core/Logs
-            C:/coa-navigation-release/coa-schema-fixture-navigation-*.manager/diagnostics
+            D:/coa-navigation-release/_upgrade-reports
+            D:/coa-navigation-release/_out/*.json
+            D:/coa-navigation-release/coa-schema-fixture-navigation-*/Core/Logs
+            D:/coa-navigation-release/coa-schema-fixture-navigation-*.manager/diagnostics
           if-no-files-found: ignore
+
