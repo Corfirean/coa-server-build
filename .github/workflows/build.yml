@@ -188,6 +188,14 @@ jobs:
       - name: Assemble the release tree
         shell: pwsh
         run: ./scripts/assemble-tree.ps1 -Binaries _binaries -Core _core -Bots _bots -Out _tree -Manager _manager -CoreSha $env:CORE_SHA -BotsSha $env:BOTS_SHA -ScalingSha $env:SCALING_SHA -SquidSha $env:SQUID_SHA -SquidTag $env:SQUID_TAG
+      - name: Record source and reused binary provenance
+        if: inputs.binaries_run_id != ''
+        shell: pwsh
+        env:
+          BINARY_CORE_SHA: ${{ inputs.binary_core_ref }}
+          BINARY_RUN_ID: ${{ inputs.binaries_run_id }}
+        run: |
+          @{ schema = 1; sourceCore = $env:CORE_SHA; binaryCore = $env:BINARY_CORE_SHA; binaryRun = $env:BINARY_RUN_ID; changes = 'sql-only' } | ConvertTo-Json | Set-Content _tree/Scripts/binary-provenance.json -Encoding utf8NoBOM
       - name: Fetch the signed base package for database acceptance
         shell: pwsh
         run: |
