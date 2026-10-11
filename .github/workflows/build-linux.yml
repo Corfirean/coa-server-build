@@ -154,7 +154,7 @@ jobs:
           # Same as the Windows job. Content Scaling is a module repository of its own and its TBC and WotLK content
           # packs are modules of their own (in content-packs/); they must stand next to it in modules/.
           mkdir -p _core/modules/mod-coa-content-scaling
-          tar -C _scaling --exclude=.git --exclude=artifacts --exclude=docs --exclude=tools -cf - . | tar -C _core/modules/mod-coa-content-scaling -xf -
+          tar -C _scaling --exclude=.git --exclude=artifacts --exclude=tools -cf - . | tar -C _core/modules/mod-coa-content-scaling -xf -
           for pack in mod-coa-tbc-content mod-coa-wotlk-content; do
             cp -r "_scaling/content-packs/$pack" "_core/modules/$pack"
           done
@@ -194,7 +194,7 @@ jobs:
           ./scripts/crlf-checkout.sh _core _bots _scaling _core/modules/mod-playerbots
           rm -rf _core/modules/mod-coa-content-scaling _core/modules/mod-coa-tbc-content _core/modules/mod-coa-wotlk-content
           mkdir -p _core/modules/mod-coa-content-scaling
-          tar -C _scaling --exclude=.git --exclude=artifacts --exclude=docs --exclude=tools -cf - . | tar -C _core/modules/mod-coa-content-scaling -xf -
+          tar -C _scaling --exclude=.git --exclude=artifacts --exclude=tools -cf - . | tar -C _core/modules/mod-coa-content-scaling -xf -
           for pack in mod-coa-tbc-content mod-coa-wotlk-content; do
             cp -r "_scaling/content-packs/$pack" "_core/modules/$pack"
           done

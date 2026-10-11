@@ -134,7 +134,7 @@ jobs:
       - name: Place Content Scaling and its content packs into the core tree (their SQL and configs ship with the release)
         shell: pwsh
         run: |
-          robocopy '_scaling' '_core\modules\mod-coa-content-scaling' /E /XD .git artifacts docs tools /NFL /NDL /NJH /NJS /NP | Out-Null
+          robocopy '_scaling' '_core\modules\mod-coa-content-scaling' /E /XD .git artifacts tools /NFL /NDL /NJH /NJS /NP | Out-Null
           if ($LASTEXITCODE -ge 8) { throw "copying mod-coa-content-scaling failed ($LASTEXITCODE)" }
           foreach ($pack in 'mod-coa-tbc-content', 'mod-coa-wotlk-content') {
             robocopy "_scaling\content-packs\$pack" "_core\modules\$pack" /E /NFL /NDL /NJH /NJS /NP | Out-Null
