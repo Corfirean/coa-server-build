@@ -45,6 +45,9 @@ def resolve(core_ref="coa-bots", manager_ref="master", bots_ref="master", scalin
     if any(not a["digest"] or not a["digest"].startswith("sha256:")
            for a in components["races"]["assets"]):
         raise RuntimeError("Custom race assets need SHA256 digests before release")
+    navigation = Path(__file__).resolve().parent.parent / 'navigation-source.json'
+    if navigation.exists():
+        components['navigation'] = json.loads(navigation.read_text(encoding='utf-8'))
     lock = {"schema": 1, "components": components,
             "excludedBranches": ["feat/portable-characters", "feat/portable-session-bridge"]}
     lock["snapshot"] = snapshot(components)

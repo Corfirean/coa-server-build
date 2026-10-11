@@ -1,0 +1,22 @@
+{
+  "repository": "Corfirean/azerothcore-wotlk-coa",
+  "ref": "8b44099f480af0b69c6dfc697e4d388e865e9ffc",
+  "sha": "8b44099f480af0b69c6dfc697e4d388e865e9ffc",
+  "sourceRelease": "navigation-20261012",
+  "manifestSha256": "7f28600735f115792e79a5e8d1c8d78a83a8f5ed14a090c6d87268e49c2bb683",
+  "archiveSha256": "aa1347a095f85af44b4f592270a0e9314954801fda4578f0147f847e32c24a60",
+  "assets": [
+    {
+      "name": "navigation.zip.001",
+      "size": 1500000000,
+      "sha256": "e3a93903fc8155ee0d92db399ec426769c360bef87c44c07beb7e21cfd892c18",
+      "url": "https://github.com/Corfirean/coa-server-build/releases/download/navigation-20261012/navigation.zip.001"
+    },
+    {
+      "name": "navigation.zip.002",
+      "size": 1377006470,
+      "sha256": "c1af26ba7f83676278613076c357c4da0a11cfa6ae1ff00003479057c4864471",
+      "url": "https://github.com/Corfirean/coa-server-build/releases/download/navigation-20261012/navigation.zip.002"
+    }
+  ]
+}
