@@ -234,6 +234,16 @@ jobs:
       - name: Start auth and world from the candidate in a disposable isolated server
         shell: pwsh
         run: |
+          $fixture = (Resolve-Path coa-schema-fixture-build).Path
+          $priorLogs = Join-Path $fixture 'Core/Logs'
+          if (Test-Path -LiteralPath $priorLogs) {
+            Move-Item -LiteralPath $priorLogs -Destination (Join-Path $fixture 'Core/qualification-prior-logs')
+          }
+          New-Item -ItemType Directory -Path $priorLogs -Force | Out-Null
+          & _tree/Core/worldserver.exe --version
+          if ($LASTEXITCODE) { throw "Candidate worldserver cannot execute: $LASTEXITCODE" }
+          & _tree/Core/authserver.exe --version
+          if ($LASTEXITCODE) { throw "Candidate authserver cannot execute: $LASTEXITCODE" }
           & _manager/target/release/coa-release.exe qualify-startup --fixture coa-schema-fixture-build --tree _tree --base _schema-base
           if ($LASTEXITCODE) { throw "Full isolated server startup failed; the candidate will not be published." }
       - name: Preserve server acceptance diagnostics
