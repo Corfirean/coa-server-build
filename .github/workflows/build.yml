@@ -4,6 +4,12 @@ name: build
 on:
   workflow_call:
     inputs:
+      binaries_run_id:
+        type: string
+        default: ""
+      binary_core_ref:
+        type: string
+        default: ""
       release_version:
         type: string
         description: Optional release version (0.yyMMdd.build); must be newer than stable
@@ -33,6 +39,12 @@ on:
         required: false
   workflow_dispatch:
     inputs:
+      binaries_run_id:
+        description: Completed run with successful source and binary jobs (SQL-only repackaging)
+        default: ""
+      binary_core_ref:
+        description: Exact core SHA used to compile those binaries
+        default: ""
       release_version:
         description: Optional release version (0.yyMMdd.build); must be newer than stable
         default: ''
@@ -57,10 +69,12 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
+  actions: read
   contents: write
 
 jobs:
   binaries:
+    if: inputs.binaries_run_id == ''
     uses: ./.github/workflows/server-binaries.yml
     with:
       core_ref: ${{ inputs.core_ref || 'coa-bots' }}
@@ -68,17 +82,40 @@ jobs:
       scaling_ref: ${{ inputs.scaling_ref || 'main' }}
       squid_ref: ${{ inputs.squid_ref || 'latest-release' }}
 
+  reuse:
+    if: inputs.binaries_run_id != ''
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RUN_ID: ${{ inputs.binaries_run_id }}
+      OLD_CORE: ${{ inputs.binary_core_ref }}
+      NEW_CORE: ${{ inputs.core_ref }}
+      BOTS: ${{ inputs.bots_ref }}
+      SCALING: ${{ inputs.scaling_ref }}
+      SQUID: ${{ inputs.squid_ref }}
+    outputs:
+      core_sha: ${{ steps.pins.outputs.core_sha }}
+      bots_sha: ${{ steps.pins.outputs.bots_sha }}
+      scaling_sha: ${{ steps.pins.outputs.scaling_sha }}
+      squid_sha: ${{ steps.pins.outputs.squid_sha }}
+      squid_tag: ${{ inputs.squid_ref }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Validate verified binaries and SQL-only source delta
+        id: pins
+        run: python3 scripts/validate-binary-reuse.py
   package:
-    needs: binaries
+    if: always() && (needs.binaries.result == 'success' || needs.reuse.result == 'success')
+    needs: [binaries, reuse]
     runs-on: windows-latest
     timeout-minutes: 90
     env:
       GH_TOKEN: ${{ github.token }}
-      SQUID_SHA: ${{ needs.binaries.outputs.squid_sha }}
-      SQUID_TAG: ${{ needs.binaries.outputs.squid_tag }}
-      CORE_SHA: ${{ needs.binaries.outputs.core_sha }}
-      BOTS_SHA: ${{ needs.binaries.outputs.bots_sha }}
-      SCALING_SHA: ${{ needs.binaries.outputs.scaling_sha }}
+      SQUID_SHA: ${{ needs.binaries.outputs.squid_sha || needs.reuse.outputs.squid_sha }}
+      SQUID_TAG: ${{ needs.binaries.outputs.squid_tag || needs.reuse.outputs.squid_tag }}
+      CORE_SHA: ${{ needs.binaries.outputs.core_sha || needs.reuse.outputs.core_sha }}
+      BOTS_SHA: ${{ needs.binaries.outputs.bots_sha || needs.reuse.outputs.bots_sha }}
+      SCALING_SHA: ${{ needs.binaries.outputs.scaling_sha || needs.reuse.outputs.scaling_sha }}
     steps:
       - uses: actions/checkout@v7
       - name: Load daily source lock
@@ -146,6 +183,8 @@ jobs:
         with:
           name: coa-server-binaries
           path: _binaries
+          run-id: ${{ inputs.binaries_run_id || github.run_id }}
+          github-token: ${{ github.token }}
       - name: Assemble the release tree
         shell: pwsh
         run: ./scripts/assemble-tree.ps1 -Binaries _binaries -Core _core -Bots _bots -Out _tree -Manager _manager -CoreSha $env:CORE_SHA -BotsSha $env:BOTS_SHA -ScalingSha $env:SCALING_SHA -SquidSha $env:SQUID_SHA -SquidTag $env:SQUID_TAG
