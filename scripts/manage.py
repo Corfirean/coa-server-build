@@ -455,21 +455,32 @@ def watch_world():
     validate_bots(ROOT)
     world = spawn("world", [ROOT / "Core/worldserver.exe", "-c", ROOT / "Core/configs/worldserver.conf"],
                   ROOT / "Core", ROOT / "Core/Logs/world-console.log")
+    world_identity = read_json(STATE / "world.json")
     relay = None
     try:
-        while world.poll() is None:
-            if relay is None or relay.poll() is not None:
-                try:
-                    relay = spawn("relay", [PYTHON, "-B", Path(__file__), "relay-worker"],
-                                  ROOT, ROOT / "BugReport/Logs/relay.log")
-                except (OSError, RuntimeError) as error:
-                    print("Report relay could not start (" + type(error).__name__ + "); retrying.", flush=True)
+        while True:
+            while world.poll() is None:
+                if relay is None or relay.poll() is not None:
+                    try:
+                        relay = spawn("relay", [PYTHON, "-B", Path(__file__), "relay-worker"],
+                                      ROOT, ROOT / "BugReport/Logs/relay.log")
+                    except (OSError, RuntimeError) as error:
+                        print("Report relay could not start (" + type(error).__name__ + "); retrying.", flush=True)
+                        time.sleep(5)
+                        continue
+                time.sleep(2)
+                if relay.poll() is not None:
                     time.sleep(5)
-                    continue
-            time.sleep(2)
-            if relay.poll() is not None:
-                time.sleep(5)
+            if world.poll() != 2:
+                break
+            atomic_json(STATE / "world-exit.json", {"process": world_identity, "exit_code": 2})
+            world = spawn("world", [ROOT / "Core/worldserver.exe", "-c", ROOT / "Core/configs/worldserver.conf"],
+                          ROOT / "Core", ROOT / "Core/Logs/world-console.log")
+            world_identity = read_json(STATE / "world.json")
     finally:
+        exit_code = world.poll()
+        if exit_code is not None:
+            atomic_json(STATE / "world-exit.json", {"process": world_identity, "exit_code": exit_code})
         (STATE / "stop-relay").touch()
         if relay:
             try:

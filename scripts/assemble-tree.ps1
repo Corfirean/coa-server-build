@@ -38,6 +38,9 @@ Copy-Item "$PSScriptRoot/manage.py", "$PSScriptRoot/squid_playerbots.py" "$Out/S
 $settingsJson = "$Core/modules/mod-playerbots/conf/playerbots.conf.settings.json"
 if (Test-Path $settingsJson) { Copy-Item $settingsJson "$Out/Core/configs/modules/playerbots.conf.settings.json" -Force }
 Copy-Item "$Core/modules/mod-playerbots/LICENSE" "$Out/Licenses/mod-playerbots-LICENSE.txt" -Force
+if (Test-Path "$Core/modules/mod-TimeIsTime/LICENSE") {
+    Copy-Item "$Core/modules/mod-TimeIsTime/LICENSE" "$Out/Licenses/mod-TimeIsTime-AGPL-3.0.txt" -Force
+}
 # Every module reads configs/modules/<name>.conf. Ship an active copy of each .dist (created only when missing on
 # install/update, never overwritten) so a fresh server runs with the documented defaults instead of warnings.
 Get-ChildItem "$Out/Core/configs/modules/*.conf.dist" | ForEach-Object {

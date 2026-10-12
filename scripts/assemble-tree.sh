@@ -41,6 +41,9 @@ printf '{\n  "schema": 1,\n  "tag": "%s",\n  "commit": "%s"\n}\n' "$squid_tag" "
 settings_json="$core/modules/mod-playerbots/conf/playerbots.conf.settings.json"
 [ -f "$settings_json" ] && cp "$settings_json" "$out/Core/configs/modules/playerbots.conf.settings.json"
 cp "$core/modules/mod-playerbots/LICENSE" "$out/Licenses/mod-playerbots-LICENSE.txt"
+if [ -f "$core/modules/mod-TimeIsTime/LICENSE" ]; then
+  cp "$core/modules/mod-TimeIsTime/LICENSE" "$out/Licenses/mod-TimeIsTime-AGPL-3.0.txt"
+fi
 # Only the .dist files are shipped: coa-release leaves active .conf files out of the package, and the Manager creates
 # them from the .dist ones.
 cp -r "$bots"/dist/reference/. "$out/Core/reference/"
