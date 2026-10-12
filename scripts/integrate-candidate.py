@@ -2,10 +2,28 @@
 import json
 import os
 import subprocess
+from pathlib import Path
 
 
 def git(*args):
-    return subprocess.check_output(["git", "-C", "_integration", *args], text=True).strip()
+    command = ["git", "-C", "_integration", *args]
+    result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    if result.stdout:
+        print(result.stdout, end='' if result.stdout.endswith('\n') else '\n', flush=True)
+    if result.returncode:
+        raise subprocess.CalledProcessError(result.returncode, command, output=result.stdout)
+    return result.stdout.strip()
+
+
+def record_failure(error):
+    def inspect(*args):
+        result = subprocess.run(['git', '-C', '_integration', *args], capture_output=True, text=True)
+        return result.stdout.strip() if result.returncode == 0 else ''
+    details = {'error': str(error), 'command': getattr(error, 'cmd', []),
+               'output': getattr(error, 'output', None) or str(error),
+               'conflicts': inspect('diff', '--name-only', '--diff-filter=U').splitlines(),
+               'status': inspect('status', '--short')}
+    Path('integration-diagnostics.json').write_text(json.dumps(details, indent=2) + '\n', encoding='utf-8')
 
 
 def main():
@@ -38,4 +56,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as error:
+        record_failure(error)
+        raise
