@@ -12,6 +12,20 @@ spec.loader.exec_module(decision)
 
 
 class DecisionTests(unittest.TestCase):
+    def test_manual_stable_cannot_make_daily_candidate_a_downgrade(self):
+        stable = {'version': '0.261012.800008'}
+        self.assertEqual(decision.next_version('261012', 44, stable, []), '0.261012.800009')
+
+    def test_existing_draft_and_published_tags_are_not_reused(self):
+        tags = ['server-0.261012.800009', 'base', 'server-0.261011.900000']
+        self.assertEqual(decision.next_version('261012', 44, {'version': '0.261012.800008'}, tags), '0.261012.800010')
+
+    def test_next_day_retains_the_normal_daily_namespace(self):
+        self.assertEqual(decision.next_version('261013', 44, {'version': '0.261012.800008'}, []), '0.261013.100044')
+
+    def test_clock_skew_cannot_lower_the_signed_stable_version(self):
+        self.assertEqual(decision.next_version('261011', 44, {'version': '0.261012.800008'}, []), '0.261012.800009')
+
     def test_only_a_real_404_allows_legacy_bootstrap(self):
         with patch.object(decision.subprocess, 'run', return_value=CompletedProcess([], 1, '{"status":"404"}')) as run:
             self.assertEqual(decision.previous_snapshot('manager'), '')
