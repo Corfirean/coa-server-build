@@ -1,0 +1,78 @@
+name: navigation-metadata-once
+on:
+  workflow_dispatch:
+    inputs:
+      expected_channels_sha:
+        required: true
+        description: Exact restored stable channels commit
+permissions:
+  actions: read
+  contents: write
+concurrency:
+  group: signed-channel-publication
+  cancel-in-progress: false
+jobs:
+  metadata:
+    runs-on: windows-2025
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: D:\coa-navigation-metadata
+    env:
+      GH_TOKEN: ${{ github.token }}
+      COA_SIGNING_KEY: ${{ secrets.COA_SIGNING_KEY }}
+      TOOL: ${{ github.workspace }}\_manager\target\release\coa-release.exe
+    steps:
+      - uses: actions/checkout@v7
+      - name: Prepare isolated metadata workspace
+        working-directory: ${{ github.workspace }}
+        run: |
+          if (Test-Path D:\coa-navigation-metadata) { throw 'Metadata workspace already exists.' }
+          if ((Get-PSDrive D).Free -lt 10GB) { throw 'Insufficient space for archive verification.' }
+          New-Item -ItemType Directory D:\coa-navigation-metadata | Out-Null
+          Copy-Item scripts D:\coa-navigation-metadata -Recurse
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: actions/checkout@v7
+        with:
+          repository: Corfirean/coa-server-manager
+          ref: 53a05820c82198058068045661f6b51bc5ce1cbf
+          path: _manager
+      - uses: actions/cache@v6
+        continue-on-error: true
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            _manager/target
+          key: trusted-release-cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('_manager/Cargo.lock') }}-${{ github.run_id }}
+          restore-keys: trusted-release-cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('_manager/Cargo.lock') }}-
+      - name: Build signing and verification tools
+        run: |
+          cargo build --release -p coa-release --manifest-path "${{ github.workspace }}\_manager\Cargo.toml"
+          if ($LASTEXITCODE) { throw 'Verification tools failed to build.' }
+      - name: Verify qualified source and correct metadata without changing payload
+        run: |
+          python scripts/navigation-metadata-once.py prepare --tool "$env:TOOL"
+          if ($LASTEXITCODE) { throw 'Source verification or metadata correction failed.' }
+      - name: Publish complete immutable correction and download it back
+        run: |
+          python scripts/publish-candidate.py --dir _out --repo Corfirean/coa-server-build --tool "$env:TOOL"
+          if ($LASTEXITCODE) { throw 'Immutable publication failed.' }
+          gh release download server-0.261012.800008 --dir _downloaded --repo Corfirean/coa-server-build
+          if ($LASTEXITCODE) { throw 'Correction readback failed.' }
+      - name: Promote exact metadata correction
+        env:
+          EXPECTED_CHANNELS_SHA: ${{ inputs.expected_channels_sha }}
+        run: |
+          python scripts/navigation-metadata-once.py promote --tool "$env:TOOL" --expected "$env:EXPECTED_CHANNELS_SHA"
+          if ($LASTEXITCODE) { throw 'Stable correction failed.' }
+      - name: Preserve metadata correction evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: navigation-metadata-correction
+          path: D:/coa-navigation-metadata/_out/*.json
+          if-no-files-found: ignore

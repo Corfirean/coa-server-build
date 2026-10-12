@@ -64,8 +64,13 @@ def apply(folder, lock_path, sources_folder, platform, tool, schema_base=None):
     manifest = json.loads(path.read_text(encoding='utf-8-sig'))
     compatibility = matrix(manifest, lock, sources, platform)
     manifest['compatibility'] = compatibility
-    manifest['minManagerVersion'] = '0.6.13'
+    manifest['minManagerVersion'] = minimum_manager(manifest.get('minManagerVersion', '0.0.0'))
     path.write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
+
+
+def minimum_manager(requested):
+    floor = '0.6.15'
+    return max((requested, floor), key=lambda version: tuple(int(part) for part in version.split('.')))
 
 
 if __name__ == '__main__':

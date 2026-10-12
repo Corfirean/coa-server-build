@@ -1,4 +1,5 @@
 import copy
+import hashlib
 import importlib.util
 import json
 import tempfile
@@ -12,6 +13,28 @@ spec.loader.exec_module(compatibility)
 
 
 class CompatibilityTests(unittest.TestCase):
+    def test_compatibility_never_lowers_the_required_manager(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            candidate = root / 'candidate'
+            candidate.mkdir()
+            lock = copy.deepcopy(self.lock)
+            lock['upgradeSources'] = []
+            for role, source in zip(('base', 'stable-1', 'stable-2'), self.sources):
+                folder = root / 'sources' / role
+                folder.mkdir(parents=True)
+                raw = json.dumps(source).encode()
+                (folder / 'manifest.json').write_bytes(raw)
+                lock['upgradeSources'].append({'role': role, 'manifestSha256': hashlib.sha256(raw).hexdigest()})
+            lock_path = root / 'lock.json'
+            lock_path.write_text(json.dumps(lock))
+            for requested, expected in [('0.6.13', '0.6.15'), ('0.6.15', '0.6.15'), ('0.7.0', '0.7.0')]:
+                manifest = dict(self.manifest, minManagerVersion=requested)
+                (candidate / 'manifest.json').write_text(json.dumps(manifest))
+                with patch.object(compatibility.subprocess, 'run'):
+                    compatibility.apply(candidate, lock_path, root / 'sources', 'windows-x86_64', 'tool')
+                self.assertEqual(json.loads((candidate / 'manifest.json').read_text())['minManagerVersion'], expected)
+
     def setUp(self):
         self.lock = {'components': {name: {'sha': str(index) * 40} for index, name in enumerate(('core', 'bots', 'scaling', 'squid', 'races'), 1)}}
         self.lock['components']['races']['ref'] = 'coa-custom-1.5.1'
