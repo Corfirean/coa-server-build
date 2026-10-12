@@ -3,16 +3,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/**'
-      - 'scripts/*release*.py'
-      - 'scripts/*candidate*.py'
-      - 'scripts/*health*.py'
-      - 'scripts/*channel*.py'
-      - 'scripts/*compatibility*.py'
-      - 'scripts/*sources*.py'
-      - 'scripts/*metadata*.py'
-      - 'scripts/*lock*.py'
-      - 'scripts/*cache*.py'
-      - 'scripts/*navigation*.py'
+      - 'scripts/*.py'
       - 'navigation-source.json'
       - 'docker/Dockerfile.linux'
   workflow_dispatch:
