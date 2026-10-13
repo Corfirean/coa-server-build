@@ -8,6 +8,12 @@ on:
       expected_channels_sha:
         description: Previous channels branch commit (compare-and-swap)
         required: true
+      owner_approved_snapshot:
+        description: Exact snapshot approved by the owner despite unrun acceptance tests (optional)
+        required: false
+      approval_reason:
+        description: Owner decision and acknowledged missing test coverage (required with snapshot)
+        required: false
 permissions:
   contents: write
 concurrency:
@@ -21,6 +27,8 @@ jobs:
       COA_SIGNING_KEY: ${{ secrets.COA_SIGNING_KEY }}
       VERSION: ${{ inputs.version }}
       EXPECTED: ${{ inputs.expected_channels_sha }}
+      OWNER_APPROVED_SNAPSHOT: ${{ inputs.owner_approved_snapshot }}
+      APPROVAL_REASON: ${{ inputs.approval_reason }}
     steps:
       - uses: actions/checkout@v7
       - name: Resolve released Manager tools
@@ -38,4 +46,9 @@ jobs:
       - name: Download immutable candidate
         run: gh release download "server-$VERSION" --dir candidate --repo "$GITHUB_REPOSITORY"
       - name: Verify qualification and atomically switch the signed pointer
-        run: python3 -B scripts/promote-channel.py --repo "$GITHUB_REPOSITORY" --version "$VERSION" --expected "$EXPECTED" --dir candidate --tool _manager/target/release/coa-release
+        run: |
+          args=()
+          if [ -n "$OWNER_APPROVED_SNAPSHOT" ]; then
+            args+=(--owner-approved-snapshot "$OWNER_APPROVED_SNAPSHOT" --approval-reason "$APPROVAL_REASON")
+          fi
+          python3 -B scripts/promote-channel.py --repo "$GITHUB_REPOSITORY" --version "$VERSION" --expected "$EXPECTED" --dir candidate --tool _manager/target/release/coa-release "${args[@]}"

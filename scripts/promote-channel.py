@@ -12,6 +12,9 @@ GATES = {'source', 'unit', 'auth-startup', 'world-startup', 'schema-contract',
          'client-assets', 'manager-update', 'rollback-interruption', 'locked-dll',
          'disk-full', 'corrupt-download', 'sql-failure', 'startup-failure',
          'headless-console', 'server-bots-pages'}
+OWNER_APPROVAL_GATES = {'source', 'build', 'unit', 'auth-startup', 'world-startup',
+                        'schema-contract', 'upgrade-base', 'upgrade-stable-1',
+                        'upgrade-stable-2', 'manager-update'}
 
 
 def api(path, method='GET', body=None):
@@ -23,12 +26,21 @@ def api(path, method='GET', body=None):
     return json.loads(result.stdout)
 
 
-def validate_report(report, snapshot, version, source_versions=None, source_databases=None):
+def validate_report(report, snapshot, version, source_versions=None, source_databases=None,
+                    owner_approved_snapshot=None):
     if report.get('schema') != 1 or report.get('snapshot') != snapshot or report.get('version') != version:
         raise RuntimeError('Qualification report does not match the candidate')
-    for platform in ('windows-x86_64', 'linux-x86_64'):
+    if owner_approved_snapshot is not None and owner_approved_snapshot != snapshot:
+        raise RuntimeError('Owner approval does not match the candidate snapshot')
+    platforms = ('windows-x86_64',) if owner_approved_snapshot else ('windows-x86_64', 'linux-x86_64')
+    for platform in platforms:
         checks = report.get('platforms', {}).get(platform, {})
-        for name in GATES | {'build'}:
+        gates = OWNER_APPROVAL_GATES if owner_approved_snapshot else GATES | {'build'}
+        if owner_approved_snapshot:
+            for other_checks in report.get('platforms', {}).values():
+                if any(check.get('result') == 'failed' for check in other_checks.values()):
+                    raise RuntimeError('An owner approval cannot promote a failed qualification')
+        for name in gates:
             check = checks.get(name, {})
             if check.get('result') != 'passed' or not re.fullmatch(r'https://github\.com/[^/]+/[^/]+/actions/runs/\d+(?:/.*)?', check.get('evidence', '')):
                 raise RuntimeError(f'Mandatory qualification missing or unsuccessful: {platform}/{name}')
@@ -45,7 +57,7 @@ def validate_report(report, snapshot, version, source_versions=None, source_data
                         raise RuntimeError(f'Upgrade tested a different signed source: {platform}/{name}')
 
 
-def publish(repo, expected, envelope):
+def publish(repo, expected, envelope, approval=None):
     if not re.fullmatch(r'[0-9a-f]{40}', expected):
         raise RuntimeError('An exact previous channels commit is required')
     ref = api(f'repos/{repo}/git/ref/heads/channels')
@@ -54,8 +66,13 @@ def publish(repo, expected, envelope):
     previous = api(f'repos/{repo}/git/commits/{expected}')
     blob = api(f'repos/{repo}/git/blobs', 'POST', {
         'encoding': 'base64', 'content': base64.b64encode(envelope).decode()})
-    tree = api(f'repos/{repo}/git/trees', 'POST', {'base_tree': previous['tree']['sha'],
-        'tree': [{'path': 'stable.json', 'mode': '100644', 'type': 'blob', 'sha': blob['sha']}]})
+    entries = [{'path': 'stable.json', 'mode': '100644', 'type': 'blob', 'sha': blob['sha']}]
+    if approval is not None:
+        audit = api(f'repos/{repo}/git/blobs', 'POST', {
+            'encoding': 'base64', 'content': base64.b64encode(json.dumps(approval, indent=2).encode()).decode()})
+        entries.append({'path': 'approvals/' + approval['snapshot'] + '.json',
+                        'mode': '100644', 'type': 'blob', 'sha': audit['sha']})
+    tree = api(f'repos/{repo}/git/trees', 'POST', {'base_tree': previous['tree']['sha'], 'tree': entries})
     commit = api(f'repos/{repo}/git/commits', 'POST', {
         'message': 'Promote verified immutable server release', 'tree': tree['sha'], 'parents': [expected]})
     # A competing update makes this commit a sibling, so GitHub rejects it as non-fast-forward.
@@ -70,6 +87,8 @@ def main():
     parser.add_argument('--expected', required=True)
     parser.add_argument('--dir', required=True, type=Path)
     parser.add_argument('--tool', required=True)
+    parser.add_argument('--owner-approved-snapshot')
+    parser.add_argument('--approval-reason')
     args = parser.parse_args()
     folder = args.dir.resolve()
     spec = importlib.util.spec_from_file_location('metadata', Path(__file__).with_name('release-metadata.py'))
@@ -87,13 +106,27 @@ def main():
     for name in ('bots', 'scaling', 'squid', 'races'):
         if manifest['compatibility']['moduleCommits'].get(name) != lock['components'][name]['sha']:
             raise RuntimeError(f'Module compatibility differs from source lock: {name}')
-    validate_report(json.loads((folder / 'qualification.json').read_text()), lock['snapshot'], args.version,
-                    manifest['compatibility']['sourceVersions'], manifest['compatibility']['sourceDatabases'])
+    report = json.loads((folder / 'qualification.json').read_text())
+    approval = None
+    if args.owner_approved_snapshot:
+        import os
+        actor = os.environ.get('GITHUB_ACTOR', '')
+        if actor.casefold() != args.repo.split('/')[0].casefold():
+            raise RuntimeError('Only the repository owner may approve incomplete qualification')
+        if not args.approval_reason or len(args.approval_reason.strip()) < 20:
+            raise RuntimeError('An explicit owner approval reason is required')
+        approval = {'schema': 1, 'version': args.version, 'snapshot': lock['snapshot'],
+                    'actor': actor, 'reason': args.approval_reason,
+                    'run': os.environ.get('GITHUB_RUN_ID'), 'qualification': report,
+                    'qualificationSha256': metadata.digest(folder / 'qualification.json')}
+    validate_report(report, lock['snapshot'], args.version,
+                    manifest['compatibility']['sourceVersions'], manifest['compatibility']['sourceDatabases'],
+                    args.owner_approved_snapshot)
     subprocess.run([args.tool, 'verify', '--dir', str(folder)], check=True)
     pointer = folder / 'stable-pointer.json'
     subprocess.run([args.tool, 'sign-channel', '--channel', 'stable', '--version', args.version,
                     '--snapshot', lock['snapshot'], '--out', str(pointer)], check=True)
-    publish(args.repo, args.expected, pointer.read_bytes())
+    publish(args.repo, args.expected, pointer.read_bytes(), approval)
 
 
 if __name__ == '__main__':
