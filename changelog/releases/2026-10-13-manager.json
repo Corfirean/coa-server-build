@@ -1,0 +1,285 @@
+{
+  "id": "2026-10-13-manager",
+  "date": "2026-10-13",
+  "versions": {
+    "manager": "0.6.16"
+  },
+  "entries": [
+    {
+      "id": "manager:20261011-player-race-patches.md",
+      "source": "manager",
+      "repo": "Corfirean/coa-server-manager",
+      "date": "2026-10-11",
+      "area": "manager",
+      "type": "added",
+      "audience": "players",
+      "title": "Players can install custom race patches when connecting to a friend",
+      "body": "Install the custom race client patch directly from the Game client section without hosting a server."
+    },
+    {
+      "id": "manager:20261005-linux-docker-server-settings.md",
+      "source": "manager",
+      "repo": "Corfirean/coa-server-manager",
+      "date": "2026-10-05",
+      "area": "manager",
+      "type": "added",
+      "audience": "admins",
+      "title": "Linux Docker servers follow Settings, sharing and backups (experimental)",
+      "body": "Experimental. Settings the Docker backend fixes are hidden, friends sharing and logs work, the game data folder can be changed, and the realm no longer shows offline after a start."
+    },
+    {
+      "id": "manager:20261010-immutable-update-channels.md",
+      "source": "manager",
+      "repo": "Corfirean/coa-server-manager",
+      "date": "2026-10-10",
+      "area": "manager",
+      "type": "added",
+      "audience": "admins",
+      "title": "Updates can follow signed channels that select a complete server release",
+      "body": "The Manager checks the channel signature and downloads every package part from the same release. Existing installations continue using the previous download source until the new channel is published."
+    },
+    {
+      "id": "manager:20261010-private-database-update-rehearsal.md",
+      "source": "manager",
+      "repo": "Corfirean/coa-server-manager",
+      "date": "2026-10-10",
+      "area": "manager",
+      "type": "added",
+      "audience": "admins",
+      "title": "Windows server updates are tested on a private copy before changing your installation",
+      "body": "The Manager tests migrations and server startup using your databases and configurations. A failed rehearsal leaves the installed server unchanged and preserves a diagnostic report."
+    },
+    {
+      "id": "manager:20261010-release-compatibility.md",
+      "source": "manager",
+      "repo": "Corfirean/coa-server-manager",
+      "date": "2026-10-10",
+      "area": "manager",
+      "type": "added",
+      "audience": "admins",
+      "title": "Server updates can require a tested combination of platform and installed version",
+      "body": "Signed release metadata identifies core and module revisions, supported starting versions and database contracts. Incompatible packages are rejected before shutdown; changed schema contracts and incompatible databases block installation before migration."
+    },
+    {
+      "id": "manager:20261013-installed-module-versions.md",
+      "source": "manager",
+      "repo": "Corfirean/coa-server-manager",
+      "date": "2026-10-13",
+      "area": "manager",
+      "type": "added",
+      "audience": "admins",
+      "title": "Module cards show installed server revisions and the client race patch version",
+      "body": "Module revisions come from the currently installed release metadata. The race card shows the client patch version separately; missing version metadata is reported honestly instead of showing a download version as installed."
+    },
+    {
+      "id": "manager:20261010-automatic-update-recovery.md",
+      "source": "manager",
+      "repo": "Corfirean/coa-server-manager",
+      "date": "2026-10-10",
+      "area": "manager",
+      "type": "changed",
+      "audience": "admins",
+      "title": "Failed server startup after an update automatically restores the previous version",
+      "body": "The Manager restores server files and databases, then checks the recovered server. If recovery cannot be confirmed, it preserves the recovery point and blocks further startup until the problem is resolved."
+    },
+    {
+      "id": "manager:20261010-complete-mysql-update-recovery.md",
+      "source": "manager",
+      "repo": "Corfirean/coa-server-manager",
+      "date": "2026-10-10",
+      "area": "manager",
+      "type": "fixed",
+      "audience": "admins",
+      "title": "Windows update recovery preserves database procedures triggers and views",
+      "body": "A verified copy of stopped MySQL restores all databases and accounts together. Interrupted restoration can be retried, and the replaced database directory is retained."
+    },
+    {
+      "id": "manager:20261010-custom-races-bot-exclusions.md",
+      "source": "manager",
+      "repo": "Corfirean/coa-server-manager",
+      "date": "2026-10-10",
+      "area": "manager",
+      "type": "fixed",
+      "audience": "admins",
+      "title": "Custom races bot setting synchronizes Playerbots excluded race lists",
+      "body": "The \"Bots can be custom races\" setting now configures AiPlayerbot.ExcludedBotRaces in playerbots.conf. Off excludes all added races (recommended), while on allows stable added races (experimental)."
+    },
+    {
+      "id": "manager:20261010-database-recovery-diagnostics.md",
+      "source": "manager",
+      "repo": "Corfirean/coa-server-manager",
+      "date": "2026-10-10",
+      "area": "manager",
+      "type": "fixed",
+      "audience": "admins",
+      "title": "Blocked updates identify database objects that prevent automatic recovery",
+      "body": "Diagnostics include the complete list of unsupported database objects across the recovery point, helping resolve update failures without removing user data."
+    },
+    {
+      "id": "manager:20261010-isolated-update-validation.md",
+      "source": "manager",
+      "repo": "Corfirean/coa-server-manager",
+      "date": "2026-10-10",
+      "area": "manager",
+      "type": "fixed",
+      "audience": "admins",
+      "title": "Server updates check startup privately before allowing players to connect",
+      "body": "Startup checks use temporary local ports. Original settings are restored before opening the server, and interrupted checks retain a recovery journal."
+    },
+    {
+      "id": "manager:20261010-local-host-while-sharing.md",
+      "source": "manager",
+      "repo": "Corfirean/coa-server-manager",
+      "date": "2026-10-10",
+      "area": "manager",
+      "type": "fixed",
+      "audience": "admins",
+      "title": "Local hosts can connect while sharing a server online",
+      "body": "The Manager no longer replaces the realm's local address with its public address when Friends mode is enabled."
+    },
+    {
+      "id": "manager:20261010-missing-database-defaults.md",
+      "source": "manager",
+      "repo": "Corfirean/coa-server-manager",
+      "date": "2026-10-10",
+      "area": "manager",
+      "type": "fixed",
+      "audience": "admins",
+      "title": "Updates repair missing database defaults from the verified release schema",
+      "body": "Only missing literal defaults are restored when column properties match. Existing rows, custom defaults, types and nullability are preserved; unresolved incompatibilities still block the update."
+    },
+    {
+      "id": "manager:20261010-module-base-update-replay.md",
+      "source": "manager",
+      "repo": "Corfirean/coa-server-manager",
+      "date": "2026-10-10",
+      "area": "manager",
+      "type": "fixed",
+      "audience": "admins",
+      "title": "Server updates no longer replay module installation scripts on existing databases",
+      "body": "Update packages contain incremental SQL only. Module table initialization and seed scripts remain available when preparing a clean installation, preventing existing content from being reset during updates."
+    },
+    {
+      "id": "manager:20261010-schema-validation-report.md",
+      "source": "manager",
+      "repo": "Corfirean/coa-server-manager",
+      "date": "2026-10-10",
+      "area": "manager",
+      "type": "fixed",
+      "audience": "admins",
+      "title": "Failed database checks keep a complete report after rollback",
+      "body": "Schema errors show readable default values and save every detected difference for troubleshooting, including after the server is restored."
+    },
+    {
+      "id": "manager:20261012-bulk-navigation-update.md",
+      "source": "manager",
+      "repo": "Corfirean/coa-server-manager",
+      "date": "2026-10-12",
+      "area": "manager",
+      "type": "fixed",
+      "audience": "admins",
+      "title": "Large server updates no longer repeatedly rewrite the recovery journal",
+      "body": "Updates containing rebuilt navigation data now prepare all recovery copies before replacing files. Interrupted updates remain recoverable without rewriting the full journal for every file."
+    },
+    {
+      "id": "manager:20261012-rehearsal-path-normalization.md",
+      "source": "manager",
+      "repo": "Corfirean/coa-server-manager",
+      "date": "2026-10-12",
+      "area": "manager",
+      "type": "fixed",
+      "audience": "admins",
+      "title": "Normalize rehearsal server roots to prevent Windows path prefix errors",
+      "body": "Server update rehearsals now canonicalize the installation root before collecting files, resolving a \"prefix not found\" error during rehearsal preparation on Windows."
+    },
+    {
+      "id": "build:20261013-squid-import-progress.md",
+      "source": "build",
+      "repo": "Corfirean/coa-server-build",
+      "date": "2026-10-13",
+      "area": "manager",
+      "type": "fixed",
+      "audience": "admins",
+      "title": "SQUID imports character tables first and reports slow database imports",
+      "body": "SQUID prepares character tables before its large travel data. Startup shows each base import and identifies a failed import without starting the world server or replaying an incomplete migration."
+    },
+    {
+      "id": "manager:20261013-docker-remote-client-restart.md",
+      "source": "manager",
+      "repo": "Corfirean/coa-server-manager",
+      "date": "2026-10-13",
+      "area": "manager",
+      "type": "fixed",
+      "audience": "admins",
+      "title": "Docker friend mode requests a restart when remote client support changes",
+      "body": "Enabling remote CoA clients now requests a world restart even when the game ports were already open. Repeating the same unchanged setting does not request another restart."
+    },
+    {
+      "id": "manager:20261013-long-rehearsal-paths.md",
+      "source": "manager",
+      "repo": "Corfirean/coa-server-manager",
+      "date": "2026-10-13",
+      "area": "manager",
+      "type": "fixed",
+      "audience": "admins",
+      "title": "Server updates accept long Windows paths inside the private test server",
+      "body": "Long SQL file paths no longer fail the folder safety check during update rehearsals. Files outside the server folder remain blocked."
+    },
+    {
+      "id": "manager:20261013-maintenance-diagnostic-export.md",
+      "source": "manager",
+      "repo": "Corfirean/coa-server-manager",
+      "date": "2026-10-13",
+      "area": "manager",
+      "type": "fixed",
+      "audience": "admins",
+      "title": "Diagnostics record blocked startup requests and maintenance owner information",
+      "body": "A start refused before the launcher runs is now logged with its reason. Exported diagnostics include the last recorded maintenance owner, while clearly distinguishing old metadata from a currently held operating-system lock."
+    },
+    {
+      "id": "manager:20261013-preserve-client-patches.md",
+      "source": "manager",
+      "repo": "Corfirean/coa-server-manager",
+      "date": "2026-10-13",
+      "area": "manager",
+      "type": "fixed",
+      "audience": "admins",
+      "title": "Client race patches can be repaired and removed while preserving original files",
+      "body": "Every overwritten client file gets an original backup. Switching preserves newer launcher files; checksums detect missing or replaced assets. Repair and removal are always available, with rollback if a file operation fails."
+    },
+    {
+      "id": "manager:20261013-recheck-installed-release.md",
+      "source": "manager",
+      "repo": "Corfirean/coa-server-manager",
+      "date": "2026-10-13",
+      "area": "manager",
+      "type": "fixed",
+      "audience": "admins",
+      "title": "Checking an already installed server update no longer reports incompatibility",
+      "body": "The installed release can be checked again even when its compatibility list only names earlier releases. Platform checks and protection against downgrades still apply."
+    },
+    {
+      "id": "manager:20261013-startup-error-details.md",
+      "source": "manager",
+      "repo": "Corfirean/coa-server-manager",
+      "date": "2026-10-13",
+      "area": "manager",
+      "type": "fixed",
+      "audience": "admins",
+      "title": "Failed server startup shows service errors even when the launcher reported ready",
+      "body": "Update rehearsal and startup failures include recent world, authentication and database error lines. Missing tables and late startup failures are visible directly in the error details, with secrets redacted."
+    },
+    {
+      "id": "manager:20261013-update-check-start-contention.md",
+      "source": "manager",
+      "repo": "Corfirean/coa-server-manager",
+      "date": "2026-10-13",
+      "area": "manager",
+      "type": "fixed",
+      "audience": "admins",
+      "title": "Starting the server waits for update checks and identifies ongoing maintenance",
+      "body": "Downloading an update manifest no longer blocks startup. A start waits up to 30 seconds for a check to finish; other active maintenance still blocks it safely and shows its operation, process and start time."
+    }
+  ],
+  "component": "manager"
+}
