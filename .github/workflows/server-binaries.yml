@@ -250,7 +250,9 @@ jobs:
         with:
           path: ${{ runner.temp }}/sccache
           key: trusted-msvc-v2-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.identity }}-boost187-mysql849-${{ hashFiles('_pipeline/.github/workflows/server-binaries.yml') }}-${{ github.run_id }}
-          restore-keys: trusted-msvc-v2-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.identity }}-boost187-mysql849-${{ hashFiles('_pipeline/.github/workflows/server-binaries.yml') }}-
+          restore-keys: |
+            trusted-msvc-v2-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.identity }}-boost187-mysql849-${{ hashFiles('_pipeline/.github/workflows/server-binaries.yml') }}-
+            trusted-msvc-v2-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.identity }}-boost187-mysql849-
       - name: Configure
         env:
           SCCACHE_IGNORE_SERVER_IO_ERROR: '1'
@@ -263,6 +265,8 @@ jobs:
           cmake -S . -B build -G Ninja `
             -DCMAKE_BUILD_TYPE=RelWithDebInfo `
             -DBUILD_TESTING=ON `
+            -DCMAKE_JOB_POOLS=link_pool=1 `
+            -DCMAKE_JOB_POOL_LINK=link_pool `
             -DCMAKE_POLICY_DEFAULT_CMP0141=NEW `
             -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded `
             -DCMAKE_C_COMPILER_LAUNCHER="$launcher" `
@@ -289,7 +293,7 @@ jobs:
           SCCACHE_IGNORE_SERVER_IO_ERROR: '1'
         shell: pwsh
         run: |
-          & ./_pipeline/scripts/run-core-verification.ps1 -CoreRoot . -BaseRef origin/coa-bots -Jobs 4 -Stages 'build,unit'
+          & ./_pipeline/scripts/run-core-verification.ps1 -CoreRoot . -BaseRef origin/coa-bots -Jobs 2 -Stages 'build,unit'
           if ($LASTEXITCODE) {
             $report = Get-ChildItem .cache/verify-all -Recurse -Filter build.log | Sort-Object LastWriteTime -Descending | Select-Object -First 1
             if ($report) { Get-Content $report.FullName -Tail 100 }
