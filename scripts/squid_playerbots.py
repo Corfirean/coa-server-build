@@ -75,12 +75,13 @@ def prepare_playerbots(root, config, mysql):
     if not (sql_root / "playerbots/base").is_dir():
         raise RuntimeError("SQUID Playerbots database files are missing. Repair the server installation.")
     world = options(root / "Core/configs/worldserver.conf")
-    schemas = {"playerbots": "acore_playerbots"}
-    for kind, key in (("world", "WorldDatabaseInfo"), ("characters", "CharacterDatabaseInfo")):
+    schemas = {}
+    for kind, key in (("characters", "CharacterDatabaseInfo"), ("world", "WorldDatabaseInfo")):
         schema = world[key].split(";")[-1]
         if not re.fullmatch(r"acore_(?:world|characters)(?:_wildcard)?", schema):
             raise RuntimeError("Unsupported world/characters database for SQUID Playerbots.")
         schemas[kind] = schema
+    schemas["playerbots"] = "acore_playerbots"
     existing_playerbots = set(mysql("SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA='acore_playerbots';").splitlines())
     data_tables = existing_playerbots - {"updates", "updates_include", "version_db_playerbots", "coa_squid_migrations", "coa_bots_installed", "coa_squid_pending"}
     installer_history = set()
@@ -157,7 +158,12 @@ def prepare_playerbots(root, config, mysql):
                         continue
                     mysql(f"INSERT INTO `{schema}`.coa_squid_pending VALUES ('{relative}','{digest}'); COMMIT;")
                     complete_sql = f"DELETE FROM `{schema}`.coa_squid_pending WHERE path='{relative}' AND sha256='{digest}'; COMMIT;"
-                    mysql(f"USE `{schema}`;\n" + source.read_text(encoding="utf-8-sig") + "\n" + ledger_sql + "\n" + complete_sql)
+                    print(f"Importing SQUID {relative} into {schema} ({source.stat().st_size:,} bytes); large imports may take several minutes...", flush=True)
+                    try:
+                        mysql(f"USE `{schema}`;\n" + source.read_text(encoding="utf-8-sig") + "\n" + ledger_sql + "\n" + complete_sql)
+                    except Exception as error:
+                        raise RuntimeError(f"SQUID import failed: {relative} in {schema}. The world server was not started. The incomplete import is recorded; restore a database backup or repair that import before retrying.") from error
+                    print(f"Imported SQUID {relative}.", flush=True)
                     tables[kind].update(definitions)
                     continue
                 if any(name == relative or name.endswith("/" + relative) for name in installer_history):

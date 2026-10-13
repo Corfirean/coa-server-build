@@ -189,8 +189,9 @@ class IntegrationTests(unittest.TestCase):
                         created.add("imported_data")
                         raise TimeoutError("base SQL exceeded 90 seconds")
                     return ""
-                with self.assertRaises(TimeoutError):
+                with self.assertRaisesRegex(RuntimeError, f"SQUID import failed: {kind}/base/large.sql in acore_{kind}") as failure:
                     prepare_playerbots(root, {"mysqlPort": 3307}, mysql)
+                self.assertIsInstance(failure.exception.__cause__, TimeoutError)
                 calls.clear()
                 with self.assertRaisesRegex(RuntimeError, "base import was interrupted"):
                     prepare_playerbots(root, {"mysqlPort": 3307}, mysql)
@@ -213,6 +214,22 @@ class IntegrationTests(unittest.TestCase):
             statement = calls[imported]
             self.assertLess(statement.index("CREATE TABLE finished_data"), statement.index("coa_squid_migrations VALUES"))
             self.assertLess(statement.index("coa_squid_migrations VALUES"), statement.index("DELETE FROM `acore_playerbots`.coa_squid_pending"))
+
+    def test_character_tables_are_imported_before_large_playerbots_data(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            sql_root = self.make_enabled_root(root)
+            for kind in ("playerbots", "world", "characters"):
+                base = sql_root / kind / "base"
+                base.mkdir(parents=True, exist_ok=True)
+                (base / "tables.sql").write_text(f"CREATE TABLE {kind}_data(id INT);")
+            imports = []
+            def mysql(sql):
+                if sql.startswith("USE "):
+                    imports.append(sql.split(";", 1)[0])
+                return ""
+            prepare_playerbots(root, {"mysqlPort": 3307}, mysql)
+            self.assertEqual(imports, ["USE `acore_characters`", "USE `acore_world`", "USE `acore_playerbots`"])
 
     def make_enabled_root(self, root):
         modules = root / "Core/configs/modules"
