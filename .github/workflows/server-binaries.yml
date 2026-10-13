@@ -77,7 +77,6 @@ jobs:
             C:\local\boost_1_87_0
             C:\tools\mysql\current
           key: winbuild-deps:boost-1.87.0:mysql-8.4.9
-            trusted-msvc-v2-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.identity }}-boost187-mysql849-
       - name: Configure OS
         shell: pwsh
         run: |
