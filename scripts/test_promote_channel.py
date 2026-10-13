@@ -35,6 +35,24 @@ class QualificationTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             promote.validate_report(self.report(), 'another', 'version')
 
+    def test_owner_approval_preserves_unrun_results_and_requires_core_checks(self):
+        report = self.report()
+        del report['platforms']['linux-x86_64']
+        report['platforms']['windows-x86_64']['login-relog']['result'] = 'not-run'
+        promote.validate_report(report, 'candidate', 'version', owner_approved_snapshot='candidate')
+        self.assertEqual(report['platforms']['windows-x86_64']['login-relog']['result'], 'not-run')
+        del report['platforms']['windows-x86_64']['schema-contract']
+        with self.assertRaises(RuntimeError):
+            promote.validate_report(report, 'candidate', 'version', owner_approved_snapshot='candidate')
+
+    def test_owner_approval_cannot_change_snapshot_or_ignore_a_failure(self):
+        with self.assertRaises(RuntimeError):
+            promote.validate_report(self.report(), 'candidate', 'version', owner_approved_snapshot='other')
+        report = self.report()
+        report['platforms']['windows-x86_64']['login-relog']['result'] = 'failed'
+        with self.assertRaises(RuntimeError):
+            promote.validate_report(report, 'candidate', 'version', owner_approved_snapshot='candidate')
+
     def test_upgrade_must_test_the_declared_source_version(self):
         report = self.report()
         sources = ['0.2.0', '0.261010.32', '0.261006.1']
