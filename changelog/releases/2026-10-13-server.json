@@ -1,0 +1,388 @@
+{
+  "id": "2026-10-13-server",
+  "date": "2026-10-13",
+  "versions": {
+    "server": "0.261013.54"
+  },
+  "entries": [
+    {
+      "id": "server:20261010-custom-race-armor-toggle.md",
+      "source": "server",
+      "repo": "Corfirean/azerothcore-wotlk-coa",
+      "date": "2026-10-10",
+      "area": "server",
+      "type": "added",
+      "audience": "players",
+      "title": "Players can hide armor and use previously blocked names with custom races",
+      "body": "Use .hidearmor to toggle armor visibility for everyone without unequipping items. The choice persists across logins. Enabling custom races removes the stock profanity and reserved-name filters."
+    },
+    {
+      "id": "build:20261012-navigation-data.md",
+      "source": "build",
+      "repo": "Corfirean/coa-server-build",
+      "date": "2026-10-12",
+      "area": "server",
+      "type": "fixed",
+      "audience": "players",
+      "title": "Refresh terrain and navigation data for CoA zones",
+      "body": "Rebuild maps, collision data and movement meshes from the CoA client, including the Cain Family Estate area. Offline integrity and navigation checks passed; gameplay verification is still pending."
+    },
+    {
+      "id": "bots:20261011-bot-account-spawn-freeze.md",
+      "source": "bots",
+      "repo": "Corfirean/mod-coa-playerbots",
+      "date": "2026-10-11",
+      "area": "bots",
+      "type": "fixed",
+      "audience": "players",
+      "title": "Random bot spawning and auto-fill no longer leak accounts or freeze the server",
+      "body": "BG and LFG auto-fill now reuses existing offline bots instead of creating duplicate characters. Account lookup is indexed to prevent hitches, bot accounts are cleaned up on purge, and `CoaBots.Enable = 0` completely disables all bot background activity."
+    },
+    {
+      "id": "scaling:20261011-lfg-bot-fill-bg-manastorm.md",
+      "source": "scaling",
+      "repo": "Corfirean/mod-coa-content-scaling",
+      "date": "2026-10-11",
+      "area": "scaling",
+      "type": "fixed",
+      "audience": "players",
+      "title": "Fix LFG bot fill and party queues, battleground access, and Manastorm entry",
+      "body": "Allow battlegrounds and Manastorm instances to bypass dungeon scaling locks, resolve party queues properly in LFG, and enable bot fill without startup race conditions."
+    },
+    {
+      "id": "scaling:20261012-private-map-access.md",
+      "source": "scaling",
+      "repo": "Corfirean/mod-coa-content-scaling",
+      "date": "2026-10-12",
+      "area": "scaling",
+      "type": "fixed",
+      "audience": "players",
+      "title": "Private dungeon access no longer bypasses restrictions on unrelated maps",
+      "body": "The private dungeon exemption applies only to the assigned map and an active private instance."
+    },
+    {
+      "id": "build:20261011-navigation-generation.md",
+      "source": "build",
+      "repo": "Corfirean/coa-server-build",
+      "date": "2026-10-11",
+      "area": "server",
+      "type": "added",
+      "audience": "admins",
+      "title": "Generate navigation data from the CoA client with pinned tools",
+      "body": "A separate generation script extracts maps and vmaps and builds mmaps in a new directory. It records input, tool and output hashes and rejects client archives that change during generation. Generated data still requires gameplay qualification before publication."
+    },
+    {
+      "id": "build:20261010-manager-startup-safety.md",
+      "source": "build",
+      "repo": "Corfirean/coa-server-build",
+      "date": "2026-10-10",
+      "area": "server",
+      "type": "changed",
+      "audience": "admins",
+      "title": "Server updates require a Manager with safe background startup",
+      "body": "Update the Manager before installing new server packages so the local console cannot stop a background world server."
+    },
+    {
+      "id": "build:20261010-legacy-display-default.md",
+      "source": "build",
+      "repo": "Corfirean/coa-server-build",
+      "date": "2026-10-10",
+      "area": "server",
+      "type": "fixed",
+      "audience": "admins",
+      "title": "Older repacks receive the missing creature display default during updates",
+      "body": "A targeted database migration aligns the legacy display preset column with the release schema without changing existing NPC appearance data."
+    },
+    {
+      "id": "server:20261010-raid-schedule-initialization.md",
+      "source": "server",
+      "repo": "Corfirean/azerothcore-wotlk-coa",
+      "date": "2026-10-10",
+      "area": "server",
+      "type": "fixed",
+      "audience": "admins",
+      "title": "Raid boss initialization matches the current difficulty schedule schema",
+      "body": "Module initialization uses explicit column lists and per-difficulty effects, including Shazzrah's area Nova. Both fresh tables and the previous schedule layout are supported."
+    },
+    {
+      "id": "server:20261013-upstream-integration.md",
+      "source": "server",
+      "repo": "Corfirean/azerothcore-wotlk-coa",
+      "date": "2026-10-13",
+      "area": "server",
+      "type": "fixed",
+      "audience": "admins",
+      "title": "Server integration includes current upstream fixes and recognizes shipped race data",
+      "body": "The integration includes current CoA gameplay fixes. Repository checks recognize the exact shipped race DBC assets by hash while still rejecting modified or personal binary data."
+    },
+    {
+      "id": "bots:20261010-custom-races-bot-lore-names.md",
+      "source": "bots",
+      "repo": "Corfirean/mod-coa-playerbots",
+      "date": "2026-10-10",
+      "area": "bots",
+      "type": "added",
+      "audience": "admins",
+      "title": "Custom races bot support and dedicated lore naming",
+      "body": "Companion bots now respect the Custom Races bot switch and exclusion lists. When enabled, bots spawn with lore names: unique races (Ogres, Sethrak, Naga, Vulpera, Pandaren, etc.) use dedicated name pools, while related sub-races reuse their canon racial naming conventions."
+    },
+    {
+      "id": "manager:20261013-upstream-bot-race-preset.md",
+      "source": "manager",
+      "repo": "Corfirean/coa-server-manager",
+      "date": "2026-10-13",
+      "area": "bots",
+      "type": "changed",
+      "audience": "admins",
+      "title": "The experimental SQUID race preset follows the current race release",
+      "body": "Custom-race bots now use the upstream supported-race preset, excluding Test Race, Skyborne and Darkfallen. The standard-races preset continues to exclude all custom races."
+    },
+    {
+      "id": "bots:20261012-bot-account-cleanup.md",
+      "source": "bots",
+      "repo": "Corfirean/mod-coa-playerbots",
+      "date": "2026-10-12",
+      "area": "bots",
+      "type": "fixed",
+      "audience": "admins",
+      "title": "Bot account cleanup preserves accounts used by other realms",
+      "body": "Cleanup uses the server account lifecycle and removes associated access, ban and mute records while retaining accounts with characters on another realm."
+    },
+    {
+      "id": "bots:20261012-bot-race-permissions.md",
+      "source": "bots",
+      "repo": "Corfirean/mod-coa-playerbots",
+      "date": "2026-10-12",
+      "area": "bots",
+      "type": "fixed",
+      "audience": "admins",
+      "title": "Companion race selection respects module switches and excluded races",
+      "body": "Companions cannot use custom races while race support is disabled. Both exclusion lists apply; spawning stops safely if no races remain available."
+    },
+    {
+      "id": "manager:20261013-stock-bot-races.md",
+      "source": "manager",
+      "repo": "Corfirean/coa-server-manager",
+      "date": "2026-10-13",
+      "area": "bots",
+      "type": "fixed",
+      "audience": "admins",
+      "title": "Disabling custom races for SQUID bots now excludes all nonstandard races",
+      "body": "The standard-races preset keeps only the ten original playable races. High elves, worgen and other custom race IDs are excluded, and the displayed setting reads complete race IDs rather than matching number substrings."
+    },
+    {
+      "id": "scaling:20261011-item-class-restrictions.md",
+      "source": "scaling",
+      "repo": "Corfirean/mod-coa-content-scaling",
+      "date": "2026-10-11",
+      "area": "scaling",
+      "type": "added",
+      "audience": "admins",
+      "title": "Allow removing class requirements from equipment and tier sets",
+      "body": "Administrators can enable CoAContentScaling.Items.RemoveClassRestrictions to clear class requirements on equipment, allowing all characters to equip tier sets and class-locked items."
+    },
+    {
+      "id": "scaling:20261011-parallel-and-global-scaling.md",
+      "source": "scaling",
+      "repo": "Corfirean/mod-coa-content-scaling",
+      "date": "2026-10-11",
+      "area": "scaling",
+      "type": "added",
+      "audience": "admins",
+      "title": "Configure parallel and global level scaling progression modes",
+      "body": "Server owners can select between sequential compression, parallel scaling (Classic 1-60 with TBC and WotLK 45-60), or global 1-60 scaling across all expansions using Progression.Mode."
+    },
+    {
+      "id": "scaling:20261013-creature-health-controls.md",
+      "source": "scaling",
+      "repo": "Corfirean/mod-coa-content-scaling",
+      "date": "2026-10-13",
+      "area": "scaling",
+      "type": "fixed",
+      "audience": "admins",
+      "title": "Content Scaling preserves your creature health settings",
+      "body": "World, dungeon, raid and per-map health multipliers now remain effective with Content Scaling enabled, including when creatures change level or encounter group size."
+    },
+    {
+      "id": "server:20261013-custom-races-upstream.md",
+      "source": "server",
+      "repo": "Corfirean/azerothcore-wotlk-coa",
+      "date": "2026-10-13",
+      "area": "modules",
+      "type": "changed",
+      "audience": "admins",
+      "title": "Custom race integration includes the upstream talent reset update",
+      "body": "The server integration follows the current custom race release, including its talent reset command and client message handler."
+    },
+    {
+      "id": "manager:20261013-custom-races-client-update.md",
+      "source": "manager",
+      "repo": "Corfirean/coa-server-manager",
+      "date": "2026-10-13",
+      "area": "client",
+      "type": "changed",
+      "audience": "admins",
+      "title": "Custom race client installation follows the current upstream release",
+      "body": "The installer verifies the current race archives and includes the two additional MPQs. Legacy patch hashes remain available so upgrading never mistakes the old custom executable for an original launcher file."
+    },
+    {
+      "id": "components:upstream:4f66bddb12a32eeba49d42621651f19c46c4f570",
+      "source": "build",
+      "repo": "jealous-sound/azerothcore-wotlk-coa",
+      "date": "",
+      "area": "server",
+      "type": "changed",
+      "audience": "players",
+      "title": "Integrated 45 upstream commits",
+      "body": "8f1f175e → 4f66bddb. https://github.com/Corfirean/azerothcore-wotlk-coa/compare/8f1f175e5e48c0106e75b8245694b0d3ba28c1ef...4f66bddb12a32eeba49d42621651f19c46c4f570"
+    },
+    {
+      "id": "components:squid:230b95549a2e749c20f06bd1060916653cf5b46e",
+      "source": "build",
+      "repo": "Zyth45/mod-playerbots",
+      "date": "",
+      "area": "server",
+      "type": "changed",
+      "audience": "players",
+      "title": "SQUID Playerbots: v2.0 → v2.1",
+      "body": "Pinned revision: 230b9554. https://github.com/Zyth45/squidbots-dashboard/releases/tag/v2.1 Dashboard: For CoA Bots 2.1: shipped in the update, and the CoA Server Manager's Dashboard tab picks it up by itself. On another AzerothCore realm, download the source code below and follow **Install** in the README."
+    },
+    {
+      "id": "components:races:4dd3a4ec6f1e26eafc516012ded6aaa03dc9d5c0",
+      "source": "build",
+      "repo": "ilusixn/azerothcore-wotlk-coa",
+      "date": "",
+      "area": "server",
+      "type": "changed",
+      "audience": "players",
+      "title": "Custom races: coa-custom-1.5.1 → coa-custom-1.6",
+      "body": "Pinned revision: 4dd3a4ec. https://github.com/ilusixn/azerothcore-wotlk-coa/releases/tag/coa-custom-1.6 Release notes: ## Download\r\n\r\nGet the three CoA-Custom zips, extract them into the **same folder**, then run `Install-Custom.bat`.\r\n\r\n**White or untextured retail races?** CoA Server Manager: click **Install Client Patch** again. Otherwise download **CoA-Custom-1.6-Client-Fix.zip**, extract it and run **Fix-Client.bat**.\r\n\r\n# CoA Custom 1.6 — Patch notes\r\n\r\n**Bas"
+    },
+    {
+      "id": "components:bots:c76847a19aaf0b709a6a3dcc785c09ada0aa8fee",
+      "source": "build",
+      "repo": "Corfirean/mod-coa-playerbots",
+      "date": "",
+      "area": "server",
+      "type": "changed",
+      "audience": "players",
+      "title": "CoA Companions: 4d9e9a8269e883f59f1e55e7f1dca7816a808aad → c76847a19aaf0b709a6a3dcc785c09ada0aa8fee",
+      "body": "Pinned revision: c76847a1. https://github.com/Corfirean/mod-coa-playerbots/compare/4d9e9a8269e883f59f1e55e7f1dca7816a808aad...c76847a19aaf0b709a6a3dcc785c09ada0aa8fee"
+    },
+    {
+      "id": "components:scaling:e5d8c67557f975ae0d9d9ad3cfda85bf48ac581b",
+      "source": "build",
+      "repo": "Corfirean/mod-coa-content-scaling",
+      "date": "",
+      "area": "server",
+      "type": "changed",
+      "audience": "players",
+      "title": "Content Scaling: de2003f210955c4048e627adf302d89280c606a0 → e5d8c67557f975ae0d9d9ad3cfda85bf48ac581b",
+      "body": "Pinned revision: e5d8c675. https://github.com/Corfirean/mod-coa-content-scaling/compare/de2003f210955c4048e627adf302d89280c606a0...e5d8c67557f975ae0d9d9ad3cfda85bf48ac581b"
+    }
+  ],
+  "snapshot": "4ec14ca6a8100bedeebdac97dc992a40ac43c485dce888c0bf4f2e66e905c674",
+  "components": {
+    "upstream": {
+      "repository": "jealous-sound/azerothcore-wotlk-coa",
+      "ref": "main",
+      "sha": "4f66bddb12a32eeba49d42621651f19c46c4f570"
+    },
+    "core": {
+      "repository": "Corfirean/azerothcore-wotlk-coa",
+      "ref": "8b2af0027040e40fc7d1856de1acdac8ba94d6c8",
+      "sha": "8b2af0027040e40fc7d1856de1acdac8ba94d6c8"
+    },
+    "bots": {
+      "repository": "Corfirean/mod-coa-playerbots",
+      "ref": "c76847a19aaf0b709a6a3dcc785c09ada0aa8fee",
+      "sha": "c76847a19aaf0b709a6a3dcc785c09ada0aa8fee"
+    },
+    "scaling": {
+      "repository": "Corfirean/mod-coa-content-scaling",
+      "ref": "e5d8c67557f975ae0d9d9ad3cfda85bf48ac581b",
+      "sha": "e5d8c67557f975ae0d9d9ad3cfda85bf48ac581b"
+    },
+    "manager": {
+      "repository": "Corfirean/coa-server-manager",
+      "ref": "master",
+      "sha": "d5f441de0c9cdeabd9ad50f85124769a2170163d"
+    },
+    "races": {
+      "repository": "ilusixn/azerothcore-wotlk-coa",
+      "ref": "coa-custom-1.6",
+      "sha": "4dd3a4ec6f1e26eafc516012ded6aaa03dc9d5c0",
+      "assets": [
+        {
+          "name": "Check-Client.zip",
+          "size": 1876,
+          "digest": "sha256:504ea1295f39baa6c98848a353089ea888c76b084bc939bb0e80cce5ca41befe",
+          "url": "https://github.com/ilusixn/azerothcore-wotlk-coa/releases/download/coa-custom-1.6/Check-Client.zip"
+        },
+        {
+          "name": "CoA-Custom-1.6-Client-Fix.zip",
+          "size": 233348474,
+          "digest": "sha256:dbba53e9931af5a3bad6ec229fe26c22d9f1d93fe7155e1ee81105a301287779",
+          "url": "https://github.com/ilusixn/azerothcore-wotlk-coa/releases/download/coa-custom-1.6/CoA-Custom-1.6-Client-Fix.zip"
+        },
+        {
+          "name": "CoA-Custom-1.6-Client-Only.zip",
+          "size": 641932469,
+          "digest": "sha256:f6cbbbf4c644ca53a481cd568f4d12820020e19e15a593d3e7e722dc3c4e8369",
+          "url": "https://github.com/ilusixn/azerothcore-wotlk-coa/releases/download/coa-custom-1.6/CoA-Custom-1.6-Client-Only.zip"
+        },
+        {
+          "name": "CoA-Custom-1.6-client-part1.zip",
+          "size": 1513021586,
+          "digest": "sha256:1dbf1901ad5be61eba66973609df90712ffc78ef9e9b2c8549a5f3e36332bf12",
+          "url": "https://github.com/ilusixn/azerothcore-wotlk-coa/releases/download/coa-custom-1.6/CoA-Custom-1.6-client-part1.zip"
+        },
+        {
+          "name": "CoA-Custom-1.6-client-part2.zip",
+          "size": 1402644656,
+          "digest": "sha256:689f7f946b4180fe977dabedc7cfe642e3e7f27431600c64c4dd5b7960b1bc66",
+          "url": "https://github.com/ilusixn/azerothcore-wotlk-coa/releases/download/coa-custom-1.6/CoA-Custom-1.6-client-part2.zip"
+        },
+        {
+          "name": "CoA-Custom-1.6-main-20261012-4dd3a4ec.zip",
+          "size": 1006106745,
+          "digest": "sha256:dfe802ea70047c129ac2e0aaa557bab3110e3cc6926d36403b8c880a0e310ee4",
+          "url": "https://github.com/ilusixn/azerothcore-wotlk-coa/releases/download/coa-custom-1.6/CoA-Custom-1.6-main-20261012-4dd3a4ec.zip"
+        }
+      ]
+    },
+    "squid": {
+      "repository": "Zyth45/mod-playerbots",
+      "ref": "v2.1",
+      "sha": "230b95549a2e749c20f06bd1060916653cf5b46e"
+    },
+    "build": {
+      "repository": "Corfirean/coa-server-build",
+      "ref": "04feb696a3f4fe0fc03f41e993590e8e73bed6f1",
+      "sha": "04feb696a3f4fe0fc03f41e993590e8e73bed6f1"
+    },
+    "navigation": {
+      "repository": "Corfirean/azerothcore-wotlk-coa",
+      "ref": "8b44099f480af0b69c6dfc697e4d388e865e9ffc",
+      "sha": "8b44099f480af0b69c6dfc697e4d388e865e9ffc",
+      "sourceRelease": "navigation-20261012",
+      "manifestSha256": "7f28600735f115792e79a5e8d1c8d78a83a8f5ed14a090c6d87268e49c2bb683",
+      "archiveSha256": "aa1347a095f85af44b4f592270a0e9314954801fda4578f0147f847e32c24a60",
+      "assets": [
+        {
+          "name": "navigation.zip.001",
+          "size": 1500000000,
+          "sha256": "e3a93903fc8155ee0d92db399ec426769c360bef87c44c07beb7e21cfd892c18",
+          "url": "https://github.com/Corfirean/coa-server-build/releases/download/navigation-20261012/navigation.zip.001"
+        },
+        {
+          "name": "navigation.zip.002",
+          "size": 1377006470,
+          "sha256": "c1af26ba7f83676278613076c357c4da0a11cfa6ae1ff00003479057c4864471",
+          "url": "https://github.com/Corfirean/coa-server-build/releases/download/navigation-20261012/navigation.zip.002"
+        }
+      ]
+    }
+  },
+  "component": "server"
+}

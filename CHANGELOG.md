@@ -3,6 +3,69 @@
 Everything that changed for players and server owners across the CoA server, bots, Content Scaling, the Manager and the renderer, newest first.
 Written from the `changelog.d/` fragments of each repository (see `changelog/GUIDE.md`).
 
+## 2026-10-13-server - Server 0.261013.54
+
+### For players
+
+**Server**
+
+- Added: Players can hide armor and use previously blocked names with custom races. Use .hidearmor to toggle armor visibility for everyone without unequipping items. The choice persists across logins. Enabling custom races removes the stock profanity and reserved-name filters.
+- Changed: CoA Companions: 4d9e9a8269e883f59f1e55e7f1dca7816a808aad → c76847a19aaf0b709a6a3dcc785c09ada0aa8fee. Pinned revision: c76847a1. https://github.com/Corfirean/mod-coa-playerbots/compare/4d9e9a8269e883f59f1e55e7f1dca7816a808aad...c76847a19aaf0b709a6a3dcc785c09ada0aa8fee
+- Changed: Custom races: coa-custom-1.5.1 → coa-custom-1.6. Pinned revision: 4dd3a4ec. https://github.com/ilusixn/azerothcore-wotlk-coa/releases/tag/coa-custom-1.6 Release notes: ## Download
+
+Get the three CoA-Custom zips, extract them into the **same folder**, then run `Install-Custom.bat`.
+
+**White or untextured retail races?** CoA Server Manager: click **Install Client Patch** again. Otherwise download **CoA-Custom-1.6-Client-Fix.zip**, extract it and run **Fix-Client.bat**.
+
+# CoA Custom 1.6 — Patch notes
+
+**Bas
+- Changed: Content Scaling: de2003f210955c4048e627adf302d89280c606a0 → e5d8c67557f975ae0d9d9ad3cfda85bf48ac581b. Pinned revision: e5d8c675. https://github.com/Corfirean/mod-coa-content-scaling/compare/de2003f210955c4048e627adf302d89280c606a0...e5d8c67557f975ae0d9d9ad3cfda85bf48ac581b
+- Changed: SQUID Playerbots: v2.0 → v2.1. Pinned revision: 230b9554. https://github.com/Zyth45/squidbots-dashboard/releases/tag/v2.1 Dashboard: For CoA Bots 2.1: shipped in the update, and the CoA Server Manager's Dashboard tab picks it up by itself. On another AzerothCore realm, download the source code below and follow **Install** in the README.
+- Changed: Integrated 45 upstream commits. 8f1f175e → 4f66bddb. https://github.com/Corfirean/azerothcore-wotlk-coa/compare/8f1f175e5e48c0106e75b8245694b0d3ba28c1ef...4f66bddb12a32eeba49d42621651f19c46c4f570
+- Fixed: Refresh terrain and navigation data for CoA zones. Rebuild maps, collision data and movement meshes from the CoA client, including the Cain Family Estate area. Offline integrity and navigation checks passed; gameplay verification is still pending.
+
+**Companion bots**
+
+- Fixed: Random bot spawning and auto-fill no longer leak accounts or freeze the server. BG and LFG auto-fill now reuses existing offline bots instead of creating duplicate characters. Account lookup is indexed to prevent hitches, bot accounts are cleaned up on purge, and `CoaBots.Enable = 0` completely disables all bot background activity.
+
+**Content Scaling**
+
+- Fixed: Fix LFG bot fill and party queues, battleground access, and Manastorm entry. Allow battlegrounds and Manastorm instances to bypass dungeon scaling locks, resolve party queues properly in LFG, and enable bot fill without startup race conditions.
+- Fixed: Private dungeon access no longer bypasses restrictions on unrelated maps. The private dungeon exemption applies only to the assigned map and an active private instance.
+
+### For server owners
+
+**Server**
+
+- Added: Generate navigation data from the CoA client with pinned tools. A separate generation script extracts maps and vmaps and builds mmaps in a new directory. It records input, tool and output hashes and rejects client archives that change during generation. Generated data still requires gameplay qualification before publication.
+- Changed: Server updates require a Manager with safe background startup. Update the Manager before installing new server packages so the local console cannot stop a background world server.
+- Fixed: Older repacks receive the missing creature display default during updates. A targeted database migration aligns the legacy display preset column with the release schema without changing existing NPC appearance data.
+- Fixed: Raid boss initialization matches the current difficulty schedule schema. Module initialization uses explicit column lists and per-difficulty effects, including Shazzrah's area Nova. Both fresh tables and the previous schedule layout are supported.
+- Fixed: Server integration includes current upstream fixes and recognizes shipped race data. The integration includes current CoA gameplay fixes. Repository checks recognize the exact shipped race DBC assets by hash while still rejecting modified or personal binary data.
+
+**Companion bots**
+
+- Added: Custom races bot support and dedicated lore naming. Companion bots now respect the Custom Races bot switch and exclusion lists. When enabled, bots spawn with lore names: unique races (Ogres, Sethrak, Naga, Vulpera, Pandaren, etc.) use dedicated name pools, while related sub-races reuse their canon racial naming conventions.
+- Changed: The experimental SQUID race preset follows the current race release. Custom-race bots now use the upstream supported-race preset, excluding Test Race, Skyborne and Darkfallen. The standard-races preset continues to exclude all custom races.
+- Fixed: Bot account cleanup preserves accounts used by other realms. Cleanup uses the server account lifecycle and removes associated access, ban and mute records while retaining accounts with characters on another realm.
+- Fixed: Companion race selection respects module switches and excluded races. Companions cannot use custom races while race support is disabled. Both exclusion lists apply; spawning stops safely if no races remain available.
+- Fixed: Disabling custom races for SQUID bots now excludes all nonstandard races. The standard-races preset keeps only the ten original playable races. High elves, worgen and other custom race IDs are excluded, and the displayed setting reads complete race IDs rather than matching number substrings.
+
+**Content Scaling**
+
+- Added: Allow removing class requirements from equipment and tier sets. Administrators can enable CoAContentScaling.Items.RemoveClassRestrictions to clear class requirements on equipment, allowing all characters to equip tier sets and class-locked items.
+- Added: Configure parallel and global level scaling progression modes. Server owners can select between sequential compression, parallel scaling (Classic 1-60 with TBC and WotLK 45-60), or global 1-60 scaling across all expansions using Progression.Mode.
+- Fixed: Content Scaling preserves your creature health settings. World, dungeon, raid and per-map health multipliers now remain effective with Content Scaling enabled, including when creatures change level or encounter group size.
+
+**Server modules**
+
+- Changed: Custom race integration includes the upstream talent reset update. The server integration follows the current custom race release, including its talent reset command and client message handler.
+
+**Game client**
+
+- Changed: Custom race client installation follows the current upstream release. The installer verifies the current race archives and includes the two additional MPQs. Legacy patch hashes remain available so upgrading never mistakes the old custom executable for an original launcher file.
+
 ## 2026-10-13-manager - Manager 0.6.16
 
 ### For players
