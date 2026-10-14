@@ -1,6 +1,8 @@
 """Exercise production dispatch without loading Windows DLLs on controller CI."""
 import argparse
 import ast
+import re
+import tempfile
 from contextlib import nullcontext
 from pathlib import Path
 import unittest
@@ -36,6 +38,28 @@ class ShutdownDispatchTests(unittest.TestCase):
     def test_start_still_rejects_an_invalid_template(self):
         with self.assertRaisesRegex(ValueError, "unresolved placeholder"):
             self.dispatch("start-mysql", ValueError("An unresolved placeholder remains in a server configuration."))
+
+    def test_invalid_template_reports_placeholder_names_without_connection_credentials(self):
+        source = ast.parse(Path(__file__).with_name("manage.py").read_text(encoding="utf-8"))
+        prepare = next(node for node in source.body if isinstance(node, ast.FunctionDef) and node.name == "prepare")
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / "Settings").mkdir()
+            (root / "Settings/authserver.conf.template").write_text("LoginDatabaseInfo=@LoginDatabaseInfo@\n")
+            (root / "Settings/worldserver.conf.template").write_text("WorldDatabaseInfo=@WorldDatabaseInfo@\nUnknown=@MISSING_DATABASE@\nOther=@BROKEN_LOGIN@\n# @COMMENT_ONLY@\n")
+            credentials = {"rootPassword": "a" * 48, "appPassword": "b" * 48}
+            namespace = {"ROOT": root, "STATE": root / ".state", "re": re,
+                         "native_root": lambda: root.as_posix(), "read_json": lambda _: credentials,
+                         "process": lambda _: None, "atomic_json": Mock()}
+            exec(compile(ast.Module(body=[prepare], type_ignores=[]), "manage.py", "exec"), namespace)
+            config = {"mysqlPort": 13307, "authPort": 13724, "worldPort": 18085, "raPort": 13443}
+            with self.assertRaises(ValueError) as raised:
+                namespace["prepare"](config)
+            message = str(raised.exception)
+            self.assertIn("Settings/worldserver.conf.template", message)
+            self.assertIn("@BROKEN_LOGIN@, @MISSING_DATABASE@", message)
+            self.assertNotIn("@COMMENT_ONLY@", message)
+            self.assertNotIn(credentials["appPassword"], message)
 
 
 if __name__ == "__main__":

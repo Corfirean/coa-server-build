@@ -259,9 +259,11 @@ def prepare(config):
         text = (ROOT / "Settings" / (name + ".template")).read_text(encoding="utf-8")
         for key, value in values.items():
             text = text.replace("@" + key + "@", value)
-        if any(re.search(r"@[A-Z_a-z]+@", line) for line in text.splitlines()
-               if line.strip() and not line.lstrip().startswith("#")):
-            raise ValueError("An unresolved placeholder remains in a server configuration.")
+        unresolved = sorted({placeholder for line in text.splitlines()
+                             if line.strip() and not line.lstrip().startswith("#")
+                             for placeholder in re.findall(r"@[A-Z_a-z]+@", line)})
+        if unresolved:
+            raise ValueError(f"An unresolved placeholder remains in Settings/{name}.template: " + ", ".join(unresolved))
         (ROOT / target).write_text(text, encoding="utf-8", newline="\n")
     (ROOT / "Core/configs/modules/coa_bugreport.conf").write_text(
         '# Managed by the repack launcher. Enabled whenever worldserver starts.\n'
