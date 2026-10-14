@@ -64,12 +64,12 @@ def apply(folder, lock_path, sources_folder, platform, tool, schema_base=None):
     manifest = json.loads(path.read_text(encoding='utf-8-sig'))
     compatibility = matrix(manifest, lock, sources, platform)
     manifest['compatibility'] = compatibility
-    manifest['minManagerVersion'] = minimum_manager(manifest.get('minManagerVersion', '0.0.0'))
+    manifest['minManagerVersion'] = minimum_manager(manifest.get('minManagerVersion', '0.0.0'), compatibility['clientPatchVersion'])
     path.write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
 
 
-def minimum_manager(requested):
-    floor = '0.6.15'
+def minimum_manager(requested, client_patch_version):
+    floor = '0.6.16' if tuple(map(int, client_patch_version.split('.'))) >= (1, 7) else '0.6.15'
     return max((requested, floor), key=lambda version: tuple(int(part) for part in version.split('.')))
 
 
