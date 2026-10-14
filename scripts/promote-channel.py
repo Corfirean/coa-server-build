@@ -123,6 +123,7 @@ def main():
                     manifest['compatibility']['sourceVersions'], manifest['compatibility']['sourceDatabases'],
                     args.owner_approved_snapshot)
     subprocess.run([args.tool, 'verify', '--dir', str(folder)], check=True)
+    subprocess.run([args.tool, 'verify-install', '--dir', str(folder)], check=True)
     pointer = folder / 'stable-pointer.json'
     subprocess.run([args.tool, 'sign-channel', '--channel', 'stable', '--version', args.version,
                     '--snapshot', lock['snapshot'], '--out', str(pointer)], check=True)

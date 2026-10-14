@@ -4,6 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+from test_installer_package import installer, write_image, qualify
 
 
 def load(name):
@@ -25,7 +26,7 @@ class MetadataTests(unittest.TestCase):
         self.folder = Path(self.temp.name)
         self.lock = {'schema': 1, 'components': {name: {'sha': 'a' * 40} for name in ('core', 'bots', 'scaling', 'squid', 'races')}}
         self.lock['snapshot'] = daily.snapshot(self.lock['components'])
-        self.manifest = {'version': '0.261012.1', 'core': {'commit': 'a' * 40}, 'bots': {'commit': 'a' * 40},
+        self.manifest = {'kind': 'update', 'version': '0.261012.1', 'core': {'commit': 'a' * 40}, 'bots': {'commit': 'a' * 40},
                          'archive': {'parts': [{'sha256': 'b' * 64}]}, 'minManagerVersion': '0.6.13',
                          'compatibility': {'platform': 'windows-x86_64', 'moduleCommits': {
                              name: 'a' * 40 for name in ('bots', 'scaling', 'squid', 'races')}}}
@@ -41,6 +42,15 @@ class MetadataTests(unittest.TestCase):
             (self.folder / name).write_text(json.dumps(value))
         self.manifest['releaseMetadata'] = {name: metadata.digest(self.folder / name) for name in metadata.FILES}
         (self.folder / 'manifest.json').write_text(json.dumps(self.manifest))
+        with tempfile.TemporaryDirectory() as image_folder:
+            image = Path(image_folder)
+            write_image(image, self.manifest)
+            installer.prepare(image, self.folder)
+            report = image / 'report.json'
+            qualify(image, report)
+            for name in ('install-manifest.json', 'install-manifest.json.sig', 'install-qualification.json', 'install-base.tar.zst.001'):
+                (self.folder / name).unlink(missing_ok=True)
+            installer.embed(image, self.folder, report)
 
     def test_verified_metadata_matches_candidate(self):
         self.write()

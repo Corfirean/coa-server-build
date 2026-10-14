@@ -37,6 +37,8 @@ def publish(folder, repo, tool, unsigned=False):
     metadata.validate(folder)
     if not unsigned:
         run(tool, "verify", "--dir", str(folder))
+        if manifest.get('compatibility', {}).get('platform') == 'windows-x86_64':
+            run(tool, "verify-install", "--dir", str(folder))
     tag = ("linux-unsigned-" if unsigned else "server-") + version
     # A retry may reuse a draft, but never modify a published release.
     found = subprocess.run(["gh", "release", "view", tag, "--repo", repo,
@@ -62,6 +64,8 @@ def publish(folder, repo, tool, unsigned=False):
         metadata.validate(downloaded)
         if not unsigned:
             run(tool, "verify", "--dir", temp)
+            if manifest.get('compatibility', {}).get('platform') == 'windows-x86_64':
+                run(tool, "verify-install", "--dir", temp)
     run("gh", "release", "edit", tag, "--repo", repo, "--draft=false")
     print(tag)
 

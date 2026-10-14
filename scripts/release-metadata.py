@@ -9,7 +9,7 @@ from pathlib import Path
 
 FILES = ('release-lock.json', 'qualification.json', 'compatibility-matrix.json')
 WINDOWS_GATES = {'source', 'build', 'unit', 'schema-contract', 'auth-startup', 'world-startup',
-                 'upgrade-base', 'upgrade-stable-1', 'upgrade-stable-2', 'manager-update'}
+                 'upgrade-base', 'upgrade-stable-1', 'upgrade-stable-2', 'manager-update', 'fresh-install'}
 LINUX_GATES = {'build', 'schema-contract', 'binary-version', 'module-config-layout'}
 
 
@@ -56,7 +56,8 @@ def collect(folder, lock_path, platform, reports, binary_run):
             'schema-contract': 'Apply release SQL on an isolated database and capture the expected schema',
             'auth-startup': 'Start auth and world from the candidate in a disposable isolated server',
             'world-startup': 'Start auth and world from the candidate in a disposable isolated server',
-            'manager-update': 'Qualify Manager upgrades from the base and two stable releases'}))
+            'manager-update': 'Qualify Manager upgrades from the base and two stable releases',
+            'fresh-install': 'Build and qualify full clean installation'}))
         if binary_run:
             checks.update(evidence_steps(repo, run_id, {
                 'sql-only-binary-reuse': 'Validate verified binaries and SQL-only source delta'}))
@@ -90,7 +91,7 @@ def collect(folder, lock_path, platform, reports, binary_run):
               'platforms': {platform: manifest['compatibility']}}
     for name, value in [('qualification.json', qualification), ('compatibility-matrix.json', matrix)]:
         folder.joinpath(name).write_text(json.dumps(value, indent=2) + '\n', encoding='utf-8')
-    manifest['releaseMetadata'] = {name: digest(folder / name) for name in FILES}
+    manifest.setdefault('releaseMetadata', {}).update({name: digest(folder / name) for name in FILES})
     folder.joinpath('manifest.json').write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
     validate(folder)
 
@@ -128,6 +129,11 @@ def validate(folder):
         check = report['platforms'].get(platform, {}).get(gate, {})
         if check.get('result') != 'passed' or not check.get('evidence', '').startswith('https://github.com/'):
             raise RuntimeError('Candidate qualification missing: ' + gate)
+    if platform == 'windows-x86_64':
+        spec = importlib.util.spec_from_file_location('installer', Path(__file__).with_name('installer-package.py'))
+        installer = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(installer)
+        installer.validate(folder)
 
 
 if __name__ == '__main__':
