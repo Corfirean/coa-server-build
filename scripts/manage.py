@@ -596,6 +596,11 @@ def main():
         if args.action == "status-json":
             status_json()
             return
+        if args.action == "stop-all":
+            # Shutdown uses the existing client/RA settings. Startup templates may
+            # be precisely what recovery needs to replace; never render them here.
+            stop_all(config)
+            return
         if args.action in ("start-all", "start-world"):
             from squid_playerbots import validate_bots
             validate_bots(ROOT)
@@ -608,8 +613,6 @@ def main():
             start_auth(config)
         if args.action in ("start-all", "start-world"):
             start_world(config, args.port_offset)
-        if args.action == "stop-all":
-            stop_all(config)
     if args.action.startswith("start-"):
         print("Use Stop_All_Server.bat to shut down this repack safely.")
 
