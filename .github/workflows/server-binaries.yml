@@ -49,7 +49,7 @@ jobs:
   build:
     needs: source
     runs-on: windows-latest
-    timeout-minutes: 240
+    timeout-minutes: 330
     outputs:
       squid_tag: ${{ steps.squid.outputs.squid_tag }}
       squid_sha: ${{ steps.shas.outputs.squid_sha }}
@@ -289,11 +289,16 @@ jobs:
         shell: pwsh
         run: sccache --zero-stats
       - name: Build worldserver and authserver
+        timeout-minutes: 280
         env:
           SCCACHE_IGNORE_SERVER_IO_ERROR: '1'
         shell: pwsh
         run: |
-          & ./_pipeline/scripts/run-core-verification.ps1 -CoreRoot . -BaseRef origin/coa-bots -Jobs 2 -Stages 'build,unit'
+          $memoryGB = (Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB
+          $jobs = [Math]::Min(4, [Environment]::ProcessorCount)
+          if ($memoryGB -lt 12) { $jobs = [Math]::Min(2, $jobs) }
+          Write-Host "Compilation: $jobs workers, $([Environment]::ProcessorCount) logical CPUs, $([Math]::Round($memoryGB, 1)) GB RAM."
+          & ./_pipeline/scripts/run-core-verification.ps1 -CoreRoot . -BaseRef origin/coa-bots -Jobs $jobs -MaximumSeconds 16200 -Stages 'build,unit'
           if ($LASTEXITCODE) {
             $report = Get-ChildItem .cache/verify-all -Recurse -Filter build.log | Sort-Object LastWriteTime -Descending | Select-Object -First 1
             if ($report) { Get-Content $report.FullName -Tail 100 }
@@ -307,6 +312,11 @@ jobs:
           sccache --show-stats
           sccache --show-stats --stats-format json | Set-Content cache-statistics.json -Encoding utf8NoBOM
           python _pipeline/scripts/cache-summary.py cache-statistics.json
+      - name: Flush compiler cache before archiving
+        if: always() && steps.sccache.outcome == 'success'
+        continue-on-error: true
+        shell: pwsh
+        run: sccache --stop-server
       - name: Preserve reusable compiler objects even when qualification fails
         if: always() && steps.sccache.outcome == 'success' && steps.compiler-cache.outputs.cache-primary-key != '' && steps.compiler-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v6

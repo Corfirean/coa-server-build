@@ -2,6 +2,7 @@ param(
     [ValidateSet('source,build,unit', 'build,unit')] [string] $Stages = 'source,build,unit',
     [string]$CoreRoot = '_core',
     [ValidateRange(1,64)][int]$Jobs = 4,
+    [ValidateRange(1,86400)][int]$MaximumSeconds = 16200,
     [ValidatePattern('^[A-Za-z0-9_./-]+$')][string]$BaseRef = 'origin/coa-bots'
 )
 $ErrorActionPreference = 'Stop'
@@ -38,6 +39,7 @@ function Write-VerificationProgress {
     }
 }
 $started = Get-Date
+$timer = [System.Diagnostics.Stopwatch]::StartNew()
 $python = (Get-Command python -ErrorAction Stop).Source
 $process = Start-Process -FilePath $python -WorkingDirectory $core -WindowStyle Hidden -PassThru `
     -ArgumentList @('-B', 'tools/verify_all.py', '--stages', $Stages, '--base', $BaseRef, '--jobs', "$Jobs") `
@@ -45,6 +47,9 @@ $process = Start-Process -FilePath $python -WorkingDirectory $core -WindowStyle 
 try {
     do {
         Write-VerificationProgress
+        if (-not $process.HasExited -and $timer.Elapsed.TotalSeconds -ge $MaximumSeconds) {
+            throw "Verification exceeded its $MaximumSeconds second budget; stopping this process tree so cache and diagnostics can be saved."
+        }
         if (-not $process.HasExited) { Start-Sleep -Seconds 10 }
         $process.Refresh()
     } while (-not $process.HasExited)
