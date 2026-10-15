@@ -17,6 +17,10 @@ on:
         type: string
         description: Fork ref (branch, tag or SHA)
         default: coa-bots
+      upstream_ref:
+        type: string
+        description: Upstream revision integrated and tested in the selected core
+        default: main
       bots_ref:
         type: string
         description: mod-coa-playerbots ref (branch, tag or SHA)
@@ -50,6 +54,9 @@ on:
       core_ref:
         description: Fork ref (branch, tag or SHA)
         default: coa-bots
+      upstream_ref:
+        description: Upstream revision integrated and tested in the selected core
+        default: main
       bots_ref:
         description: mod-coa-playerbots ref (branch, tag or SHA)
         default: master
@@ -77,6 +84,7 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       CORE_REF: ${{ inputs.core_ref || 'coa-bots' }}
+      UPSTREAM_REF: ${{ inputs.upstream_ref || 'main' }}
       BOTS_REF: ${{ inputs.bots_ref || 'master' }}
       SCALING_REF: ${{ inputs.scaling_ref || 'main' }}
       SQUID_REF: ${{ inputs.squid_ref || 'latest-release' }}

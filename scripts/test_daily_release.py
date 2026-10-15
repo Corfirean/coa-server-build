@@ -9,6 +9,21 @@ spec.loader.exec_module(daily)
 
 
 class IntegrationTests(unittest.TestCase):
+    def test_resolve_freezes_selected_upstream_and_checks_its_ancestry(self):
+        def api(endpoint):
+            if endpoint.endswith('/releases/latest'):
+                return {'tag_name': 'coa-custom-1.7', 'assets': []}
+            if '/tags?' in endpoint:
+                return [{'name': 'v1.0', 'commit': {'sha': 'squid-sha'}}]
+            return {'status': 'ahead'}
+
+        with patch.object(daily, 'gh', side_effect=api) as calls, \
+                patch.object(daily, 'revision', side_effect=lambda repo, ref: ref):
+            lock = daily.resolve(upstream_ref='tested-upstream-sha')
+            self.assertEqual(lock['components']['upstream']['sha'], 'tested-upstream-sha')
+            daily.check_integration(lock)
+            calls.assert_any_call('repos/Corfirean/azerothcore-wotlk-coa/compare/tested-upstream-sha...coa-bots')
+
     def lock(self):
         return {"components": {
             "core": {"repository": "owner/core", "sha": "candidate"},
