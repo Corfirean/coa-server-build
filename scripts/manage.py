@@ -259,9 +259,11 @@ def prepare(config):
         text = (ROOT / "Settings" / (name + ".template")).read_text(encoding="utf-8")
         for key, value in values.items():
             text = text.replace("@" + key + "@", value)
-        if any(re.search(r"@[A-Z_a-z]+@", line) for line in text.splitlines()
-               if line.strip() and not line.lstrip().startswith("#")):
-            raise ValueError("An unresolved placeholder remains in a server configuration.")
+        unresolved = sorted({placeholder for line in text.splitlines()
+                             if line.strip() and not line.lstrip().startswith("#")
+                             for placeholder in re.findall(r"@[A-Z_a-z]+@", line)})
+        if unresolved:
+            raise ValueError(f"An unresolved placeholder remains in Settings/{name}.template: " + ", ".join(unresolved))
         (ROOT / target).write_text(text, encoding="utf-8", newline="\n")
     (ROOT / "Core/configs/modules/coa_bugreport.conf").write_text(
         '# Managed by the repack launcher. Enabled whenever worldserver starts.\n'
@@ -596,6 +598,11 @@ def main():
         if args.action == "status-json":
             status_json()
             return
+        if args.action == "stop-all":
+            # Shutdown uses the existing client/RA settings. Startup templates may
+            # be precisely what recovery needs to replace; never render them here.
+            stop_all(config)
+            return
         if args.action in ("start-all", "start-world"):
             from squid_playerbots import validate_bots
             validate_bots(ROOT)
@@ -608,8 +615,6 @@ def main():
             start_auth(config)
         if args.action in ("start-all", "start-world"):
             start_world(config, args.port_offset)
-        if args.action == "stop-all":
-            stop_all(config)
     if args.action.startswith("start-"):
         print("Use Stop_All_Server.bat to shut down this repack safely.")
 

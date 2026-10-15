@@ -17,6 +17,10 @@ on:
         type: string
         description: Fork ref (branch, tag or SHA)
         default: coa-bots
+      upstream_ref:
+        type: string
+        description: Upstream revision integrated and tested in the selected core
+        default: main
       bots_ref:
         type: string
         description: mod-coa-playerbots ref (branch, tag or SHA)
@@ -50,6 +54,9 @@ on:
       core_ref:
         description: Fork ref (branch, tag or SHA)
         default: coa-bots
+      upstream_ref:
+        description: Upstream revision integrated and tested in the selected core
+        default: main
       bots_ref:
         description: mod-coa-playerbots ref (branch, tag or SHA)
         default: master
@@ -77,6 +84,7 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       CORE_REF: ${{ inputs.core_ref || 'coa-bots' }}
+      UPSTREAM_REF: ${{ inputs.upstream_ref || 'main' }}
       BOTS_REF: ${{ inputs.bots_ref || 'master' }}
       SCALING_REF: ${{ inputs.scaling_ref || 'main' }}
       SQUID_REF: ${{ inputs.squid_ref || 'latest-release' }}
@@ -140,7 +148,7 @@ jobs:
     if: always() && (needs.binaries.result == 'success' || needs.reuse.result == 'success')
     needs: [resolve, binaries, reuse]
     runs-on: windows-latest
-    timeout-minutes: 90
+    timeout-minutes: 210
     env:
       GH_TOKEN: ${{ github.token }}
       SQUID_SHA: ${{ needs.binaries.outputs.squid_sha || needs.reuse.outputs.squid_sha }}
@@ -311,6 +319,39 @@ jobs:
           if ($LASTEXITCODE) { throw "Release compatibility validation failed" }
           & $tool sign --dir _out;   if ($LASTEXITCODE) { throw "sign failed" }
           & $tool verify --dir _out; if ($LASTEXITCODE) { throw "verify failed" }
+      - name: Build and qualify full clean installation
+        shell: pwsh
+        env:
+          COA_SIGNING_KEY: ${{ secrets.COA_SIGNING_KEY }}
+        run: |
+          $tool = "_manager/target/release/coa-release.exe"
+          & $tool compose-install --base _schema-base --candidate _out --fixture coa-schema-fixture-install-image
+          if ($LASTEXITCODE) { throw "Preparing the full installation image failed." }
+          & $tool pack-base --tree coa-schema-fixture-install-image --out _install-out --version $env:VERSION --core-commit $env:CORE_SHA --bots-commit $env:BOTS_SHA
+          if ($LASTEXITCODE) { throw "Packing the full installation image failed." }
+          python scripts/installer-package.py prepare --installer _install-out --candidate _out
+          if ($LASTEXITCODE) { throw "Installation package identity validation failed." }
+          & $tool sign --dir _install-out
+          if ($LASTEXITCODE) { throw "Signing the installation image failed." }
+          $workspace = [IO.Path]::GetFullPath((Get-Location).Path).TrimEnd('\') + '\'
+          foreach ($owned in 'coa-schema-fixture-install-image', 'coa-schema-fixture-install-image.manager') {
+            $absolute = [IO.Path]::GetFullPath((Join-Path (Get-Location) $owned))
+            if (-not $absolute.StartsWith($workspace, [StringComparison]::OrdinalIgnoreCase)) { throw 'Fixture cleanup escaped the workspace.' }
+            Remove-Item -LiteralPath $absolute -Recurse -Force
+          }
+          & $tool qualify-install --package _install-out --fixture coa-schema-fixture-clean-install --report _install-qualification.json
+          if ($LASTEXITCODE) { throw "The full package failed clean installation qualification." }
+          python scripts/installer-package.py embed --installer _install-out --candidate _out --report _install-qualification.json
+          if ($LASTEXITCODE) { throw "Binding the qualified installer to the release failed." }
+          & $tool sign --dir _out
+          if ($LASTEXITCODE) { throw "Signing the candidate with installation assets failed." }
+          & $tool verify-install --dir _out
+          if ($LASTEXITCODE) { throw "The embedded installation package failed verification." }
+          foreach ($owned in 'coa-schema-fixture-clean-install', 'coa-schema-fixture-clean-install.manager') {
+            $absolute = [IO.Path]::GetFullPath((Join-Path (Get-Location) $owned))
+            if (-not $absolute.StartsWith($workspace, [StringComparison]::OrdinalIgnoreCase)) { throw 'Fixture cleanup escaped the workspace.' }
+            Remove-Item -LiteralPath $absolute -Recurse -Force
+          }
       - name: Qualify Manager upgrades from the base and two stable releases
         shell: pwsh
         run: |
@@ -333,6 +374,11 @@ jobs:
           name: windows-manager-upgrade-qualification
           path: |
             _upgrade-reports
+            _install-qualification.json
+            coa-schema-fixture-clean-install/Core/Logs
+            coa-schema-fixture-clean-install.manager/diagnostics
+            coa-schema-fixture-install-image/Core/Logs
+            coa-schema-fixture-install-image.manager/diagnostics
             coa-schema-fixture-upgrade-*/Core/Logs
             coa-schema-fixture-upgrade-*.manager/diagnostics
             coa-schema-fixture-upgrade-*.manager/updates/*/txn.json

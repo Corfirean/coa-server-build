@@ -24,7 +24,8 @@ def freeze(path):
         if not lock.get('upgradeSources'):
             raise RuntimeError('Shared snapshot has no frozen upgrade sources')
     else:
-        lock = daily.resolve(refs['core'], refs['manager'], refs['bots'], refs['scaling'], refs['squid'])
+        lock = daily.resolve(refs['core'], refs['manager'], refs['bots'], refs['scaling'], refs['squid'],
+                             upstream_ref=os.environ.get('UPSTREAM_REF') or 'main')
         daily.check_integration(lock)
         lock['upgradeSources'] = load('upgrade-sources').resolve()
     path.parent.mkdir(parents=True, exist_ok=True)

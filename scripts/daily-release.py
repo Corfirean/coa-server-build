@@ -15,7 +15,7 @@ def revision(repo, ref):
     return gh(f"repos/{repo}/commits/{ref}")["sha"]
 
 
-def resolve(core_ref="coa-bots", manager_ref="master", bots_ref="master", scaling_ref="main", squid_ref="latest-release"):
+def resolve(core_ref="coa-bots", manager_ref="master", bots_ref="master", scaling_ref="main", squid_ref="latest-release", upstream_ref="main"):
     races = gh("repos/ilusixn/azerothcore-wotlk-coa/releases/latest")
     tags = gh("repos/Zyth45/mod-playerbots/tags?per_page=100")
     import re
@@ -24,7 +24,7 @@ def resolve(core_ref="coa-bots", manager_ref="master", bots_ref="master", scalin
         raise RuntimeError("No stable SQUID source tag found")
     squid = max(stable, key=lambda t: tuple(map(int, t["name"][1:].split("."))))
     components = {
-        "upstream": {"repository": "jealous-sound/azerothcore-wotlk-coa", "ref": "main"},
+        "upstream": {"repository": "jealous-sound/azerothcore-wotlk-coa", "ref": upstream_ref},
         "core": {"repository": "Corfirean/azerothcore-wotlk-coa", "ref": core_ref},
         "bots": {"repository": "Corfirean/mod-coa-playerbots", "ref": bots_ref},
         "scaling": {"repository": "Corfirean/mod-coa-content-scaling", "ref": scaling_ref},
@@ -78,8 +78,9 @@ def main():
     parser.add_argument("--bots-ref", default="master")
     parser.add_argument("--scaling-ref", default="main")
     parser.add_argument("--squid-ref", default="latest-release")
+    parser.add_argument("--upstream-ref", default="main")
     args = parser.parse_args()
-    lock = resolve(args.core_ref, args.manager_ref, args.bots_ref, args.scaling_ref, args.squid_ref)
+    lock = resolve(args.core_ref, args.manager_ref, args.bots_ref, args.scaling_ref, args.squid_ref, args.upstream_ref)
     Path(args.out).write_text(json.dumps(lock, indent=2) + "\n", encoding="utf-8")
     if args.check_integration:
         check_integration(lock)
