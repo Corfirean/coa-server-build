@@ -247,7 +247,7 @@ jobs:
         run: python3 scripts/restore-navigation.py --lock _release-lock/release-lock.json --tree _tree --download _navigation-download
       - name: Fetch the signed base package for database acceptance
         run: |
-          python3 scripts/upgrade-sources.py --lock _release-lock/release-lock.json --download _upgrade-sources --packages --tool _manager/target/release/coa-release
+          python3 scripts/upgrade-sources.py --lock _release-lock/release-lock.json --download _upgrade-sources --packages --role base --tool _manager/target/release/coa-release
           mkdir -p _schema-base
           cp _upgrade-sources/base/* _schema-base/
       - name: Apply release SQL on an isolated database and capture the expected schema

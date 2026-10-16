@@ -56,7 +56,7 @@ def collect(folder, lock_path, platform, reports, binary_run):
             'schema-contract': 'Apply release SQL on an isolated database and capture the expected schema',
             'auth-startup': 'Start auth and world from the candidate in a disposable isolated server',
             'world-startup': 'Start auth and world from the candidate in a disposable isolated server',
-            'manager-update': 'Qualify Manager upgrades from every published release',
+            'manager-update': 'Qualify representative direct Manager upgrades',
             'fresh-install': 'Build and qualify full clean installation'}))
         if binary_run:
             checks.update(evidence_steps(repo, run_id, {

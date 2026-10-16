@@ -66,14 +66,12 @@ def apply(folder, lock_path, sources_folder, platform, tool, schema_base=None):
     compatibility = matrix(manifest, lock, sources, platform)
     manifest['compatibility'] = compatibility
     manifest['minManagerVersion'] = minimum_manager(manifest.get('minManagerVersion', '0.0.0'), compatibility['clientPatchVersion'])
-    if len(sources) > 3:
-        manifest['minManagerVersion'] = max((manifest['minManagerVersion'], '0.6.20'),
-                                            key=lambda value: tuple(map(int, value.split('.'))))
     path.write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
 
 
 def minimum_manager(requested, client_patch_version):
-    floor = '0.6.16' if tuple(map(int, client_patch_version.split('.'))) >= (1, 7) else '0.6.15'
+    # Earlier public Managers treated test coverage as an exclusive allowlist.
+    floor = '0.6.21'
     return max((requested, floor), key=lambda version: tuple(int(part) for part in version.split('.')))
 
 
