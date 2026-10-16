@@ -1,0 +1,104 @@
+name: direct-upgrade-tests
+on:
+  workflow_dispatch:
+    inputs:
+      manager_ref:
+        description: Manager revision to qualify
+        default: master
+      target_version:
+        description: Signed server version (empty selects current stable)
+        default: ''
+permissions:
+  contents: read
+jobs:
+  tool:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    env:
+      GH_TOKEN: ${{ github.token }}
+    outputs:
+      matrix: ${{ steps.freeze.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Freeze all source manifests and the Manager revision
+        id: freeze
+        env:
+          MANAGER_REF: ${{ inputs.manager_ref }}
+          TARGET_VERSION: ${{ inputs.target_version }}
+        shell: pwsh
+        run: python scripts/direct-upgrade-matrix.py
+      - uses: actions/checkout@v7
+        with:
+          repository: Corfirean/coa-server-manager
+          ref: ${{ steps.freeze.outputs.manager }}
+          path: _manager
+      - uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            _manager/target
+          key: trusted-direct-tool-${{ runner.os }}-${{ hashFiles('_manager/Cargo.lock') }}
+          restore-keys: trusted-direct-tool-${{ runner.os }}-
+      - name: Build the release verifier and production updater once
+        run: cargo build --release --locked -p coa-release --manifest-path _manager/Cargo.toml
+      - uses: actions/upload-artifact@v4
+        with:
+          name: direct-upgrade-tool
+          path: |
+            direct-upgrade-lock.json
+            _manager/target/release/coa-release.exe
+          retention-days: 7
+  upgrade:
+    needs: tool
+    runs-on: windows-latest
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      max-parallel: 11
+      matrix: ${{ fromJSON(needs.tool.outputs.matrix) }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_ROLE: ${{ matrix.role }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v4
+        with:
+          name: direct-upgrade-tool
+      - name: Verify and qualify the direct update
+        shell: pwsh
+        run: |
+          $lock = Get-Content direct-upgrade-lock.json -Raw | ConvertFrom-Json
+          $tool = '_manager/target/release/coa-release.exe'
+          foreach ($role in @('base', $lock.targetRole, $env:SOURCE_ROLE) | Select-Object -Unique) {
+            python scripts/upgrade-sources.py --lock direct-upgrade-lock.json --download _sources --packages --role $role --tool $tool
+            if ($LASTEXITCODE) { throw "Source verification failed: $role" }
+          }
+          New-Item -ItemType Directory -Force _reports | Out-Null
+          & $tool qualify-upgrade --base _sources/base --source "_sources/$env:SOURCE_ROLE" --candidate "_sources/$($lock.targetRole)" --fixture "coa-schema-fixture-direct-$env:SOURCE_ROLE" --report "_reports/$env:SOURCE_ROLE.json"
+          if ($LASTEXITCODE) { throw "Direct update failed: $env:SOURCE_ROLE" }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: direct-upgrade-${{ matrix.role }}
+          path: |
+            _reports
+            coa-schema-fixture-direct-*/Core/Logs
+            coa-schema-fixture-direct-*.manager/diagnostics
+            coa-schema-fixture-direct-*.manager/updates/*/txn.json
+          retention-days: 7
+  report:
+    needs: [tool, upgrade]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v4
+        with:
+          name: direct-upgrade-tool
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: direct-upgrade-*
+          merge-multiple: true
+          path: _evidence
+      - name: Require a passing report for every frozen source
+        run: python scripts/direct-upgrade-matrix.py --reports _evidence/_reports
