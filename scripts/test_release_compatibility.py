@@ -28,7 +28,7 @@ class CompatibilityTests(unittest.TestCase):
                 lock['upgradeSources'].append({'role': role, 'manifestSha256': hashlib.sha256(raw).hexdigest()})
             lock_path = root / 'lock.json'
             lock_path.write_text(json.dumps(lock))
-            for requested, expected in [('0.6.13', '0.6.15'), ('0.6.15', '0.6.15'), ('0.7.0', '0.7.0')]:
+            for requested, expected in [('0.6.13', '0.6.21'), ('0.6.15', '0.6.21'), ('0.7.0', '0.7.0')]:
                 manifest = dict(self.manifest, minManagerVersion=requested)
                 (candidate / 'manifest.json').write_text(json.dumps(manifest))
                 with patch.object(compatibility.subprocess, 'run'):
@@ -36,9 +36,9 @@ class CompatibilityTests(unittest.TestCase):
                 self.assertEqual(json.loads((candidate / 'manifest.json').read_text())['minManagerVersion'], expected)
 
     def test_grummle_release_requires_a_manager_with_matching_client_assets(self):
-        self.assertEqual(compatibility.minimum_manager("0.6.15", "1.7"), "0.6.16")
+        self.assertEqual(compatibility.minimum_manager("0.6.15", "1.7"), "0.6.21")
         self.assertEqual(compatibility.minimum_manager("0.7.0", "1.7"), "0.7.0")
-        self.assertEqual(compatibility.minimum_manager("0.6.15", "1.6"), "0.6.15")
+        self.assertEqual(compatibility.minimum_manager("0.6.15", "1.6"), "0.6.21")
 
     def setUp(self):
         self.lock = {'components': {name: {'sha': str(index) * 40} for index, name in enumerate(('core', 'bots', 'scaling', 'squid', 'races'), 1)}}

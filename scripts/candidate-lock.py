@@ -27,7 +27,14 @@ def freeze(path):
         lock = daily.resolve(refs['core'], refs['manager'], refs['bots'], refs['scaling'], refs['squid'],
                              upstream_ref=os.environ.get('UPSTREAM_REF') or 'main')
         daily.check_integration(lock)
-        lock['upgradeSources'] = load('upgrade-sources').resolve()
+        # Coverage is not an updater allowlist. Keep full history for independent
+        # parallel acceptance, with three representative upgrades in packaging.
+        sources = load('upgrade-sources').resolve()
+        lock['historicalUpgradeSources'] = sources
+        lock['upgradeSources'] = sources[:3]
+    if len(lock['upgradeSources']) > 3:
+        lock.setdefault('historicalUpgradeSources', lock['upgradeSources'])
+        lock['upgradeSources'] = lock['upgradeSources'][:3]
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(lock, indent=2) + '\n', encoding='utf-8')
     with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:

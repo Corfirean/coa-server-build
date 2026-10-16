@@ -199,5 +199,7 @@ if __name__ == '__main__':
     else:
         if args.packages:
             parser.error('--packages requires --download')
-        lock['upgradeSources'] = resolve()
+        sources = resolve()
+        lock['historicalUpgradeSources'] = sources
+        lock['upgradeSources'] = sources[:3]
         args.lock.write_text(json.dumps(lock, indent=2) + '\n', encoding='utf-8')

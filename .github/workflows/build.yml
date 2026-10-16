@@ -352,7 +352,7 @@ jobs:
             if (-not $absolute.StartsWith($workspace, [StringComparison]::OrdinalIgnoreCase)) { throw 'Fixture cleanup escaped the workspace.' }
             Remove-Item -LiteralPath $absolute -Recurse -Force
           }
-      - name: Qualify Manager upgrades from every published release
+      - name: Qualify representative direct Manager upgrades
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force _upgrade-reports | Out-Null
