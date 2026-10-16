@@ -149,6 +149,8 @@ jobs:
     needs: [resolve, binaries, reuse]
     runs-on: windows-latest
     timeout-minutes: 210
+    outputs:
+      manifest_sha256: ${{ steps.candidate.outputs.manifest_sha256 }}
     env:
       GH_TOKEN: ${{ github.token }}
       SQUID_SHA: ${{ needs.binaries.outputs.squid_sha || needs.reuse.outputs.squid_sha }}
@@ -246,8 +248,10 @@ jobs:
       - name: Fetch the signed base package for database acceptance
         shell: pwsh
         run: |
-          python scripts/upgrade-sources.py --lock _release-lock/release-lock.json --download _upgrade-sources --packages --tool _manager/target/release/coa-release.exe
-          if ($LASTEXITCODE) { throw "Full locked upgrade fixture verification failed." }
+          python scripts/upgrade-sources.py --lock _release-lock/release-lock.json --download _upgrade-sources
+          if ($LASTEXITCODE) { throw "Locked upgrade manifest download failed." }
+          python scripts/upgrade-sources.py --lock _release-lock/release-lock.json --download _upgrade-sources --packages --tool _manager/target/release/coa-release.exe --roles base
+          if ($LASTEXITCODE) { throw "Full locked base fixture verification failed." }
           New-Item -ItemType Directory -Force _schema-base | Out-Null
           Copy-Item _upgrade-sources/base/* _schema-base
           Copy-Item _schema-base/manifest.json base-manifest.json
@@ -352,38 +356,159 @@ jobs:
             if (-not $absolute.StartsWith($workspace, [StringComparison]::OrdinalIgnoreCase)) { throw 'Fixture cleanup escaped the workspace.' }
             Remove-Item -LiteralPath $absolute -Recurse -Force
           }
-      - name: Qualify Manager upgrades from the base and two stable releases
+      - name: Record the qualified candidate identity
+        id: candidate
         shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force _upgrade-reports | Out-Null
-          foreach ($role in 'base', 'stable-1', 'stable-2') {
-            $fixture = "coa-schema-fixture-upgrade-$role"
-            & _manager/target/release/coa-release.exe qualify-upgrade --base _schema-base --source "_upgrade-sources/$role" --candidate _out --fixture $fixture --report "_upgrade-reports/$role.json"
-            if ($LASTEXITCODE) { throw "Manager upgrade from $role failed; candidate publication is blocked." }
-            $workspace = [IO.Path]::GetFullPath((Get-Location).Path).TrimEnd('\') + '\'
-            foreach ($owned in $fixture, "$fixture.manager") {
-              $absolute = [IO.Path]::GetFullPath((Join-Path (Get-Location) $owned))
-              if (-not $absolute.StartsWith($workspace, [StringComparison]::OrdinalIgnoreCase)) { throw 'Fixture cleanup escaped the workspace.' }
-              Remove-Item -LiteralPath $absolute -Recurse -Force
-            }
-          }
-      - name: Preserve Manager upgrade qualification evidence
+        run: '"manifest_sha256=$((Get-FileHash _out/manifest.json -Algorithm SHA256).Hash.ToLowerInvariant())" >> $env:GITHUB_OUTPUT'
+      - name: Preserve signed candidate for independent qualification and retries
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-signed-candidate
+          path: |
+            _out/*
+            !_out/install-*
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 14
+      - name: Preserve qualified installation assets separately
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-qualified-installer
+          path: _out/install-*
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 14
+      - name: Preserve the frozen release tool
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-release-tool
+          path: _manager/target/release/coa-release.exe
+          if-no-files-found: error
+          retention-days: 14
+      - name: Preserve clean installation evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: windows-manager-upgrade-qualification
+          name: windows-clean-install-qualification
           path: |
-            _upgrade-reports
             _install-qualification.json
             coa-schema-fixture-clean-install/Core/Logs
             coa-schema-fixture-clean-install.manager/diagnostics
-            coa-schema-fixture-install-image/Core/Logs
-            coa-schema-fixture-install-image.manager/diagnostics
+          if-no-files-found: ignore
+
+  qualify-upgrade:
+    needs: package
+    if: ${{ !cancelled() && needs.package.result == 'success' }}
+    runs-on: windows-latest
+    timeout-minutes: 90
+    permissions:
+      actions: read
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        role: [base, stable-1, stable-2]
+    env:
+      GH_TOKEN: ${{ github.token }}
+      UPGRADE_ROLE: ${{ matrix.role }}
+      EXPECTED_MANIFEST_SHA256: ${{ needs.package.outputs.manifest_sha256 }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-lock-windows
+          path: _release-lock
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-signed-candidate
+          path: _out
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-release-tool
+          path: _tools
+      - name: Verify candidate identity before qualification
+        shell: pwsh
+        run: |
+          $actual = (Get-FileHash _out/manifest.json -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $env:EXPECTED_MANIFEST_SHA256) { throw 'Candidate manifest differs from the packaged candidate.' }
+          & _tools/coa-release.exe verify --dir _out
+          if ($LASTEXITCODE) { throw 'Candidate signature or archive verification failed.' }
+      - name: Download only the locked fixtures required by this upgrade
+        shell: pwsh
+        run: |
+          python scripts/upgrade-sources.py --lock _release-lock/release-lock.json --download _upgrade-sources --packages --tool _tools/coa-release.exe --roles "base,$env:UPGRADE_ROLE"
+          if ($LASTEXITCODE) { throw 'Locked upgrade fixture verification failed.' }
+      - name: Qualify Manager upgrade from ${{ matrix.role }}
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force _upgrade-reports | Out-Null
+          & _tools/coa-release.exe qualify-upgrade --base _upgrade-sources/base --source "_upgrade-sources/$env:UPGRADE_ROLE" --candidate _out --fixture "coa-schema-fixture-upgrade-$env:UPGRADE_ROLE" --report "_upgrade-reports/$env:UPGRADE_ROLE.json"
+          if ($LASTEXITCODE) { throw "Manager upgrade from $env:UPGRADE_ROLE failed; candidate publication is blocked." }
+          python scripts/qualification-identity.py --candidate _out --report "_upgrade-reports/$env:UPGRADE_ROLE.json" --expected $env:EXPECTED_MANIFEST_SHA256
+          if ($LASTEXITCODE) { throw 'Upgrade report is not bound to the packaged candidate.' }
+      - name: Preserve successful upgrade report
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-manager-upgrade-${{ matrix.role }}
+          overwrite: true
+          path: _upgrade-reports/${{ matrix.role }}.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Preserve Manager upgrade diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-upgrade-diagnostics-${{ matrix.role }}-${{ github.run_attempt }}
+          path: |
+            _upgrade-reports
             coa-schema-fixture-upgrade-*/Core/Logs
             coa-schema-fixture-upgrade-*.manager/diagnostics
             coa-schema-fixture-upgrade-*.manager/updates/*/txn.json
             coa-schema-fixture-upgrade-*.manager/validation-configs.json
           if-no-files-found: ignore
+          include-hidden-files: true
+          retention-days: 14
+
+  publish:
+    needs: [package, qualify-upgrade]
+    if: ${{ !cancelled() && needs.package.result == 'success' && needs.qualify-upgrade.result == 'success' }}
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+      EXPECTED_MANIFEST_SHA256: ${{ needs.package.outputs.manifest_sha256 }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-lock-windows
+          path: _release-lock
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-signed-candidate
+          path: _out
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-qualified-installer
+          path: _out
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-release-tool
+          path: _tools
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: windows-manager-upgrade-*
+          path: _upgrade-reports
+          merge-multiple: true
+      - name: Verify candidate before binding qualification
+        shell: pwsh
+        run: |
+          $actual = (Get-FileHash _out/manifest.json -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $env:EXPECTED_MANIFEST_SHA256) { throw 'Candidate manifest differs from the packaged candidate.' }
+          & _tools/coa-release.exe verify --dir _out
+          if ($LASTEXITCODE) { throw 'Candidate verification failed.' }
+          & _tools/coa-release.exe verify-install --dir _out
+          if ($LASTEXITCODE) { throw 'Installation package verification failed.' }
       - name: Bind qualification and release metadata to the signed candidate
         shell: pwsh
         env:
@@ -391,11 +516,11 @@ jobs:
           BINARY_RUN: ${{ inputs.binaries_run_id }}
           BINARY_CORE_SHA: ${{ inputs.binary_core_ref }}
         run: |
-          python scripts/release-metadata.py --dir _out --lock _release-lock/release-lock.json --platform windows-x86_64 --binary-run "$env:BINARY_RUN"
+          python scripts/release-metadata.py --dir _out --lock _release-lock/release-lock.json --platform windows-x86_64 --reports _upgrade-reports --binary-run "$env:BINARY_RUN"
           if ($LASTEXITCODE) { throw 'Release evidence is missing or differs from the candidate.' }
-          & _manager/target/release/coa-release.exe sign --dir _out
+          & _tools/coa-release.exe sign --dir _out
           if ($LASTEXITCODE) { throw 'Signing final metadata failed.' }
       - name: Publish immutable Windows candidate
         shell: pwsh
         run: |
-          python scripts/publish-candidate.py --dir _out --repo $env:GITHUB_REPOSITORY --tool _manager/target/release/coa-release.exe
+          python scripts/publish-candidate.py --dir _out --repo $env:GITHUB_REPOSITORY --tool _tools/coa-release.exe
