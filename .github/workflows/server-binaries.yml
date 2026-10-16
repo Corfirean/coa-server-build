@@ -58,7 +58,7 @@ jobs:
       scaling_sha: ${{ steps.shas.outputs.scaling_sha }}
     env:
       BOOST_ROOT: C:\local\boost_1_87_0
-      SCCACHE_CACHE_SIZE: 6G
+      SCCACHE_CACHE_SIZE: 8G
       SCCACHE_IGNORE_SERVER_IO_ERROR: '1'
     steps:
       - uses: actions/checkout@v7
@@ -249,8 +249,9 @@ jobs:
         continue-on-error: true
         with:
           path: ${{ runner.temp }}/sccache
-          key: trusted-msvc-v2-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.identity }}-boost187-mysql849-${{ hashFiles('_pipeline/.github/workflows/server-binaries.yml') }}-${{ github.run_id }}
+          key: trusted-msvc-v2-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.identity }}-boost187-mysql849-${{ hashFiles('_pipeline/.github/workflows/server-binaries.yml') }}-${{ steps.shas.outputs.core_sha }}-${{ steps.shas.outputs.bots_sha }}-${{ steps.shas.outputs.scaling_sha }}-${{ steps.shas.outputs.squid_sha }}
           restore-keys: |
+            trusted-msvc-v2-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.identity }}-boost187-mysql849-${{ hashFiles('_pipeline/.github/workflows/server-binaries.yml') }}-${{ steps.shas.outputs.core_sha }}-${{ steps.shas.outputs.bots_sha }}-${{ steps.shas.outputs.scaling_sha }}-${{ steps.shas.outputs.squid_sha }}-
             trusted-msvc-v2-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.identity }}-boost187-mysql849-${{ hashFiles('_pipeline/.github/workflows/server-binaries.yml') }}-
             trusted-msvc-v2-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.identity }}-boost187-mysql849-
       - name: Configure
@@ -323,7 +324,7 @@ jobs:
         continue-on-error: true
         with:
           path: ${{ runner.temp }}/sccache
-          key: ${{ steps.compiler-cache.outputs.cache-primary-key }}
+          key: ${{ steps.compiler-cache.outputs.cache-primary-key }}${{ job.status != 'success' && format('-partial-{0}-{1}', github.run_id, github.run_attempt) || '' }}
       - name: Upload compiler cache statistics
         if: always() && steps.sccache.outcome == 'success'
         uses: actions/upload-artifact@v4
