@@ -145,7 +145,7 @@ jobs:
         id: pins
         run: python3 scripts/validate-binary-reuse.py
   package:
-    if: always() && (needs.binaries.result == 'success' || needs.reuse.result == 'success')
+    if: ${{ !cancelled() && (needs.binaries.result == 'success' || needs.reuse.result == 'success') }}
     needs: [resolve, binaries, reuse]
     runs-on: windows-latest
     timeout-minutes: 210
