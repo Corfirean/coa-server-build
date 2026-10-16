@@ -11,6 +11,12 @@ REPO = 'Corfirean/coa-server-build'
 ROLES = ('base', 'stable-1', 'stable-2')
 
 
+def validate_roles(sources):
+    roles = [s['role'] for s in sources]
+    if len(roles) < 2 or roles != ['base'] + [f'stable-{i}' for i in range(1, len(roles))]:
+        raise RuntimeError('Invalid upgrade fixture roles')
+
+
 def api(path):
     return json.loads(subprocess.check_output(['gh', 'api', path], text=True))
 
@@ -62,42 +68,53 @@ def resolve():
     stable = source(api(f'repos/{REPO}/releases/tags/{stable_tag}'), 'stable-1')
     if current:
         stable['channelPointer'] = current[0]
-        history = api(f'repos/{REPO}/commits?sha=channels&path=stable.json&per_page=100')
-        for commit in history:
-            previous_pointer = channel(commit['sha'])
-            if previous_pointer and previous_pointer[1]['releaseTag'] != stable_tag:
-                previous = source(api(f'repos/{REPO}/releases/tags/{previous_pointer[1]["releaseTag"]}'), 'stable-2')
-                previous['channelPointer'] = previous_pointer[0]
-                return [base, stable, previous]
-    version = tuple(map(int, stable['version'].split('.')))
-    releases = api(f'repos/{REPO}/releases?per_page=100')
-    older = [r for r in releases if not r['draft'] and not r['prerelease']
-             and re.fullmatch(r'server-\d+\.\d+\.\d+', r['tag_name'])
-             and tuple(map(int, r['tag_name'].removeprefix('server-').split('.'))) < version]
-    legacy = source(api(f'repos/{REPO}/releases/tags/stable'), 'stable-2')
-    legacy_version = tuple(map(int, legacy['version'].split('.')))
-    if legacy_version < version and (not older or legacy_version > max(
-            tuple(map(int, r['tag_name'].removeprefix('server-').split('.'))) for r in older)):
-        return [base, stable, legacy]
-    if not older:
-        raise RuntimeError('Previous published stable fixture is unavailable')
-    previous = max(older, key=lambda r: tuple(map(int, r['tag_name'].removeprefix('server-').split('.'))))
-    return [base, stable, source(previous, 'stable-2')]
+    # Preserve every published source, rather than forgetting it after two releases.
+    # Legacy movable tags are frozen by manifest digest just like immutable tags.
+    releases = []
+    page = 1
+    while True:
+        batch = api(f'repos/{REPO}/releases?per_page=100&page={page}')
+        releases.extend(r for r in batch if not r['draft'] and (
+            re.fullmatch(r'server-\d+\.\d+\.\d+', r['tag_name']) or r['tag_name'] in ('stable', 'edge')))
+        if len(batch) < 100:
+            break
+        page += 1
+    known = {base['version']: base, stable['version']: stable}
+    for release in releases:
+        if release['tag_name'] == stable_tag:
+            continue
+        item = source(release, 'pending')
+        if not re.fullmatch(r'\d+\.\d+\.\d+', item['version']):
+            raise RuntimeError('Published source has an invalid version')
+        old = known.get(item['version'])
+        if old and old['manifestSha256'] != item['manifestSha256']:
+            raise RuntimeError('Different signed packages share source version ' + item['version'])
+        known.setdefault(item['version'], item)
+    remaining = sorted((s for v, s in known.items() if v not in (base['version'], stable['version'])),
+                       key=lambda s: tuple(map(int, s['version'].split('.'))), reverse=True)
+    result = [base, stable] + remaining
+    for index, item in enumerate(result[1:], 1):
+        item['role'] = f'stable-{index}'
+    return result
 
 
 def download(lock, folder):
     sources = lock['upgradeSources']
-    if [s['role'] for s in sources] != list(ROLES):
-        raise RuntimeError('Invalid upgrade fixture roles')
+    validate_roles(sources)
     for item in sources:
         package = folder / item['role']
         package.mkdir(parents=True, exist_ok=True)
         for name in ('manifest.json', 'manifest.json.sig'):
             asset = item['assets'][name]
+            target = package / name
+            if target.exists():
+                if hashlib.sha256(target.read_bytes()).hexdigest() != asset['sha256']:
+                    raise RuntimeError(f'Existing locked fixture changed: {item["role"]}/{name}')
+                continue
             raw = fetch(asset['url'])
             if hashlib.sha256(raw).hexdigest() != asset['sha256']:
                 raise RuntimeError(f'Locked upgrade fixture changed: {item["role"]}/{name}')
-            (package / name).write_bytes(raw)
+            target.write_bytes(raw)
 
 
 def download_part(url, target, size, digest):
@@ -132,9 +149,13 @@ def download_part(url, target, size, digest):
             temporary.unlink(missing_ok=True)
 
 
-def download_packages(lock, folder, tool):
+def download_packages(lock, folder, tool, role=None):
     download(lock, folder)
+    if role is not None and role not in [s['role'] for s in lock['upgradeSources']]:
+        raise RuntimeError('Unknown upgrade fixture role')
     for item in lock['upgradeSources']:
+        if role is not None and item['role'] != role:
+            continue
         package = folder / item['role']
         # Parse archive paths only after the Manager validates the manifest signature and structure.
         subprocess.run([str(tool), 'verify-manifest', '--dir', str(package)], check=True)
@@ -165,13 +186,14 @@ if __name__ == '__main__':
     parser.add_argument('--download', type=Path)
     parser.add_argument('--packages', action='store_true')
     parser.add_argument('--tool', type=Path)
+    parser.add_argument('--role', help='Download archives only for this frozen source; manifests remain complete')
     args = parser.parse_args()
     lock = json.loads(args.lock.read_text(encoding='utf-8-sig'))
     if args.download:
         if args.packages:
             if not args.tool:
                 parser.error('--packages requires --tool')
-            download_packages(lock, args.download, args.tool.resolve())
+            download_packages(lock, args.download, args.tool.resolve(), args.role)
         else:
             download(lock, args.download)
     else:

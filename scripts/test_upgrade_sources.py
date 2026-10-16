@@ -13,6 +13,50 @@ spec.loader.exec_module(sources)
 
 
 class SourceTests(unittest.TestCase):
+    def test_resolver_retains_all_published_sources_and_freezes_legacy_tags(self):
+        releases = [{'tag_name': tag, 'draft': False} for tag in
+                    ['server-0.261015.58', 'server-0.261013.54', 'server-0.261005.0', 'edge', 'stable']]
+        versions = {'base': '0.2.0', 'server-0.261015.58': '0.261015.58',
+                    'server-0.261013.54': '0.261013.54', 'server-0.261005.0': '0.261005.0',
+                    'edge': '0.261010.33', 'stable': '0.261010.32'}
+        def api(path):
+            return releases if 'releases?' in path else {'tag_name': path.rsplit('/', 1)[-1]}
+        def source(release, role):
+            version = versions[release['tag_name']]
+            return {'role': role, 'tag': release['tag_name'], 'version': version,
+                    'manifestSha256': hashlib.sha256(version.encode()).hexdigest()}
+        pointer = ({'payload': 'signed'}, {'releaseTag': 'server-0.261015.58'})
+        with patch.object(sources, 'api', side_effect=api), patch.object(sources, 'source', side_effect=source), \
+             patch.object(sources, 'channel', return_value=pointer):
+            result = sources.resolve()
+        self.assertEqual({s['version'] for s in result}, set(versions.values()))
+        self.assertEqual([s['role'] for s in result], ['base'] + [f'stable-{i}' for i in range(1, 6)])
+        self.assertEqual(result[1]['channelPointer'], pointer[0])
+
+    def test_duplicate_version_with_different_signed_bytes_is_rejected(self):
+        def source(release, role):
+            return {'role': role, 'version': '0.2.0' if release['tag_name'] == 'base' else '0.261015.58',
+                    'manifestSha256': hashlib.sha256(release['tag_name'].encode()).hexdigest()}
+        def api(path):
+            return [{'tag_name': 'stable', 'draft': False}] if 'releases?' in path else {'tag_name': path.rsplit('/', 1)[-1]}
+        with patch.object(sources, 'api', side_effect=api), patch.object(sources, 'source', side_effect=source), \
+             patch.object(sources, 'channel', return_value=({}, {'releaseTag': 'server-0.261015.58'})):
+            with self.assertRaisesRegex(RuntimeError, 'Different signed packages'):
+                sources.resolve()
+
+    def test_every_frozen_source_is_downloaded_and_invalid_paths_are_rejected(self):
+        lock = self.lock()
+        extra = dict(lock['upgradeSources'][-1], role='stable-3')
+        lock['upgradeSources'].append(extra)
+        with tempfile.TemporaryDirectory() as directory, patch.object(sources, 'fetch', return_value=b'original'):
+            sources.download(lock, Path(directory))
+            self.assertEqual((Path(directory) / 'stable-3/manifest.json').read_bytes(), b'original')
+        extra['role'] = '../outside'
+        with patch.object(sources, 'fetch') as fetch:
+            with self.assertRaises(RuntimeError):
+                sources.download(lock, Path('unused'))
+            fetch.assert_not_called()
+
     def lock(self):
         return {'upgradeSources': [{'role': role, 'assets': {name: {
             'url': 'https://github.com/Corfirean/coa-server-build/releases/download/stable/' + name,
