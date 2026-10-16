@@ -246,7 +246,7 @@ jobs:
       - name: Fetch the signed base package for database acceptance
         shell: pwsh
         run: |
-          python scripts/upgrade-sources.py --lock _release-lock/release-lock.json --download _upgrade-sources --packages --tool _manager/target/release/coa-release.exe
+          python scripts/upgrade-sources.py --lock _release-lock/release-lock.json --download _upgrade-sources --packages --role base --tool _manager/target/release/coa-release.exe
           if ($LASTEXITCODE) { throw "Full locked upgrade fixture verification failed." }
           New-Item -ItemType Directory -Force _schema-base | Out-Null
           Copy-Item _upgrade-sources/base/* _schema-base
@@ -352,11 +352,15 @@ jobs:
             if (-not $absolute.StartsWith($workspace, [StringComparison]::OrdinalIgnoreCase)) { throw 'Fixture cleanup escaped the workspace.' }
             Remove-Item -LiteralPath $absolute -Recurse -Force
           }
-      - name: Qualify Manager upgrades from the base and two stable releases
+      - name: Qualify Manager upgrades from every published release
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force _upgrade-reports | Out-Null
-          foreach ($role in 'base', 'stable-1', 'stable-2') {
+          $sources = (Get-Content _release-lock/release-lock.json -Raw | ConvertFrom-Json).upgradeSources
+          foreach ($source in $sources) {
+            $role = $source.role
+            python scripts/upgrade-sources.py --lock _release-lock/release-lock.json --download _upgrade-sources --packages --role $role --tool _manager/target/release/coa-release.exe
+            if ($LASTEXITCODE) { throw "Signed upgrade source $role could not be verified." }
             $fixture = "coa-schema-fixture-upgrade-$role"
             & _manager/target/release/coa-release.exe qualify-upgrade --base _schema-base --source "_upgrade-sources/$role" --candidate _out --fixture $fixture --report "_upgrade-reports/$role.json"
             if ($LASTEXITCODE) { throw "Manager upgrade from $role failed; candidate publication is blocked." }
@@ -365,6 +369,15 @@ jobs:
               $absolute = [IO.Path]::GetFullPath((Join-Path (Get-Location) $owned))
               if (-not $absolute.StartsWith($workspace, [StringComparison]::OrdinalIgnoreCase)) { throw 'Fixture cleanup escaped the workspace.' }
               Remove-Item -LiteralPath $absolute -Recurse -Force
+            }
+            # Only one old archive is needed at a time; retain every signed manifest and report.
+            if ($role -ne 'base') {
+              $package = Join-Path _upgrade-sources $role
+              $sourceManifest = Get-Content (Join-Path $package manifest.json) -Raw | ConvertFrom-Json
+              foreach ($part in $sourceManifest.archive.parts) {
+                if ($part.name -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]*$') { throw 'Invalid archive name during fixture cleanup.' }
+                Remove-Item -LiteralPath (Join-Path $package $part.name) -Force
+              }
             }
           }
       - name: Preserve Manager upgrade qualification evidence

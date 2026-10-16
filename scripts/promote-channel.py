@@ -45,10 +45,14 @@ def validate_report(report, snapshot, version, source_versions=None, source_data
             if check.get('result') != 'passed' or not re.fullmatch(r'https://github\.com/[^/]+/[^/]+/actions/runs/\d+(?:/.*)?', check.get('evidence', '')):
                 raise RuntimeError(f'Mandatory qualification missing or unsuccessful: {platform}/{name}')
         if source_versions is not None:
-            if len(source_versions) != 3:
-                raise RuntimeError('Three upgrade sources must qualify')
-            for name, source in zip(('upgrade-base', 'upgrade-stable-1', 'upgrade-stable-2'), source_versions):
-                if checks[name].get('fromVersion') != source:
+            if len(source_versions) < 2 or len(set(source_versions)) != len(source_versions):
+                raise RuntimeError('Every distinct upgrade source must qualify')
+            names = ['upgrade-base'] + [f'upgrade-stable-{i}' for i in range(1, len(source_versions))]
+            for name, source in zip(names, source_versions):
+                check = checks.get(name, {})
+                if check.get('result') != 'passed' or not re.fullmatch(r'https://github\.com/[^/]+/[^/]+/actions/runs/\d+(?:/.*)?', check.get('evidence', '')):
+                    raise RuntimeError(f'Mandatory qualification missing or unsuccessful: {platform}/{name}')
+                if check.get('fromVersion') != source:
                     raise RuntimeError(f'Upgrade qualification differs from compatibility matrix: {platform}/{name}')
                 if source_databases is not None:
                     expected = source_databases[source]

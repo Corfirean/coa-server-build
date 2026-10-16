@@ -57,6 +57,13 @@ class CompatibilityTests(unittest.TestCase):
         self.assertIsNone(result['sourceDatabases']['0.2.0']['schemaSha256'])
         self.assertEqual(result['sourceDatabases']['0.261010.32']['schemaSha256'], 'b' * 64)
 
+    def test_old_versions_are_not_dropped_after_two_updates(self):
+        self.sources.extend([dict(self.sources[1], version='0.261005.0'),
+                             dict(self.sources[1], version='0.261003.17')])
+        result = compatibility.matrix(self.manifest, self.lock, self.sources, 'windows-x86_64')
+        self.assertEqual(len(result['sourceVersions']), 5)
+        self.assertIn('0.261003.17', result['sourceDatabases'])
+
     def test_missing_update_schema_contract_is_rejected(self):
         self.sources[1]['files'] = []
         with self.assertRaises(RuntimeError):

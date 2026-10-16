@@ -19,10 +19,10 @@ def matrix(manifest, lock, sources, platform):
     if not re.fullmatch(r'\d+\.\d+(?:\.\d+)?', version):
         raise RuntimeError('Unknown custom race release version')
     versions = [source['version'] for source in sources]
-    if len(versions) != 3 or len(set(versions)) != 3 or any(not re.fullmatch(r'\d+\.\d+\.\d+', v) for v in versions):
-        raise RuntimeError('Three distinct upgrade sources are required: base and two stable versions')
+    if len(versions) < 3 or len(set(versions)) != len(versions) or any(not re.fullmatch(r'\d+\.\d+\.\d+', v) for v in versions):
+        raise RuntimeError('Distinct upgrade sources are required: base and all published versions')
     if sources[0]['kind'] != 'base' or any(s['kind'] != 'update' for s in sources[1:]):
-        raise RuntimeError('Upgrade sources must contain a signed base and two updates')
+        raise RuntimeError('Upgrade sources must contain a signed base followed by updates')
     databases = {}
     for source in sources:
         digest = source.get('_signedManifestSha256', '')
@@ -39,7 +39,8 @@ def matrix(manifest, lock, sources, platform):
 
 def apply(folder, lock_path, sources_folder, platform, tool, schema_base=None):
     lock = json.loads(lock_path.read_text(encoding='utf-8-sig'))
-    if [s['role'] for s in lock['upgradeSources']] != ['base', 'stable-1', 'stable-2']:
+    roles = [s['role'] for s in lock['upgradeSources']]
+    if len(roles) < 2 or roles != ['base'] + [f'stable-{i}' for i in range(1, len(roles))]:
         raise RuntimeError('Invalid upgrade fixture roles')
     if schema_base is not None:
         if hashlib.sha256((schema_base / 'manifest.json').read_bytes()).hexdigest() != lock['upgradeSources'][0]['manifestSha256']:
@@ -65,6 +66,9 @@ def apply(folder, lock_path, sources_folder, platform, tool, schema_base=None):
     compatibility = matrix(manifest, lock, sources, platform)
     manifest['compatibility'] = compatibility
     manifest['minManagerVersion'] = minimum_manager(manifest.get('minManagerVersion', '0.0.0'), compatibility['clientPatchVersion'])
+    if len(sources) > 3:
+        manifest['minManagerVersion'] = max((manifest['minManagerVersion'], '0.6.20'),
+                                            key=lambda value: tuple(map(int, value.split('.'))))
     path.write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
 
 

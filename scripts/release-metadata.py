@@ -56,7 +56,7 @@ def collect(folder, lock_path, platform, reports, binary_run):
             'schema-contract': 'Apply release SQL on an isolated database and capture the expected schema',
             'auth-startup': 'Start auth and world from the candidate in a disposable isolated server',
             'world-startup': 'Start auth and world from the candidate in a disposable isolated server',
-            'manager-update': 'Qualify Manager upgrades from the base and two stable releases',
+            'manager-update': 'Qualify Manager upgrades from every published release',
             'fresh-install': 'Build and qualify full clean installation'}))
         if binary_run:
             checks.update(evidence_steps(repo, run_id, {
@@ -116,6 +116,9 @@ def validate(folder):
     platform = manifest['compatibility']['platform']
     if matrix['platforms'].get(platform) != manifest['compatibility'] or matrix['minManagerVersion'] != manifest['minManagerVersion']:
         raise RuntimeError('Standalone compatibility differs from signed manifest')
+    frozen_sources = lock.get('upgradeSources', [])
+    if frozen_sources and manifest['compatibility'].get('sourceVersions') != [s['version'] for s in frozen_sources]:
+        raise RuntimeError('Compatibility omits or changes a frozen upgrade source')
     if manifest['core']['commit'] != lock['components']['core']['sha'] or manifest['bots']['commit'] != lock['components']['bots']['sha']:
         raise RuntimeError('Release differs from source lock')
     for name in ('bots', 'scaling', 'squid', 'races'):
@@ -125,10 +128,22 @@ def validate(folder):
         if report['platforms'][platform].get('sql-only-binary-reuse', {}).get('result') != 'passed':
             raise RuntimeError('Reused binaries lack SQL-only verification')
     required = WINDOWS_GATES if platform == 'windows-x86_64' else LINUX_GATES
+    if platform == 'windows-x86_64':
+        sources = manifest['compatibility'].get('sourceVersions', [])
+        required = required | {f'upgrade-stable-{i}' for i in range(1, len(sources))}
     for gate in required:
         check = report['platforms'].get(platform, {}).get(gate, {})
         if check.get('result') != 'passed' or not check.get('evidence', '').startswith('https://github.com/'):
             raise RuntimeError('Candidate qualification missing: ' + gate)
+    if platform == 'windows-x86_64':
+        for source in frozen_sources:
+            gate = 'upgrade-' + source['role']
+            check = report['platforms'][platform].get(gate, {})
+            database = manifest['compatibility']['sourceDatabases'][source['version']]
+            if (check.get('fromVersion') != source['version']
+                    or check.get('fromManifestSha256') != source['manifestSha256']
+                    or check.get('fromSchemaSha256') != database['schemaSha256']):
+                raise RuntimeError('Upgrade evidence differs from frozen source: ' + gate)
     if platform == 'windows-x86_64':
         spec = importlib.util.spec_from_file_location('installer', Path(__file__).with_name('installer-package.py'))
         installer = importlib.util.module_from_spec(spec)

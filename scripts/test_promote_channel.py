@@ -76,6 +76,21 @@ class QualificationTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             promote.validate_report(report, 'candidate', 'version', sources, databases)
 
+    def test_an_older_source_cannot_be_claimed_without_a_passing_upgrade(self):
+        report = self.report()
+        sources = ['0.2.0', '0.261013.54', '0.261006.1', '0.261005.0']
+        names = ['upgrade-base', 'upgrade-stable-1', 'upgrade-stable-2', 'upgrade-stable-3']
+        for checks in report['platforms'].values():
+            for name, version in zip(names, sources):
+                checks[name] = {'result': 'passed', 'evidence': 'https://github.com/o/r/actions/runs/7',
+                                'fromVersion': version}
+        promote.validate_report(report, 'candidate', 'version', sources)
+        for result in ('not-run', 'failed'):
+            report['platforms']['windows-x86_64']['upgrade-stable-3']['result'] = result
+            with self.assertRaises(RuntimeError):
+                promote.validate_report(report, 'candidate', 'version', sources,
+                                        owner_approved_snapshot='candidate')
+
 
 class AtomicPublicationTests(unittest.TestCase):
     def test_stale_parent_makes_no_writes(self):
