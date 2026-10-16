@@ -56,13 +56,20 @@ def collect(folder, lock_path, platform, reports, binary_run):
             'schema-contract': 'Apply release SQL on an isolated database and capture the expected schema',
             'auth-startup': 'Start auth and world from the candidate in a disposable isolated server',
             'world-startup': 'Start auth and world from the candidate in a disposable isolated server',
-            'manager-update': 'Qualify Manager upgrades from the base and two stable releases',
             'fresh-install': 'Build and qualify full clean installation'}))
+        upgrades = evidence_steps(repo, run_id, {
+            'upgrade-' + role: 'Qualify Manager upgrade from ' + role
+            for role in ('base', 'stable-1', 'stable-2')})
+        checks['manager-update'] = dict(upgrades['upgrade-base'],
+                                       scenarios=[upgrades['upgrade-' + role]['evidence']
+                                                  for role in ('base', 'stable-1', 'stable-2')])
         if binary_run:
             checks.update(evidence_steps(repo, run_id, {
                 'sql-only-binary-reuse': 'Validate verified binaries and SQL-only source delta'}))
         for source in lock['upgradeSources']:
             report = read(reports / (source['role'] + '.json'))
+            if report.get('candidateManifestSha256') != digest(folder / 'manifest.json'):
+                raise RuntimeError('Upgrade tested a different candidate: ' + source['role'])
             if (report['result'] != 'passed' or report['toVersion'] != manifest['version']
                     or report['fromVersion'] != source['version']
                     or report['fromManifestSha256'] != source['manifestSha256']):
@@ -71,7 +78,8 @@ def collect(folder, lock_path, platform, reports, binary_run):
             expected_database = manifest['compatibility']['sourceDatabases'][source['version']]
             if report['fromSchemaSha256'] != expected_database['schemaSha256']:
                 raise RuntimeError('Upgrade tested a different database schema: ' + source['role'])
-            checks[gate] = dict(checks['manager-update'], fromVersion=report['fromVersion'],
+            checks[gate] = dict(upgrades[gate], fromVersion=report['fromVersion'],
+                                candidateManifestSha256=report['candidateManifestSha256'],
                                 fromManifestSha256=report['fromManifestSha256'],
                                 fromSchemaSha256=report['fromSchemaSha256'])
     else:

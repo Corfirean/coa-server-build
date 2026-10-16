@@ -85,11 +85,17 @@ def resolve():
     return [base, stable, source(previous, 'stable-2')]
 
 
-def download(lock, folder):
+def selected_sources(lock, roles=None):
     sources = lock['upgradeSources']
     if [s['role'] for s in sources] != list(ROLES):
         raise RuntimeError('Invalid upgrade fixture roles')
-    for item in sources:
+    if roles is not None and (not roles or not set(roles) <= set(ROLES)):
+        raise RuntimeError('Invalid requested upgrade fixture roles')
+    return [item for item in sources if roles is None or item['role'] in roles]
+
+
+def download(lock, folder, roles=None):
+    for item in selected_sources(lock, roles):
         package = folder / item['role']
         package.mkdir(parents=True, exist_ok=True)
         for name in ('manifest.json', 'manifest.json.sig'):
@@ -132,9 +138,9 @@ def download_part(url, target, size, digest):
             temporary.unlink(missing_ok=True)
 
 
-def download_packages(lock, folder, tool):
-    download(lock, folder)
-    for item in lock['upgradeSources']:
+def download_packages(lock, folder, tool, roles=None):
+    download(lock, folder, roles)
+    for item in selected_sources(lock, roles):
         package = folder / item['role']
         # Parse archive paths only after the Manager validates the manifest signature and structure.
         subprocess.run([str(tool), 'verify-manifest', '--dir', str(package)], check=True)
@@ -165,15 +171,16 @@ if __name__ == '__main__':
     parser.add_argument('--download', type=Path)
     parser.add_argument('--packages', action='store_true')
     parser.add_argument('--tool', type=Path)
+    parser.add_argument('--roles', help='Comma-separated frozen fixture roles to download')
     args = parser.parse_args()
     lock = json.loads(args.lock.read_text(encoding='utf-8-sig'))
     if args.download:
         if args.packages:
             if not args.tool:
                 parser.error('--packages requires --tool')
-            download_packages(lock, args.download, args.tool.resolve())
+            download_packages(lock, args.download, args.tool.resolve(), args.roles.split(',') if args.roles else None)
         else:
-            download(lock, args.download)
+            download(lock, args.download, args.roles.split(',') if args.roles else None)
     else:
         if args.packages:
             parser.error('--packages requires --download')
