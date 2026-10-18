@@ -80,7 +80,7 @@ jobs:
           fetch-depth: 0
       - name: Locate PowerShell 7 on the dedicated runner
         if: runner.environment == 'self-hosted'
-        shell: powershell
+        shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
         run: |
           $locations = @((Join-Path $env:ProgramFiles 'PowerShell/7'), 'C:/tools/PowerShell/7')
           $shell = Get-Command pwsh.exe -ErrorAction SilentlyContinue

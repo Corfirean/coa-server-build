@@ -38,7 +38,7 @@ same frozen components without packaging. A repository variable `COA_WINDOWS_RUN
 runner with a JSON label array such as `["self-hosted","Windows","X64","coa-persistent"]`; the default is hosted Windows.
 The dedicated runner needs PowerShell 7 on PATH, in `C:/Program Files/PowerShell/7` or `C:/tools/PowerShell/7`,
 along with Visual Studio C++ tools, Boost and MySQL development files. The workflow locates PowerShell before
-using its shell. On the dedicated runner Ninja outputs live outside the cleaned checkout in `RUNNER_WORKSPACE/_coa-build-state`.
+using its shell. Its bootstrap uses a process-scoped execution policy; the machine policy stays unchanged. On the dedicated runner Ninja outputs live outside the cleaned checkout in `RUNNER_WORKSPACE/_coa-build-state`.
 Unchanged source bytes recover their previous timestamps, changed bytes invalidate outputs, and CMake refreshes the
 source graph. Keep the existing optimization/debug settings and all unit tests. Do not mix static OpenSSL with the
 static MySQL client that imports the same OpenSSL symbols; use compatible dynamic OpenSSL development libraries.
