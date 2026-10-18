@@ -44,6 +44,14 @@ source graph. Keep the existing optimization/debug settings and all unit tests. 
 static MySQL client that imports the same OpenSSL symbols; use compatible dynamic OpenSSL development libraries.
 The compiler-prefix probe verifies localized MSVC header dependency parsing before any incremental result is trusted.
 
+Measured on the dedicated Ryzen 7700X / 32 GB runner with 16 workers, RelWithDebInfo, `/O2`, `/Z7`,
+static modules and PCH disabled (2026-10-18): the GitHub incremental build and unit step took 170.7 seconds.
+A controlled change to `ScriptedCreature.h` (588 dependent objects) plus 32 C++ files across CoA, game,
+scripts and SQUID produced 657 Ninja operations and passed build/unit verification in 865.0 seconds.
+These measurements cover compilation and unit verification, not downloading packages or installation qualification.
+A widely included header or toolchain change can still approach a full rebuild; never promise a fixed duration
+for every change or skip required checks to meet a timing target.
+
 Packaging verifies signatures and frozen fixtures, applies SQL in an isolated database, checks startup, prepares and
 qualifies a clean installer, and tests representative direct Manager upgrades. The full historical upgrade matrix is
 separate (`direct-upgrade-tests.yml`). Report the actual tested scope; an unrun gate is never a pass.
