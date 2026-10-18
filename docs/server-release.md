@@ -18,7 +18,7 @@ SQUID is `Zyth45/mod-playerbots`, highest stable numeric `v*` tag. Manager tooli
 3. Verify the resulting core using its AGENTS.md and `tools/verify_all.py`. Include the updated external modules in the
    build. Publish the source branch/PR so GitHub Actions can fetch its exact commit. Source integration is not a release.
 4. Run `build.yml` from the reviewed build workflow revision, supplying exact `core_ref`, `upstream_ref`, `bots_ref`,
-   `scaling_ref`, `squid_ref`, `manager_ref` and `publish_candidate=false`. The source lock freezes race assets, navigation,
+   `scaling_ref`, `squid_ref`, `races_ref` (the reviewed release tag), `manager_ref` and `publish_candidate=false`. The source lock freezes race assets, navigation,
    representative upgrade fixtures and historical sources. Fix a failed source/integration gate; never bypass it.
 
 Example (replace every placeholder with the recorded exact value):
@@ -26,7 +26,7 @@ Example (replace every placeholder with the recorded exact value):
 ```powershell
 gh workflow run build.yml -R Corfirean/coa-server-build --ref <pipeline-ref> `
   -f core_ref=<core-sha> -f upstream_ref=<upstream-sha> -f bots_ref=<bots-sha> `
-  -f scaling_ref=<scaling-sha> -f squid_ref=<squid-sha> -f manager_ref=<manager-sha> `
+  -f scaling_ref=<scaling-sha> -f squid_ref=<squid-sha> -f races_ref=<race-tag> -f manager_ref=<manager-sha> `
   -F publish_candidate=false
 gh run view <run-id> -R Corfirean/coa-server-build --json status,conclusion,jobs
 ```

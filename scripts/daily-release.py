@@ -15,8 +15,9 @@ def revision(repo, ref):
     return gh(f"repos/{repo}/commits/{ref}")["sha"]
 
 
-def resolve(core_ref="coa-bots", manager_ref="master", bots_ref="master", scaling_ref="main", squid_ref="latest-release", upstream_ref="main"):
-    races = gh("repos/ilusixn/azerothcore-wotlk-coa/releases/latest")
+def resolve(core_ref="coa-bots", manager_ref="master", bots_ref="master", scaling_ref="main", squid_ref="latest-release", upstream_ref="main", races_ref="latest-release"):
+    races_path = "latest" if races_ref == "latest-release" else "tags/" + races_ref
+    races = gh("repos/ilusixn/azerothcore-wotlk-coa/releases/" + races_path)
     tags = gh("repos/Zyth45/mod-playerbots/tags?per_page=100")
     import re
     stable = [t for t in tags if re.fullmatch(r"v\d+\.\d+(?:\.\d+)?", t["name"])]
