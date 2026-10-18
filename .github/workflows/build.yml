@@ -319,6 +319,8 @@ jobs:
           if ($LASTEXITCODE) { throw "Candidate authserver cannot execute: $LASTEXITCODE" }
           & _manager/target/release/coa-release.exe qualify-startup --fixture coa-schema-fixture-build --tree _tree --base _schema-base
           if ($LASTEXITCODE) { throw "Full isolated server startup failed; the candidate will not be published." }
+          python scripts/verify-manastorm-startup.py --core _core --tree _tree --logs coa-schema-fixture-build/Core/Logs
+          if ($LASTEXITCODE) { throw 'The enabled Manastorm backend did not initialize.' }
       - name: Preserve server acceptance diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
