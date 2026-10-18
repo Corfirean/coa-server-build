@@ -52,6 +52,10 @@ a failed run requires fresh preparation; do not publish an unqualified partial p
 
 ## Publication only on owner command
 
+If the candidate raises `minManagerVersion`, prepare the matching Manager installer as well. On the owner's release
+command, publish that compatible Manager before making the server available to users. A server requiring an
+unpublished Manager is not ready for stable promotion.
+
 After the owner explicitly approves the identified prepared candidate, dispatch `publish-prepared.yml` with its build
 run ID. It verifies source-run identity, signed metadata, installer and package contents, then publishes the exact
 immutable `server-<version>` candidate. It does not rebuild from moving refs or change `stable`.
