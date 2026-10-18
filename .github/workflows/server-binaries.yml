@@ -365,9 +365,10 @@ jobs:
           if ($memoryGB -lt 12) { $jobs = [Math]::Min(2, $jobs) }
           $effectiveJobs = if ($jobs) { $jobs } else { [Environment]::ProcessorCount }
           Write-Host "Compilation: $effectiveJobs workers, $([Environment]::ProcessorCount) logical CPUs, $([Math]::Round($memoryGB, 1)) GB RAM."
+          $budget = if ($env:COA_BUILD_MODE -eq 'incremental') { 3600 } else { 16200 }
           $watch = [Diagnostics.Stopwatch]::StartNew()
           try {
-            & ./_pipeline/scripts/run-core-verification.ps1 -CoreRoot . -BaseRef origin/coa-bots -Jobs $jobs -MaximumSeconds 16200 -BuildDirectory $env:COA_BUILD_DIRECTORY -Stages 'build,unit'
+            & ./_pipeline/scripts/run-core-verification.ps1 -CoreRoot . -BaseRef origin/coa-bots -Jobs $jobs -MaximumSeconds $budget -BuildDirectory $env:COA_BUILD_DIRECTORY -Stages 'build,unit'
             if ($LASTEXITCODE) {
               $report = Get-ChildItem .cache/verify-all -Recurse -Filter build.log | Sort-Object LastWriteTime -Descending | Select-Object -First 1
               if ($report) { Get-Content $report.FullName -Tail 100 }
@@ -380,7 +381,7 @@ jobs:
           } finally {
             $watch.Stop()
             $mode = if ($env:COA_BUILD_MODE) { $env:COA_BUILD_MODE } else { 'cold' }
-            @{ mode = $mode; seconds = $watch.Elapsed.TotalSeconds; workers = $effectiveJobs } | ConvertTo-Json |
+            @{ mode = $mode; seconds = $watch.Elapsed.TotalSeconds; workers = $effectiveJobs; budgetSeconds = $budget } | ConvertTo-Json |
               Set-Content .cache/compilation-timing.json -Encoding utf8
             "Compilation and unit verification ($mode): $([Math]::Round($watch.Elapsed.TotalMinutes, 1)) minutes, $effectiveJobs workers." >> $env:GITHUB_STEP_SUMMARY
           }

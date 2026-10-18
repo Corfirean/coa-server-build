@@ -53,6 +53,8 @@ static modules and PCH disabled (2026-10-18): the GitHub incremental build and u
 A controlled change to `ScriptedCreature.h` (588 dependent objects) plus 32 C++ files across CoA, game,
 scripts and SQUID produced 657 Ninja operations and passed build/unit verification in 865.0 seconds.
 These measurements cover compilation and unit verification, not downloading packages or installation qualification.
+Incremental build/unit verification has a 3600-second budget; a timeout fails the job and preserves diagnostics,
+without skipping tests or publishing a partial result. Cold builds retain their separate budget.
 A widely included header or toolchain change can still approach a full rebuild; never promise a fixed duration
 for every change or skip required checks to meet a timing target.
 
