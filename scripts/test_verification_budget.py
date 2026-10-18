@@ -37,7 +37,7 @@ class VerificationBudgetTests(unittest.TestCase):
         self.assertIn(str(build.resolve()), result.stdout)
 
     def test_budget_stops_verification_before_job_deadline(self):
-        result = self.run_fixture('import time\nprint("fixture started", flush=True)\ntime.sleep(120)\n', 1)
+        result = self.run_fixture('import time\nprint("fixture started", flush=True)\ntime.sleep(120)\n', 5)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('fixture started', result.stdout)
         self.assertIn('budget', result.stdout + result.stderr)

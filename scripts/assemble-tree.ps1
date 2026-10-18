@@ -51,6 +51,19 @@ if (Test-Path "$Core/modules/mod-coa-custom-races/data/dbc") {
 New-Item -ItemType Directory -Force -Path "$Out/Data/dbc" | Out-Null
 Copy-Item "$Bots/reference/coa_missing_equipment_displays.txt" "$Out/Data/dbc/" -Force
 Copy-Item "$Bots/addon/CoABotUI" "$Out/Extras/CoABotUI" -Recurse -Force
+$manastormClient = "$Core/modules/mod-manastorm-endless/client"
+if (Test-Path "$manastormClient/overlay") {
+    New-Item -ItemType Directory -Force -Path "$Out/Extras/Manastorm" | Out-Null
+    Copy-Item "$manastormClient/overlay" "$Out/Extras/Manastorm/overlay" -Recurse -Force
+    Copy-Item "$manastormClient/Readme.txt" "$Out/Extras/Manastorm/UPSTREAM-README.txt" -Force
+    @"
+Matching client corrections for the included Manastorm module are in overlay/.
+Keep their exact Interface/ paths when adding them to the client archive.
+Alternatively, set Manastorm.ClientUIFixes = 15 in Core/configs/modules/manastorm-endless.conf
+to send all four corrections from the server at login. Choose one method.
+UPSTREAM-README.txt describes the source repository's archive builder.
+"@ | Set-Content "$Out/Extras/Manastorm/README.txt" -Encoding utf8
+}
 # The offline bot factory: creates fully equipped bots straight in the database while the server is stopped.
 New-Item -ItemType Directory -Force -Path "$Out/Extras/CoABotTools" | Out-Null
 Copy-Item "$Bots/tools/offline_bot_factory.py" "$Out/Extras/CoABotTools/" -Force
