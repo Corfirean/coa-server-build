@@ -4,6 +4,9 @@ name: server-binaries
 on:
   workflow_call:
     inputs:
+      allow_historical_sql:
+        type: boolean
+        default: false
       core_ref:
         type: string
         default: coa-bots
@@ -39,7 +42,12 @@ jobs:
           ref: ${{ inputs.core_ref || 'coa-bots' }}
           fetch-depth: 0
       - name: Verify source and harness infrastructure on POSIX
-        run: python3 -B tools/verify_all.py --stages source --base origin/coa-bots
+        env:
+          ALLOW_HISTORICAL_SQL: ${{ inputs.allow_historical_sql }}
+        run: |
+          args=()
+          if [ "$ALLOW_HISTORICAL_SQL" = "true" ]; then args+=(--allow-historical-sql); fi
+          python3 -B tools/verify_all.py --stages source --base origin/coa-bots "${args[@]}"
       - name: Upload source verification diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -48,7 +56,10 @@ jobs:
           path: .cache/verify-all/
   build:
     needs: source
-    runs-on: windows-latest
+    runs-on: ${{ fromJSON(vars.COA_WINDOWS_RUNNER || '["windows-latest"]') }}
+    permissions:
+      actions: read
+      contents: read
     timeout-minutes: 330
     outputs:
       squid_tag: ${{ steps.squid.outputs.squid_tag }}
@@ -57,6 +68,7 @@ jobs:
       bots_sha: ${{ steps.shas.outputs.bots_sha }}
       scaling_sha: ${{ steps.shas.outputs.scaling_sha }}
     env:
+      VSLANG: 1033
       BOOST_ROOT: C:\local\boost_1_87_0
       SCCACHE_CACHE_SIZE: 8G
       SCCACHE_IGNORE_SERVER_IO_ERROR: '1'
@@ -70,6 +82,7 @@ jobs:
       # and re-run the Boost installer on every run. The Test-Path guards in
       # "Configure OS" short-circuit the install work when these are restored.
       - name: Cache Boost & MySQL
+        if: runner.environment != 'self-hosted'
         uses: actions/cache@v6
         continue-on-error: true
         with:
@@ -160,7 +173,7 @@ jobs:
           }
 
           # --- OpenSSL: use the copy already installed on the runner image ---
-          $opensslRoot = @($env:OPENSSL_ROOT_DIR, 'C:\Program Files\OpenSSL', 'C:\Program Files\OpenSSL-Win64') |
+          $opensslRoot = @($env:OPENSSL_ROOT_DIR, 'C:\Program Files\OpenSSL', 'C:\Program Files\OpenSSL-Win64', 'C:\vcpkg\installed\x64-windows') |
               Where-Object { $_ -and (Test-Path (Join-Path $_ 'include\openssl\opensslv.h')) } |
               Select-Object -First 1
           if (-not $opensslRoot)
@@ -227,11 +240,39 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
+      - name: Locate CMake and Ninja on the dedicated runner
+        if: runner.environment == 'self-hosted'
+        shell: pwsh
+        run: |
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'
+          $installation = & $vswhere -latest -prerelease -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $installation) { throw 'Visual Studio C++ tools were not found.' }
+          foreach ($relative in 'Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin', 'Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja') {
+            $directory = Join-Path $installation $relative
+            if (-not (Test-Path -LiteralPath $directory)) { throw "Missing build tools: $directory" }
+            $directory >> $env:GITHUB_PATH
+          }
+      - name: Select persistent build directory and restore unchanged input timestamps
+        if: runner.environment == 'self-hosted'
+        shell: pwsh
+        run: |
+          $compiler = (Get-Command cl.exe).Source
+          $binaries = 'cl.exe', 'c1xx.dll', 'c2.dll', 'link.exe'
+          $hashes = $binaries | ForEach-Object { (Get-FileHash (Join-Path (Split-Path $compiler) $_) -Algorithm SHA256).Hash }
+          $identity = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes(($hashes -join '-')))).Substring(0, 16).ToLowerInvariant()
+          $state = Join-Path $env:RUNNER_WORKSPACE "_coa-build-state/$identity-noPCH-Z7-deps-v3"
+          New-Item -ItemType Directory -Force -Path $state | Out-Null
+          "COA_BUILD_DIRECTORY=$state/build" >> $env:GITHUB_ENV
+          $mode = if (Test-Path (Join-Path $state 'verified.json')) { 'incremental' } else { 'cold' }
+          "COA_BUILD_MODE=$mode" >> $env:GITHUB_ENV
+          python _pipeline/scripts/persistent-build.py --root . --state "$state/inputs.json"
+          if ($LASTEXITCODE) { throw 'Persistent source identity validation failed.' }
       - name: Set compiler cache directory before starting sccache
         shell: pwsh
         run: '"SCCACHE_DIR=$env:RUNNER_TEMP/sccache" | Out-File $env:GITHUB_ENV -Append -Encoding utf8'
       - name: Install pinned sccache
         id: sccache
+        if: runner.environment != 'self-hosted'
         continue-on-error: true
         uses: mozilla-actions/sccache-action@d651010b8da762cde178750d8eda7b5febfe147a # v0.0.9
         with:
@@ -245,6 +286,7 @@ jobs:
           "identity=$identity" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
       - name: Restore compiler cache
         id: compiler-cache
+        if: runner.environment != 'self-hosted'
         uses: actions/cache/restore@v6
         continue-on-error: true
         with:
@@ -261,9 +303,14 @@ jobs:
         run: |
           "SCCACHE_DIR=$env:RUNNER_TEMP/sccache" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           $env:SCCACHE_DIR = "$env:RUNNER_TEMP/sccache"
-          $launcher = if (Get-Command sccache.exe -ErrorAction SilentlyContinue) { 'sccache' } else { '' }
-          if (-not $launcher) { Write-Warning 'sccache unavailable; compiling directly with MSVC.' }
-          cmake -S . -B build -G Ninja `
+          $launcher = if ($env:RUNNER_ENVIRONMENT -ne 'self-hosted' -and (Get-Command sccache.exe -ErrorAction SilentlyContinue)) { 'sccache' } else { '' }
+          $build = if ($env:COA_BUILD_DIRECTORY) { $env:COA_BUILD_DIRECTORY } else { 'build' }
+          if (-not $launcher) { Write-Host 'Using MSVC directly; persistent Ninja outputs provide incremental builds on the dedicated runner.' }
+          $opensslArgs = @()
+          if ($env:RUNNER_ENVIRONMENT -eq 'self-hosted' -and $env:OPENSSL_ROOT_DIR -like '*vcpkg*') {
+            $opensslArgs += '-DOPENSSL_USE_STATIC_LIBS=OFF', "-DOPENSSL_INCLUDE_DIR=$env:OPENSSL_ROOT_DIR/include", "-DOPENSSL_CRYPTO_LIBRARY=$env:OPENSSL_ROOT_DIR/lib/libcrypto.lib", "-DOPENSSL_SSL_LIBRARY=$env:OPENSSL_ROOT_DIR/lib/libssl.lib"
+          }
+          cmake -S . -B "$build" -G Ninja @opensslArgs `
             -DCMAKE_BUILD_TYPE=RelWithDebInfo `
             -DBUILD_TESTING=ON `
             -DCMAKE_JOB_POOLS=link_pool=1 `
@@ -275,14 +322,21 @@ jobs:
             -DAPPS_BUILD=all -DTOOLS_BUILD=none `
             -DSCRIPTS=static -DMODULES=static `
             -DUSE_COREPCH=0 -DUSE_SCRIPTPCH=0 `
-            -DBOOST_ROOT=$env:BOOST_ROOT `
+            "-DBOOST_ROOT=$env:BOOST_ROOT" `
             -DMYSQL_INCLUDE_DIR=C:/tools/mysql/current/include `
             -DMYSQL_LIBRARY=C:/tools/mysql/current/lib/mysqlclient.lib `
             -DOPENSSL_ROOT_DIR="$env:OPENSSL_ROOT_DIR"
+      - name: Validate Ninja header dependency parsing for the installed MSVC language
+        shell: pwsh
+        run: |
+          $build = if ($env:COA_BUILD_DIRECTORY) { $env:COA_BUILD_DIRECTORY } else { 'build' }
+          python _pipeline/scripts/msvc-dependency-prefix.py --build "$build"
+          if ($LASTEXITCODE) { throw 'Ninja cannot safely track MSVC header dependencies.' }
       - name: Verify generated MSVC commands can be cached
         shell: pwsh
         run: |
-          ninja -C build -t commands | python _pipeline/scripts/validate-msvc-cache.py
+          $build = if ($env:COA_BUILD_DIRECTORY) { $env:COA_BUILD_DIRECTORY } else { 'build' }
+          ninja -C "$build" -t commands | python _pipeline/scripts/validate-msvc-cache.py
           if ($LASTEXITCODE) { throw 'Generated compiler flags violate the cache configuration.' }
       - name: Reset compiler cache counters
         if: steps.sccache.outcome == 'success'
@@ -297,13 +351,28 @@ jobs:
         run: |
           $memoryGB = (Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB
           $jobs = [Math]::Min(4, [Environment]::ProcessorCount)
+          if ($env:RUNNER_ENVIRONMENT -eq 'self-hosted') { $jobs = 0 }
           if ($memoryGB -lt 12) { $jobs = [Math]::Min(2, $jobs) }
-          Write-Host "Compilation: $jobs workers, $([Environment]::ProcessorCount) logical CPUs, $([Math]::Round($memoryGB, 1)) GB RAM."
-          & ./_pipeline/scripts/run-core-verification.ps1 -CoreRoot . -BaseRef origin/coa-bots -Jobs $jobs -MaximumSeconds 16200 -Stages 'build,unit'
-          if ($LASTEXITCODE) {
-            $report = Get-ChildItem .cache/verify-all -Recurse -Filter build.log | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-            if ($report) { Get-Content $report.FullName -Tail 100 }
-            throw 'Source, build or unit verification failed. See windows-verification-diagnostics for the complete logs.'
+          $effectiveJobs = if ($jobs) { $jobs } else { [Environment]::ProcessorCount }
+          Write-Host "Compilation: $effectiveJobs workers, $([Environment]::ProcessorCount) logical CPUs, $([Math]::Round($memoryGB, 1)) GB RAM."
+          $watch = [Diagnostics.Stopwatch]::StartNew()
+          try {
+            & ./_pipeline/scripts/run-core-verification.ps1 -CoreRoot . -BaseRef origin/coa-bots -Jobs $jobs -MaximumSeconds 16200 -BuildDirectory $env:COA_BUILD_DIRECTORY -Stages 'build,unit'
+            if ($LASTEXITCODE) {
+              $report = Get-ChildItem .cache/verify-all -Recurse -Filter build.log | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+              if ($report) { Get-Content $report.FullName -Tail 100 }
+              throw 'Source, build or unit verification failed. See windows-verification-diagnostics for the complete logs.'
+            }
+            if ($env:COA_BUILD_DIRECTORY) {
+              @{ core = (git rev-parse HEAD); verifiedAt = [DateTime]::UtcNow.ToString('o') } | ConvertTo-Json |
+                Set-Content (Join-Path (Split-Path $env:COA_BUILD_DIRECTORY) 'verified.json') -Encoding utf8
+            }
+          } finally {
+            $watch.Stop()
+            $mode = if ($env:COA_BUILD_MODE) { $env:COA_BUILD_MODE } else { 'cold' }
+            @{ mode = $mode; seconds = $watch.Elapsed.TotalSeconds; workers = $effectiveJobs } | ConvertTo-Json |
+              Set-Content .cache/compilation-timing.json -Encoding utf8
+            "Compilation and unit verification ($mode): $([Math]::Round($watch.Elapsed.TotalMinutes, 1)) minutes, $effectiveJobs workers." >> $env:GITHUB_STEP_SUMMARY
           }
       - name: Compiler cache statistics
         if: always() && steps.sccache.outcome == 'success'
@@ -336,14 +405,20 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: windows-verification-diagnostics
-          path: .cache/verify-all/
+          path: |
+            .cache/verify-all/
+            .cache/compilation-timing.json
           include-hidden-files: true
           retention-days: 14
       - name: Smoke test (binaries start and report their revision)
         if: success()
         shell: pwsh
         run: |
-          $bin = (Get-ChildItem build -Recurse -Filter worldserver.exe | Select-Object -First 1).DirectoryName
+          $build = if ($env:COA_BUILD_DIRECTORY) { $env:COA_BUILD_DIRECTORY } else { 'build' }
+          $bin = (Get-ChildItem $build -Recurse -Filter worldserver.exe | Select-Object -First 1).DirectoryName
+          if ($env:OPENSSL_ROOT_DIR -like '*vcpkg*') {
+            Copy-Item "$env:OPENSSL_ROOT_DIR/bin/libcrypto*.dll", "$env:OPENSSL_ROOT_DIR/bin/libssl*.dll" -Destination $bin -Force
+          }
           Write-Host "binaries in $bin"
           Get-ChildItem $bin | Select-Object Name, Length | Format-Table -AutoSize
           & "$bin\worldserver.exe" --version

@@ -1,8 +1,9 @@
 param(
     [ValidateSet('source,build,unit', 'build,unit')] [string] $Stages = 'source,build,unit',
     [string]$CoreRoot = '_core',
-    [ValidateRange(1,64)][int]$Jobs = 4,
+    [ValidateRange(0,64)][int]$Jobs = 4,
     [ValidateRange(1,86400)][int]$MaximumSeconds = 16200,
+    [string]$BuildDirectory = '',
     [ValidatePattern('^[A-Za-z0-9_./-]+$')][string]$BaseRef = 'origin/coa-bots'
 )
 $ErrorActionPreference = 'Stop'
@@ -41,8 +42,16 @@ function Write-VerificationProgress {
 $started = Get-Date
 $timer = [System.Diagnostics.Stopwatch]::StartNew()
 $python = (Get-Command python -ErrorAction Stop).Source
+$verificationArgs = @('-B', 'tools/verify_all.py', '--stages', $Stages, '--base', $BaseRef)
+if ($Jobs -gt 0) { $verificationArgs += @('--jobs', "$Jobs") }
+if ($BuildDirectory) {
+    $settingsName = ".cache/verification-$token.settings.json"
+    @{ build_directory = [IO.Path]::GetFullPath($BuildDirectory) } | ConvertTo-Json |
+        Set-Content -LiteralPath (Join-Path $core $settingsName) -Encoding utf8
+    $verificationArgs += @('--settings', $settingsName)
+}
 $process = Start-Process -FilePath $python -WorkingDirectory $core -WindowStyle Hidden -PassThru `
-    -ArgumentList @('-B', 'tools/verify_all.py', '--stages', $Stages, '--base', $BaseRef, '--jobs', "$Jobs") `
+    -ArgumentList $verificationArgs `
     -RedirectStandardOutput $stdout -RedirectStandardError $stderr
 try {
     do {
