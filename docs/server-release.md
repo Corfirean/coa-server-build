@@ -36,7 +36,9 @@ gh run view <run-id> -R Corfirean/coa-server-build --json status,conclusion,jobs
 `server-binaries.yml` runs POSIX source checks and Windows build/unit verification. `verify-server.yml` compiles the
 same frozen components without packaging. A repository variable `COA_WINDOWS_RUNNER` can select a registered dedicated
 runner with a JSON label array such as `["self-hosted","Windows","X64","coa-persistent"]`; the default is hosted Windows.
-On the dedicated runner Ninja outputs live outside the cleaned checkout in `RUNNER_WORKSPACE/_coa-build-state`.
+The dedicated runner needs PowerShell 7 on PATH, in `C:/Program Files/PowerShell/7` or `C:/tools/PowerShell/7`,
+along with Visual Studio C++ tools, Boost and MySQL development files. The workflow locates PowerShell before
+using its shell. On the dedicated runner Ninja outputs live outside the cleaned checkout in `RUNNER_WORKSPACE/_coa-build-state`.
 Unchanged source bytes recover their previous timestamps, changed bytes invalidate outputs, and CMake refreshes the
 source graph. Keep the existing optimization/debug settings and all unit tests. Do not mix static OpenSSL with the
 static MySQL client that imports the same OpenSSL symbols; use compatible dynamic OpenSSL development libraries.
