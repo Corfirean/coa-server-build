@@ -62,6 +62,12 @@ Packaging verifies signatures and frozen fixtures, applies SQL in an isolated da
 qualifies a clean installer, and tests representative direct Manager upgrades. The full historical upgrade matrix is
 separate (`direct-upgrade-tests.yml`). Report the actual tested scope; an unrun gate is never a pass.
 
+For an upstream integration, preflight SQL locally on a disposable copy of the exact signed base with the pinned
+Manager's `extract-schema-base`, `schema-contract` and `qualify-startup` commands before the final GitHub build.
+Keep a pristine fixture for retries after a failed migration; do not repair its ledger manually. Assign free ports
+in the fixture's `Settings/repack.json` before startup if another local server is running. An enabled Manastorm must
+log successful backend initialization as well as worldserver readiness.
+
 When `publish_candidate=false`, the successful run stores `windows-qualified-candidate` and `windows-candidate-tool`
 for 14 days. Preserve the run ID, exact lock/snapshot and qualification results in the handoff. An artifact expiring or
 a failed run requires fresh preparation; do not publish an unqualified partial package.
@@ -72,9 +78,24 @@ If the candidate raises `minManagerVersion`, prepare the matching Manager instal
 command, publish that compatible Manager before making the server available to users. A server requiring an
 unpublished Manager is not ready for stable promotion.
 
+The Manager release workflow also supports preparation without publication:
+
+```powershell
+gh workflow run release.yml -R Corfirean/coa-server-manager --ref <manager-ref> -F publish_release=false
+```
+
+Preserve `prepared-manager-windows` (installer, updater signature, `latest.json`, source/hash metadata). On the owner's
+publication command, verify those hashes/signatures and publish the exact prepared assets under `v<manager-version>`
+if a compatible Manager is not already available. Never run a publishing workflow just to test installer compilation.
+
 After the owner explicitly approves the identified prepared candidate, dispatch `publish-prepared.yml` with its build
 run ID. It verifies source-run identity, signed metadata, installer and package contents, then publishes the exact
 immutable `server-<version>` candidate. It does not rebuild from moving refs or change `stable`.
+The publication workflow must be present on the default branch before dispatching it:
+
+```powershell
+gh workflow run publish-prepared.yml -R Corfirean/coa-server-build -F candidate_run_id=<approved-build-run>
+```
 
 Stable promotion is a separate owner command through `promote.yml`: obtain the current `channels` branch SHA, use the
 exact candidate version and compare-and-swap SHA, and preserve all applicable promotion gates. An owner-approved
