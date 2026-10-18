@@ -15,6 +15,10 @@ SQUID is `Zyth45/mod-playerbots`, highest stable numeric `v*` tag. Manager tooli
 2. On an isolated core branch based on `origin/coa-bots`, merge the fetched upstream and race release. Resolve conflicts
    by examining both changes and their callers. Review new race SQL and convert required changes to immutable pending
    migrations under the core repository's rules. Do not merge the excluded portable-character/session branches.
+   Inspect mandatory SQL shipped under module `base/` and nested `updates/` directories as well: the release
+   collector does not automatically apply either location to an existing installation. Port required, reviewed
+   schema/data changes into pending migrations. Keep authored snapshot ordering, ownership guards and player data;
+   never replay raw character exports or replace entire tables to satisfy startup checks.
 3. Verify the resulting core using its AGENTS.md and `tools/verify_all.py`. Include the updated external modules in the
    build. Publish the source branch/PR so GitHub Actions can fetch its exact commit. Source integration is not a release.
 4. Run `build.yml` from the reviewed build workflow revision, supplying exact `core_ref`, `upstream_ref`, `bots_ref`,
