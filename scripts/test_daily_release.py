@@ -34,7 +34,7 @@ class IntegrationTests(unittest.TestCase):
         with patch.object(daily, 'gh', side_effect=api), \
                 patch.object(daily, 'revision', side_effect=lambda repo, ref: ref):
             lock = daily.resolve(races_ref='coa-custom-1.8')
-        self.assertEqual(lock['components']['races']['sha'], 'coa-custom-1.8')
+        self.assertEqual(lock['components']['races']['sha'], 'refs/tags/coa-custom-1.8')
 
     def lock(self):
         return {"components": {

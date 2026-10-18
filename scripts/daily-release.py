@@ -35,8 +35,9 @@ def resolve(core_ref="coa-bots", manager_ref="master", bots_ref="master", scalin
     }
     pipeline_sha = os.environ.get('GITHUB_SHA') or subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
     components['build'] = {'repository': 'Corfirean/coa-server-build', 'ref': pipeline_sha}
-    for component in components.values():
-        component["sha"] = revision(component["repository"], component["ref"])
+    for name, component in components.items():
+        ref = "refs/tags/" + component["ref"] if name == "races" else component["ref"]
+        component["sha"] = revision(component["repository"], ref)
     components['squid']['ref'] = next((t['name'] for t in stable
                                      if t['commit']['sha'] == components['squid']['sha']), components['squid']['ref'])
     components["races"]["assets"] = [
