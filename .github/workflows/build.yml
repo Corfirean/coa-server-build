@@ -195,7 +195,8 @@ jobs:
           ref: ${{ needs.resolve.outputs.manager }}
           path: _manager
       - name: Cache release-tool dependencies
-        uses: actions/cache@v6
+        id: release-cache
+        uses: actions/cache/restore@v6
         continue-on-error: true
         with:
           path: |
@@ -207,6 +208,16 @@ jobs:
       - name: Build coa-release
         shell: pwsh
         run: cargo build --release -p coa-release --manifest-path _manager/Cargo.toml
+      - name: Preserve compiled release tooling before database qualification
+        if: steps.release-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        continue-on-error: true
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            _manager/target
+          key: trusted-release-cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('_manager/Cargo.lock') }}-${{ github.run_id }}
       - name: Core sources at the exact commit (full history, SQL order comes from it)
         uses: actions/checkout@v7
         with:
