@@ -308,7 +308,7 @@ jobs:
           if (-not $launcher) { Write-Host 'Using MSVC directly; persistent Ninja outputs provide incremental builds on the dedicated runner.' }
           $opensslArgs = @()
           if ($env:RUNNER_ENVIRONMENT -eq 'self-hosted' -and $env:OPENSSL_ROOT_DIR -like '*vcpkg*') {
-            $opensslArgs += '-DOPENSSL_USE_STATIC_LIBS=OFF', "-DOPENSSL_INCLUDE_DIR=$env:OPENSSL_ROOT_DIR/include", "-DOPENSSL_CRYPTO_LIBRARY=$env:OPENSSL_ROOT_DIR/lib/libcrypto.lib", "-DOPENSSL_SSL_LIBRARY=$env:OPENSSL_ROOT_DIR/lib/libssl.lib"
+            $opensslArgs += '-DOPENSSL_USE_STATIC_LIBS=OFF', '-ULIB_EAY*', '-USSL_EAY*', "-DOPENSSL_INCLUDE_DIR=$env:OPENSSL_ROOT_DIR/include", "-DOPENSSL_CRYPTO_LIBRARY=$env:OPENSSL_ROOT_DIR/lib/libcrypto.lib", "-DOPENSSL_SSL_LIBRARY=$env:OPENSSL_ROOT_DIR/lib/libssl.lib"
           }
           cmake -S . -B "$build" -G Ninja @opensslArgs `
             -DCMAKE_BUILD_TYPE=RelWithDebInfo `
