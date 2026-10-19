@@ -1,0 +1,132 @@
+{
+  "schema": 1,
+  "version": "0.261018.70",
+  "snapshot": "482677660568d18b4c41d61f568a2a64c7380fe48557d3558710de375cedd609",
+  "actor": "Corfirean",
+  "reason": "Owner explicitly approved stable promotion of server 0.261018.70 after acknowledging unrun Linux, login/relog, bot, race, client asset, rollback and update fault acceptance checks. Build, startup, schema, fresh install and prior-version upgrades passed.",
+  "run": "39266001083",
+  "qualification": {
+    "schema": 1,
+    "snapshot": "482677660568d18b4c41d61f568a2a64c7380fe48557d3558710de375cedd609",
+    "version": "0.261018.70",
+    "archive": {
+      "format": "tar.zst",
+      "parts": [
+        {
+          "name": "base.tar.zst.001",
+          "size": 1900000000,
+          "sha256": "2717df5f4c97c631e938aade345ae5f536115e2b4b7350d1a71c299378615338"
+        },
+        {
+          "name": "base.tar.zst.002",
+          "size": 156809759,
+          "sha256": "28ad0c5640bb86f01f9257b5320cc13bdcee9ad2c7642e394f69bb21461f0efc"
+        }
+      ],
+      "unpackedSize": 5602241028
+    },
+    "platforms": {
+      "windows-x86_64": {
+        "upgrade-stable-1": {
+          "result": "passed",
+          "evidence": "https://github.com/Corfirean/coa-server-build/actions/runs/39171156265/job/117805745877#step:24:1",
+          "fromVersion": "0.261015.58",
+          "fromManifestSha256": "f3ade5759e66d398663867ced8a2431316bb3749ca302e2fa019006382c6c0d5",
+          "fromSchemaSha256": "3289b41aaac017404ee7fe13ffb2c8eec59edf0909c878a9d67be83b8a6683cf"
+        },
+        "build": {
+          "result": "passed",
+          "evidence": "https://github.com/Corfirean/coa-server-build/actions/runs/39171156265/job/117804888127#step:23:1"
+        },
+        "races-enabled": {
+          "result": "not-run"
+        },
+        "upgrade-base": {
+          "result": "passed",
+          "evidence": "https://github.com/Corfirean/coa-server-build/actions/runs/39171156265/job/117805745877#step:24:1",
+          "fromVersion": "0.2.0",
+          "fromManifestSha256": "0d03c2e3df18fa01ea99e477139342f48567f940fb3564a29c6d515219b5a117",
+          "fromSchemaSha256": null
+        },
+        "login-relog": {
+          "result": "not-run"
+        },
+        "manager-update": {
+          "result": "passed",
+          "evidence": "https://github.com/Corfirean/coa-server-build/actions/runs/39171156265/job/117805745877#step:24:1"
+        },
+        "rollback-interruption": {
+          "result": "not-run"
+        },
+        "world-startup": {
+          "result": "passed",
+          "evidence": "https://github.com/Corfirean/coa-server-build/actions/runs/39171156265/job/117805745877#step:20:1"
+        },
+        "companions": {
+          "result": "not-run"
+        },
+        "upgrade-stable-2": {
+          "result": "passed",
+          "evidence": "https://github.com/Corfirean/coa-server-build/actions/runs/39171156265/job/117805745877#step:24:1",
+          "fromVersion": "0.261013.54",
+          "fromManifestSha256": "4ec922b4807c66c5c13e4a5f4c2ab3d3fa3782514e2a8c10db7be6897d42ae15",
+          "fromSchemaSha256": "ceb444519e7a9f28b1db821822a3e9e3f5708220e335a6a22d6c9035d758758b"
+        },
+        "auth-startup": {
+          "result": "passed",
+          "evidence": "https://github.com/Corfirean/coa-server-build/actions/runs/39171156265/job/117805745877#step:20:1"
+        },
+        "headless-console": {
+          "result": "not-run"
+        },
+        "disk-full": {
+          "result": "not-run"
+        },
+        "races-disabled": {
+          "result": "not-run"
+        },
+        "server-bots-pages": {
+          "result": "not-run"
+        },
+        "unit": {
+          "result": "passed",
+          "evidence": "https://github.com/Corfirean/coa-server-build/actions/runs/39171156265/job/117804888127#step:23:1"
+        },
+        "locked-dll": {
+          "result": "not-run"
+        },
+        "sql-failure": {
+          "result": "not-run"
+        },
+        "corrupt-download": {
+          "result": "not-run"
+        },
+        "hidearmor": {
+          "result": "not-run"
+        },
+        "source": {
+          "result": "passed",
+          "evidence": "https://github.com/Corfirean/coa-server-build/actions/runs/39171156265/job/117804415391#step:3:1"
+        },
+        "schema-contract": {
+          "result": "passed",
+          "evidence": "https://github.com/Corfirean/coa-server-build/actions/runs/39171156265/job/117805745877#step:19:1"
+        },
+        "startup-failure": {
+          "result": "not-run"
+        },
+        "client-assets": {
+          "result": "not-run"
+        },
+        "squid": {
+          "result": "not-run"
+        },
+        "fresh-install": {
+          "result": "passed",
+          "evidence": "https://github.com/Corfirean/coa-server-build/actions/runs/39171156265/job/117805745877#step:23:1"
+        }
+      }
+    }
+  },
+  "qualificationSha256": "84fa3bcd689119ccce50738dd1d419d52c97051cccba00530ad8eb8abd392109"
+}
