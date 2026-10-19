@@ -97,7 +97,9 @@ The publication workflow must be present on the default branch before dispatchin
 gh workflow run publish-prepared.yml -R Corfirean/coa-server-build -F candidate_run_id=<approved-build-run>
 ```
 
-Stable promotion is a separate owner command through `promote.yml`: obtain the current `channels` branch SHA and use
+Stable promotion is the required final step of a normal owner release instruction, through `promote.yml`.
+Do not ask for the same permission again or stop at the published candidate. Only an explicit candidate/prerelease
+or prepare-only request stops short of stable. Obtain the current `channels` branch SHA and use
 the exact candidate version and compare-and-swap SHA. It runs on the owner's persistent Windows PC by default
 (`COA_WINDOWS_RUNNER`). Keep its runner online; `runner=hosted` explicitly selects hosted Windows when necessary.
 Tools are built from the exact released Manager commit, with persistent Cargo outputs outside the cleaned checkout.
@@ -131,6 +133,69 @@ If the final GitHub release edit fails, the pointer may already have changed: re
 retrying with a newly fetched channels SHA. Legacy explicit snapshot approvals remain auditable, but are no longer
 required merely because optional local acceptance or Linux checks were not run.
 
+## Fast release checklist for the next agent
+
+1. **Recover, do not restart.** Read this runbook and the previous handoff. Inspect the exact successful run and
+   artifact expiry before scheduling any compilation. A current, verified prepared package is the release input;
+   do not rebuild it just to publish it. Use `gh run view <run-id> -R Corfirean/coa-server-build --json
+   status,conclusion,headSha,jobs` and inspect its actual qualification. If only a later publication failed, resume
+   that stage. Never replace missing evidence with a successful-looking result.
+2. **Check the local runner.** Use `gh api repos/Corfirean/coa-server-build/actions/runners` and confirm the
+   `coa-persistent` Windows runner is online. On the owner's PC its existing installation is
+   `C:/games/coa-build-runner`; inspect `.runner` to confirm the repository and check for an existing
+   `Runner.Listener.exe` before starting it. Start an existing authorized runner hidden; never print `.credentials`
+   or tokens, create a duplicate listener, change machine execution policy or run checks against production MySQL.
+   On this PC production uses3307; disposable fixtures must use their own verified paths and free ports.
+3. **Qualify changes locally.** Use only the applicable checks described above and retain logs against the frozen
+   snapshot. Build/unit/startup/install/upgrade evidence is already produced by preparation; do not repeat the
+   entire suite merely to move the channel. A relevant failure requires a fix and new candidate. Skipped local
+   gameplay stays `not-run`; screenshots with mocked data do not establish compatibility or successful gameplay.
+4. **Publish the compatible Manager if needed.** An already prepared Manager installer should be published from
+   `prepared-manager-windows`, not rebuilt by dispatching `release.yml` again. Check `prepared-source.json` against
+   the approved exact source/run/version, installer SHA-256 and `latest.json`; verify the updater signature with
+   the matching released source's `src-tauri/tauri.conf.json` public key. Preserve the installer, `.sig`, `latest.json`
+   and source metadata. Use the identified version/commit for the GitHub release, never a moving branch; do not
+   overwrite an already published version with different bytes. Verify GitHub Latest and its `latest.json` before
+   promoting a server that requires that Manager. The normal installer workflow remains for new preparation.
+5. **Publish the server once.** Dispatch `publish-prepared.yml` with the approved build run ID and wait for success.
+   If that exact immutable candidate already exists with matching signed assets, reuse it. Publication alone
+   leaves a candidate; it does not make Manager users receive an update.
+6. **Promote that exact server.** Read the current channels SHA immediately before dispatch; do not copy an old
+   SHA from this document or the previous handoff. The real promotion command is:
+
+   ```powershell
+   $version = '<approved-numeric-version>'
+   $previous = gh api repos/Corfirean/coa-server-build/git/ref/heads/channels --jq '.object.sha'
+   gh workflow run promote.yml -R Corfirean/coa-server-build -f "version=$version" `
+     -f "expected_channels_sha=$previous" -f runner=local -f check_only=false
+   ```
+
+   Record the returned run URL and wait for that specific run. Do not confuse a verification-only success with
+   publication. `check_only=true` is for workflow changes or unresolved qualification concerns, not a mandatory
+   extra pass before every unchanged release. A stale-parent failure means re-read the channel and inspect the
+   competing change; never force the branch or replay an older promotion blindly.
+7. **Confirm delivery, not just workflow success.** Inspect these independently:
+
+   ```powershell
+   gh api repos/Corfirean/coa-server-build/releases/latest --jq '{tag_name,prerelease,draft}'
+   $channel = Invoke-RestMethod 'https://raw.githubusercontent.com/Corfirean/coa-server-build/channels/stable.json'
+   $channel.payload | ConvertFrom-Json | Select-Object channel,version,releaseTag,snapshot
+   ```
+
+   GitHub Latest must be the exact intended server, `prerelease=false`, `draft=false`; the public signed pointer
+   must name the same version/snapshot. GitHub's raw CDN can retain the prior pointer (`max-age=300`); distinguish
+   that from a failed promotion and allow refresh. The GitHub contents API on `ref=channels` can confirm committed
+   state while the CDN catches up. Check the actual Manager update path from a previous stable installation when
+   applicable; do not tell players to reinstall just because the channel or CDN still points to an older build.
+8. **Report and hand off.** Give the owner download/changelog/run links, actual qualification limits and whether
+   the public pointer has refreshed. Player-facing release notes describe our authored changes; imported upstream
+   or module changes must not be presented as our fixes. Prepare Discord text but send nothing without an explicit
+   instruction to post it. Keep0.7.0 docs/screenshots awaiting review separate from a server release instruction.
+
+Measured reference: the2026-10-19 persistent-PC verification-only run39268500611 took83 seconds with a warm cache.
+That is not a cold-cache guarantee and does not include server compilation or local gameplay acceptance. Normal
+promotion should reuse both tools and packages; only missing/changed verified assets need downloading.
+
 ## Handoff between agents
 
 Leave these facts in the current chat before stopping: pipeline branch/commit and PR; core integration branch/commit
@@ -138,6 +203,23 @@ and PR; frozen upstream/races/SQUID/companion/scaling/Manager SHAs; build run UR
 version and snapshot; verification report paths and passed/failed/unrun gates; incremental timing if actually measured;
 remaining integration conflicts or prerequisites; and whether publication/promotion has been explicitly authorized.
 Resume that candidate from its lock and artifacts. Do not silently advance versions or re-resolve source refs.
+
+Store the handoff in a file as well as the chat, using this compact template:
+
+```text
+State: prepared | candidate-published | stable-promoted
+Owner scope: prepare-only | candidate-only | normal release (publication + stable)
+Server version / snapshot / signed manifest SHA256:
+Frozen component SHAs / pipeline SHA / source PRs:
+Preparation run / conclusion / artifacts / expiry / local evidence directory:
+Windows build/startup/schema/fresh-install/upgrade evidence:
+Applicable local acceptance: passed / failed / not-run, with logs and limitations:
+Manager required version / released version / source SHA / prepared installer run+SHA256:
+Publication run / immutable release URL:
+Promotion run / channels commit / GitHub Latest status / public raw pointer status:
+Runner status / cache location / measured scope and duration:
+Remaining work / next exact command / publication or text approvals still needed:
+```
 
 For an explicitly requested upstream integration that imports module SQL outside pending migrations, pass
 `allow_historical_sql=true` for the frozen candidate. Leave it false for ordinary changes. New CoA migrations
