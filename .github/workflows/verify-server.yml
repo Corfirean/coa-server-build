@@ -2,6 +2,10 @@ name: verify-server
 on:
   workflow_dispatch:
     inputs:
+      allow_historical_sql:
+        description: Authorize imported upstream SQL for this integration
+        type: boolean
+        default: false
       core_ref:
         description: Exact core commit
         required: true
@@ -15,6 +19,7 @@ on:
         description: Exact SQUID commit
         required: true
 permissions:
+  actions: read
   contents: read
 concurrency:
   group: verify-server
@@ -23,6 +28,7 @@ jobs:
   binaries:
     uses: ./.github/workflows/server-binaries.yml
     with:
+      allow_historical_sql: ${{ inputs.allow_historical_sql || false }}
       core_ref: ${{ inputs.core_ref }}
       bots_ref: ${{ inputs.bots_ref }}
       scaling_ref: ${{ inputs.scaling_ref }}

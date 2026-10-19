@@ -24,6 +24,18 @@ class IntegrationTests(unittest.TestCase):
             daily.check_integration(lock)
             calls.assert_any_call('repos/Corfirean/azerothcore-wotlk-coa/compare/tested-upstream-sha...coa-bots')
 
+    def test_explicit_race_release_does_not_follow_the_latest_release(self):
+        def api(endpoint):
+            if endpoint.endswith('/releases/tags/coa-custom-1.8'):
+                return {'tag_name': 'coa-custom-1.8', 'assets': []}
+            if '/tags?' in endpoint:
+                return [{'name': 'v2.5', 'commit': {'sha': 'squid-sha'}}]
+            raise AssertionError(endpoint)
+        with patch.object(daily, 'gh', side_effect=api), \
+                patch.object(daily, 'revision', side_effect=lambda repo, ref: ref):
+            lock = daily.resolve(races_ref='coa-custom-1.8')
+        self.assertEqual(lock['components']['races']['sha'], 'refs/tags/coa-custom-1.8')
+
     def lock(self):
         return {"components": {
             "core": {"repository": "owner/core", "sha": "candidate"},

@@ -15,8 +15,9 @@ def revision(repo, ref):
     return gh(f"repos/{repo}/commits/{ref}")["sha"]
 
 
-def resolve(core_ref="coa-bots", manager_ref="master", bots_ref="master", scaling_ref="main", squid_ref="latest-release", upstream_ref="main"):
-    races = gh("repos/ilusixn/azerothcore-wotlk-coa/releases/latest")
+def resolve(core_ref="coa-bots", manager_ref="master", bots_ref="master", scaling_ref="main", squid_ref="latest-release", upstream_ref="main", races_ref="latest-release"):
+    races_path = "latest" if races_ref == "latest-release" else "tags/" + races_ref
+    races = gh("repos/ilusixn/azerothcore-wotlk-coa/releases/" + races_path)
     tags = gh("repos/Zyth45/mod-playerbots/tags?per_page=100")
     import re
     stable = [t for t in tags if re.fullmatch(r"v\d+\.\d+(?:\.\d+)?", t["name"])]
@@ -34,8 +35,9 @@ def resolve(core_ref="coa-bots", manager_ref="master", bots_ref="master", scalin
     }
     pipeline_sha = os.environ.get('GITHUB_SHA') or subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
     components['build'] = {'repository': 'Corfirean/coa-server-build', 'ref': pipeline_sha}
-    for component in components.values():
-        component["sha"] = revision(component["repository"], component["ref"])
+    for name, component in components.items():
+        ref = "refs/tags/" + component["ref"] if name == "races" else component["ref"]
+        component["sha"] = revision(component["repository"], ref)
     components['squid']['ref'] = next((t['name'] for t in stable
                                      if t['commit']['sha'] == components['squid']['sha']), components['squid']['ref'])
     components["races"]["assets"] = [

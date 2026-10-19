@@ -128,3 +128,5 @@ The scripts and workflows in this repository are under the [GNU Affero General P
 The packages published from it contain a `Licenses` folder with the licences of everything shipped (the server fork,
 the bots module, MySQL) and a `NOTICE.txt` naming the exact source commits. The game data in the base package is not
 covered by this licence.
+
+Server integration, incremental compilation and owner-approved release workflow: [runbook](docs/server-release.md).

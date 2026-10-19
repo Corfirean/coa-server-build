@@ -3,6 +3,13 @@ name: build
 on:
   workflow_call:
     inputs:
+      allow_historical_sql:
+        description: Explicitly authorize imported upstream SQL outside pending migrations
+        type: boolean
+        default: false
+      publish_candidate:
+        type: boolean
+        default: true
       binaries_run_id:
         type: string
         default: ""
@@ -33,6 +40,10 @@ on:
         type: string
         description: 'SQUID source: latest-release selects the newest stable v* tag; explicit refs override'
         default: latest-release
+      races_ref:
+        description: Published custom race release tag reviewed for this candidate
+        type: string
+        default: latest-release
       manager_ref:
         type: string
         description: Manager release-tool ref (must support release schema validation)
@@ -42,6 +53,14 @@ on:
         required: false
   workflow_dispatch:
     inputs:
+      allow_historical_sql:
+        description: Explicitly authorize imported upstream SQL outside pending migrations
+        type: boolean
+        default: false
+      publish_candidate:
+        description: Publish the qualified candidate (leave off to prepare artifacts for owner approval)
+        type: boolean
+        default: false
       binaries_run_id:
         description: Completed run with successful source and binary jobs (SQL-only repackaging)
         default: ""
@@ -66,6 +85,10 @@ on:
       squid_ref:
         description: 'SQUID source: latest-release selects the newest stable v* tag; explicit refs override'
         default: latest-release
+      races_ref:
+        description: Published custom race release tag reviewed for this candidate
+        type: string
+        default: latest-release
       manager_ref:
         description: Manager release-tool ref (must support release schema validation)
         default: master
@@ -89,6 +112,7 @@ jobs:
       SCALING_REF: ${{ inputs.scaling_ref || 'main' }}
       SQUID_REF: ${{ inputs.squid_ref || 'latest-release' }}
       MANAGER_REF: ${{ inputs.manager_ref || 'master' }}
+      RACES_REF: ${{ inputs.races_ref || 'latest-release' }}
     outputs:
       core: ${{ steps.lock.outputs.core }}
       bots: ${{ steps.lock.outputs.bots }}
@@ -116,6 +140,7 @@ jobs:
     if: inputs.binaries_run_id == ''
     uses: ./.github/workflows/server-binaries.yml
     with:
+      allow_historical_sql: ${{ inputs.allow_historical_sql || false }}
       core_ref: ${{ needs.resolve.outputs.core }}
       bots_ref: ${{ needs.resolve.outputs.bots }}
       scaling_ref: ${{ needs.resolve.outputs.scaling }}
@@ -170,7 +195,8 @@ jobs:
           ref: ${{ needs.resolve.outputs.manager }}
           path: _manager
       - name: Cache release-tool dependencies
-        uses: actions/cache@v6
+        id: release-cache
+        uses: actions/cache/restore@v6
         continue-on-error: true
         with:
           path: |
@@ -182,6 +208,16 @@ jobs:
       - name: Build coa-release
         shell: pwsh
         run: cargo build --release -p coa-release --manifest-path _manager/Cargo.toml
+      - name: Preserve compiled release tooling before database qualification
+        if: steps.release-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        continue-on-error: true
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            _manager/target
+          key: trusted-release-cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('_manager/Cargo.lock') }}-${{ github.run_id }}
       - name: Core sources at the exact commit (full history, SQL order comes from it)
         uses: actions/checkout@v7
         with:
@@ -283,6 +319,8 @@ jobs:
           if ($LASTEXITCODE) { throw "Candidate authserver cannot execute: $LASTEXITCODE" }
           & _manager/target/release/coa-release.exe qualify-startup --fixture coa-schema-fixture-build --tree _tree --base _schema-base
           if ($LASTEXITCODE) { throw "Full isolated server startup failed; the candidate will not be published." }
+          python scripts/verify-manastorm-startup.py --core _core --tree _tree --logs coa-schema-fixture-build/Core/Logs
+          if ($LASTEXITCODE) { throw 'The enabled Manastorm backend did not initialize.' }
       - name: Preserve server acceptance diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
@@ -408,7 +446,23 @@ jobs:
           if ($LASTEXITCODE) { throw 'Release evidence is missing or differs from the candidate.' }
           & _manager/target/release/coa-release.exe sign --dir _out
           if ($LASTEXITCODE) { throw 'Signing final metadata failed.' }
+      - name: Preserve qualified candidate pending publication
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-qualified-candidate
+          path: _out/*
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 14
+      - name: Preserve the exact candidate verification tool
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-candidate-tool
+          path: _manager/target/release/coa-release.exe
+          if-no-files-found: error
+          retention-days: 14
       - name: Publish immutable Windows candidate
+        if: inputs.publish_candidate
         shell: pwsh
         run: |
           python scripts/publish-candidate.py --dir _out --repo $env:GITHUB_REPOSITORY --tool _manager/target/release/coa-release.exe
