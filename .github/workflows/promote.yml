@@ -34,7 +34,7 @@ jobs:
     timeout-minutes: 30
     defaults:
       run:
-        shell: powershell
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
     env:
       GH_TOKEN: ${{ github.token }}
       CHECK_ONLY: ${{ inputs.check_only }}
