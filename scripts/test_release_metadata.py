@@ -77,9 +77,11 @@ class MetadataTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'upgrade-stable-1'):
             metadata.validate(self.folder)
 
-    def test_partial_candidate_still_cannot_be_promoted(self):
+    def test_windows_candidate_can_promote_without_unrelated_acceptance(self):
         self.write()
         metadata.validate(self.folder)
+        promote.validate_report(self.report, self.lock['snapshot'], self.manifest['version'])
+        self.report['platforms']['windows-x86_64']['manager-update']['result'] = 'not-run'
         with self.assertRaises(RuntimeError):
             promote.validate_report(self.report, self.lock['snapshot'], self.manifest['version'])
 

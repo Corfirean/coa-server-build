@@ -19,15 +19,20 @@ class QualificationTests(unittest.TestCase):
     def test_complete_report(self):
         promote.validate_report(self.report(), 'candidate', 'version')
 
-    def test_skipped_gameplay_blocks_promotion(self):
+    def test_unrun_local_acceptance_is_not_claimed_as_a_pass(self):
         report = self.report()
-        report['platforms']['windows-x86_64']['login-relog']['result'] = 'skipped'
-        with self.assertRaises(RuntimeError):
-            promote.validate_report(report, 'candidate', 'version')
+        report['platforms']['windows-x86_64']['login-relog'] = {'result': 'not-run'}
+        promote.validate_report(report, 'candidate', 'version')
+        self.assertEqual(report['platforms']['windows-x86_64']['login-relog']['result'], 'not-run')
 
-    def test_missing_linux_gate_blocks_promotion(self):
+    def test_windows_package_does_not_require_linux_acceptance(self):
         report = self.report()
-        del report['platforms']['linux-x86_64']['schema-contract']
+        del report['platforms']['linux-x86_64']
+        promote.validate_report(report, 'candidate', 'version')
+
+    def test_windows_automated_gate_cannot_be_skipped(self):
+        report = self.report()
+        del report['platforms']['windows-x86_64']['fresh-install']
         with self.assertRaises(RuntimeError):
             promote.validate_report(report, 'candidate', 'version')
 
@@ -38,7 +43,7 @@ class QualificationTests(unittest.TestCase):
     def test_owner_approval_preserves_unrun_results_and_requires_core_checks(self):
         report = self.report()
         del report['platforms']['linux-x86_64']
-        report['platforms']['windows-x86_64']['login-relog']['result'] = 'not-run'
+        report['platforms']['windows-x86_64']['login-relog'] = {'result': 'not-run'}
         promote.validate_report(report, 'candidate', 'version', owner_approved_snapshot='candidate')
         self.assertEqual(report['platforms']['windows-x86_64']['login-relog']['result'], 'not-run')
         del report['platforms']['windows-x86_64']['schema-contract']
@@ -49,9 +54,11 @@ class QualificationTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             promote.validate_report(self.report(), 'candidate', 'version', owner_approved_snapshot='other')
         report = self.report()
-        report['platforms']['windows-x86_64']['login-relog']['result'] = 'failed'
+        report['platforms']['windows-x86_64']['login-relog'] = {'result': 'failed'}
         with self.assertRaises(RuntimeError):
             promote.validate_report(report, 'candidate', 'version', owner_approved_snapshot='candidate')
+        with self.assertRaises(RuntimeError):
+            promote.validate_report(report, 'candidate', 'version')
 
     def test_upgrade_must_test_the_declared_source_version(self):
         report = self.report()
@@ -72,7 +79,7 @@ class QualificationTests(unittest.TestCase):
             for name, version in zip(('upgrade-base', 'upgrade-stable-1', 'upgrade-stable-2'), sources):
                 checks[name].update(fromVersion=version, fromManifestSha256='a' * 64, fromSchemaSha256=None)
         promote.validate_report(report, 'candidate', 'version', sources, databases)
-        report['platforms']['linux-x86_64']['upgrade-base']['fromManifestSha256'] = 'b' * 64
+        report['platforms']['windows-x86_64']['upgrade-base']['fromManifestSha256'] = 'b' * 64
         with self.assertRaises(RuntimeError):
             promote.validate_report(report, 'candidate', 'version', sources, databases)
 

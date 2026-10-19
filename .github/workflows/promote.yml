@@ -8,6 +8,15 @@ on:
       expected_channels_sha:
         description: Previous channels branch commit (compare-and-swap)
         required: true
+      runner:
+        description: Run verification on the persistent PC, or use hosted Windows if it is offline
+        type: choice
+        options: [local, hosted]
+        default: local
+      check_only:
+        description: Verify the exact candidate without changing stable or the release
+        type: boolean
+        default: false
       owner_approved_snapshot:
         description: Exact snapshot approved by the owner despite unrun acceptance tests (optional)
         required: false
@@ -21,34 +30,56 @@ concurrency:
   cancel-in-progress: false
 jobs:
   promote:
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(inputs.runner == 'hosted' && '["windows-latest"]' || vars.COA_WINDOWS_RUNNER || '["self-hosted","Windows","X64","coa-persistent"]') }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
     env:
       GH_TOKEN: ${{ github.token }}
-      COA_SIGNING_KEY: ${{ secrets.COA_SIGNING_KEY }}
+      CHECK_ONLY: ${{ inputs.check_only }}
       VERSION: ${{ inputs.version }}
       EXPECTED: ${{ inputs.expected_channels_sha }}
       OWNER_APPROVED_SNAPSHOT: ${{ inputs.owner_approved_snapshot }}
       APPROVAL_REASON: ${{ inputs.approval_reason }}
     steps:
       - uses: actions/checkout@v7
-      - name: Resolve released Manager tools
+      - name: Resolve immutable released Manager tools
         id: manager
         run: |
-          tag=$(gh api repos/Corfirean/coa-server-manager/releases/latest --jq '.tag_name')
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          $tag = gh api repos/Corfirean/coa-server-manager/releases/latest --jq '.tag_name'
+          if ($LASTEXITCODE) { throw 'Cannot resolve released Manager.' }
+          $sha = gh api "repos/Corfirean/coa-server-manager/commits/$tag" --jq '.sha'
+          if ($LASTEXITCODE -or $sha -notmatch '^[0-9a-f]{40}$') { throw 'Cannot resolve immutable Manager source.' }
+          "sha=$sha" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
       - uses: actions/checkout@v7
         with:
           repository: Corfirean/coa-server-manager
-          ref: ${{ steps.manager.outputs.tag }}
+          ref: ${{ steps.manager.outputs.sha }}
           path: _manager
-      - name: Build verification tools from the released Manager
-        run: cargo build --release -p coa-release --manifest-path _manager/Cargo.toml
-      - name: Download immutable candidate
-        run: gh release download "server-$VERSION" --dir candidate --repo "$GITHUB_REPOSITORY"
-      - name: Verify qualification and atomically switch the signed pointer
+      - name: Reuse local verification tools and candidate packages
+        env:
+          MANAGER_SHA: ${{ steps.manager.outputs.sha }}
         run: |
-          args=()
-          if [ -n "$OWNER_APPROVED_SNAPSHOT" ]; then
-            args+=(--owner-approved-snapshot "$OWNER_APPROVED_SNAPSHOT" --approval-reason "$APPROVAL_REASON")
-          fi
-          python3 -B scripts/promote-channel.py --repo "$GITHUB_REPOSITORY" --version "$VERSION" --expected "$EXPECTED" --dir candidate --tool _manager/target/release/coa-release "${args[@]}"
+          $state = Join-Path $env:RUNNER_WORKSPACE '_coa-promotion-state'
+          $env:CARGO_TARGET_DIR = Join-Path $state "tools/$env:MANAGER_SHA"
+          $tool = Join-Path $env:CARGO_TARGET_DIR 'release/coa-release.exe'
+          # Retain Cargo fingerprint checks; never trust an untracked executable alone.
+          cargo build --release --locked -p coa-release --manifest-path _manager/Cargo.toml
+          if ($LASTEXITCODE) { throw 'Verification tool build failed.' }
+          $cache = Join-Path $state 'candidates'
+          python scripts/cache-release-assets.py --repo $env:GITHUB_REPOSITORY --version $env:VERSION --cache $cache
+          if ($LASTEXITCODE) { throw 'Candidate download or cache verification failed.' }
+          "PROMOTION_TOOL=$tool" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "PROMOTION_CANDIDATE=$(Join-Path $cache "server-$env:VERSION")" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Verify qualification and atomically switch the signed pointer
+        env:
+          COA_SIGNING_KEY: ${{ secrets.COA_SIGNING_KEY }}
+        run: |
+          $options = @()
+          if ($env:CHECK_ONLY -eq 'true') { $options += '--check-only' }
+          if ($env:OWNER_APPROVED_SNAPSHOT) {
+            $options += @('--owner-approved-snapshot', $env:OWNER_APPROVED_SNAPSHOT, '--approval-reason', $env:APPROVAL_REASON)
+          }
+          python -B scripts/promote-channel.py --repo $env:GITHUB_REPOSITORY --version $env:VERSION --expected $env:EXPECTED --dir $env:PROMOTION_CANDIDATE --tool $env:PROMOTION_TOOL @options
+          if ($LASTEXITCODE) { throw 'Promotion verification or publication failed.' }
