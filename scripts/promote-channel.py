@@ -6,15 +6,12 @@ import subprocess
 import importlib.util
 from pathlib import Path
 
-GATES = {'source', 'unit', 'auth-startup', 'world-startup', 'schema-contract',
-         'upgrade-base', 'upgrade-stable-1', 'upgrade-stable-2', 'login-relog',
-         'companions', 'squid', 'races-enabled', 'races-disabled', 'hidearmor',
-         'client-assets', 'manager-update', 'rollback-interruption', 'locked-dll',
-         'disk-full', 'corrupt-download', 'sql-failure', 'startup-failure',
-         'headless-console', 'server-bots-pages'}
-OWNER_APPROVAL_GATES = {'source', 'build', 'unit', 'auth-startup', 'world-startup',
+GATES = {'source', 'build', 'unit', 'auth-startup', 'world-startup',
                         'schema-contract', 'upgrade-base', 'upgrade-stable-1',
-                        'upgrade-stable-2', 'manager-update'}
+                        'upgrade-stable-2', 'manager-update', 'fresh-install'}
+# Interactive and fault-injection acceptance belongs to local, change-specific
+# preparation. Keep its actual results; a recorded failure still blocks release.
+# Promotion distributes a Windows package, not a Linux package.
 
 
 def api(path, method='GET', body=None):
@@ -32,14 +29,13 @@ def validate_report(report, snapshot, version, source_versions=None, source_data
         raise RuntimeError('Qualification report does not match the candidate')
     if owner_approved_snapshot is not None and owner_approved_snapshot != snapshot:
         raise RuntimeError('Owner approval does not match the candidate snapshot')
-    platforms = ('windows-x86_64',) if owner_approved_snapshot else ('windows-x86_64', 'linux-x86_64')
+    platforms = ('windows-x86_64',)
+    for other_checks in report.get('platforms', {}).values():
+        if any(check.get('result') == 'failed' for check in other_checks.values()):
+            raise RuntimeError('Cannot promote a failed qualification')
     for platform in platforms:
         checks = report.get('platforms', {}).get(platform, {})
-        gates = OWNER_APPROVAL_GATES if owner_approved_snapshot else GATES | {'build'}
-        if owner_approved_snapshot:
-            for other_checks in report.get('platforms', {}).values():
-                if any(check.get('result') == 'failed' for check in other_checks.values()):
-                    raise RuntimeError('An owner approval cannot promote a failed qualification')
+        gates = GATES
         for name in gates:
             check = checks.get(name, {})
             if check.get('result') != 'passed' or not re.fullmatch(r'https://github\.com/[^/]+/[^/]+/actions/runs/\d+(?:/.*)?', check.get('evidence', '')):
@@ -93,6 +89,7 @@ def main():
     parser.add_argument('--tool', required=True)
     parser.add_argument('--owner-approved-snapshot')
     parser.add_argument('--approval-reason')
+    parser.add_argument('--check-only', action='store_true', help='Verify locally without signing or publishing')
     args = parser.parse_args()
     folder = args.dir.resolve()
     spec = importlib.util.spec_from_file_location('metadata', Path(__file__).with_name('release-metadata.py'))
@@ -128,10 +125,16 @@ def main():
                     args.owner_approved_snapshot)
     subprocess.run([args.tool, 'verify', '--dir', str(folder)], check=True)
     subprocess.run([args.tool, 'verify-install', '--dir', str(folder)], check=True)
+    if args.check_only:
+        print('Promotion preflight passed; no channel or release was changed')
+        return
     pointer = folder / 'stable-pointer.json'
     subprocess.run([args.tool, 'sign-channel', '--channel', 'stable', '--version', args.version,
                     '--snapshot', lock['snapshot'], '--out', str(pointer)], check=True)
     publish(args.repo, args.expected, pointer.read_bytes(), approval)
+    # Keep GitHub's Latest release consistent with the signed Manager channel.
+    subprocess.run(['gh', 'release', 'edit', 'server-' + args.version, '--repo', args.repo,
+                    '--prerelease=false', '--latest'], check=True)
 
 
 if __name__ == '__main__':

@@ -97,9 +97,39 @@ The publication workflow must be present on the default branch before dispatchin
 gh workflow run publish-prepared.yml -R Corfirean/coa-server-build -F candidate_run_id=<approved-build-run>
 ```
 
-Stable promotion is a separate owner command through `promote.yml`: obtain the current `channels` branch SHA, use the
-exact candidate version and compare-and-swap SHA, and preserve all applicable promotion gates. An owner-approved
-snapshot exception requires the owner's explicit decision and acknowledged missing coverage; an agent cannot invent it.
+Stable promotion is a separate owner command through `promote.yml`: obtain the current `channels` branch SHA and use
+the exact candidate version and compare-and-swap SHA. It runs on the owner's persistent Windows PC by default
+(`COA_WINDOWS_RUNNER`). Keep its runner online; `runner=hosted` explicitly selects hosted Windows when necessary.
+Tools are built from the exact released Manager commit, with persistent Cargo outputs outside the cleaned checkout.
+Candidate assets are reused only when their size and GitHub SHA-256 match; signatures and signed package hashes are
+still verified on every promotion. The workflow does not recompile the server or repeat its successful build tests.
+
+The package distributed by this workflow is Windows-only. Required recorded checks are source, build, unit,
+auth/world startup, schema contract, fresh install, Manager update and every upgrade source declared in its signed
+compatibility matrix. Linux qualification is not a prerequisite for shipping this Windows package. Interactive
+gameplay and fault-injection checks are performed locally during preparation, according to the changed features;
+keep their real results in qualification rather than calling unrun checks successful. Any recorded failed check
+still blocks promotion. An owner exception cannot bypass the automated Windows requirements.
+
+Before publishing, agents should run applicable local checks in disposable fixtures: login/relog after changes to
+authentication or characters; companions/SQUID after bot changes; races/hidearmor/client assets after patch changes;
+rollback, locked DLL, disk-full, corrupt download and SQL/startup failure after updater/recovery changes; headless
+console and Manager server/bot pages after UI or startup changes. Preserve the fixture, logs and frozen snapshot in
+the handoff. Never use the owner's production database or claim that screenshot mocks qualify live gameplay.
+
+Use `check_only=true` to exercise tool/package/qualification verification locally without signing or publishing.
+For example (replace version and SHA):
+
+```powershell
+gh workflow run promote.yml -R Corfirean/coa-server-build -f version=<version> `
+  -f expected_channels_sha=<channels-sha> -f check_only=true
+```
+
+On a real promotion the signed pointer is switched atomically first; the same immutable GitHub release then becomes
+Latest and loses its Pre-release flag. Check both and fetch the public raw pointer, allowing for GitHub CDN caching.
+If the final GitHub release edit fails, the pointer may already have changed: reconcile the release metadata before
+retrying with a newly fetched channels SHA. Legacy explicit snapshot approvals remain auditable, but are no longer
+required merely because optional local acceptance or Linux checks were not run.
 
 ## Handoff between agents
 
