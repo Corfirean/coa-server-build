@@ -187,7 +187,12 @@ required merely because optional local acceptance or Linux checks were not run.
    that from a failed promotion and allow refresh. The GitHub contents API on `ref=channels` can confirm committed
    state while the CDN catches up. Check the actual Manager update path from a previous stable installation when
    applicable; do not tell players to reinstall just because the channel or CDN still points to an older build.
-8. **Report and hand off.** Give the owner download/changelog/run links, actual qualification limits and whether
+8. **Synchronize notes and hand off.** The component changelog workflows run after publication/promotion. Verify
+   their success: each repository's `CHANGELOG.md` and GitHub release notes must match its reviewed
+   `changelog/history.json`, containing only its own shipped changes. If needed dispatch `changelog-release.yml`
+   (server) or `changelog.yml` (Manager). Do not revive the archived combined changelog generator or collect from
+   moving source branches. See `changelog/GUIDE.md` for historical corrections and exact commands.
+   Give the owner download/changelog/run links, actual qualification limits and whether
    the public pointer has refreshed. Player-facing release notes describe our authored changes; imported upstream
    or module changes must not be presented as our fixes. Prepare Discord text but send nothing without an explicit
    instruction to post it. Keep0.7.0 docs/screenshots awaiting review separate from a server release instruction.

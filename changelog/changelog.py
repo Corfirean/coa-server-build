@@ -347,6 +347,13 @@ def render_discord(r: dict) -> list[str]:
 
 
 def write_outputs(releases: list[dict]) -> None:
+    if (HERE / 'history.json').exists():
+        # Production history is component-scoped and based on actual releases.
+        # Never let the old combined fragment renderer replace the repaired log.
+        from sync_history import render
+        history = json.loads((HERE / 'history.json').read_text(encoding='utf8'))
+        (ROOT / 'CHANGELOG.md').write_text(render(history), encoding='utf8')
+        return
     (ROOT / "CHANGELOG.md").write_text(render_changelog_md(releases), encoding="utf-8", newline="\n")
     (HERE / "changelog.json").write_text(
         json.dumps({"schema": 1, "releases": sorted(releases, key=lambda r: r["id"], reverse=True)}, indent=2, ensure_ascii=False) + "\n",
@@ -407,6 +414,9 @@ def cmd_status(a) -> int:
 
 
 def cmd_release(a) -> int:
+    if (HERE / 'history.json').exists():
+        print('Use changelog/sync_history.py after publication; combined release history is archived.')
+        return 1
     lock = getattr(a, "lock", None)
     frags = collect_locked(Path(lock)) if lock else collect(a.remote or not a.source, parse_overrides(a.source))
     component = getattr(a, "component", None)

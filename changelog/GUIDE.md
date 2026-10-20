@@ -1,22 +1,33 @@
 # CoA changelog guide
 
-One changelog for everything the community runs: the server (`azerothcore-wotlk-coa`), the companion bots
-(`mod-coa-playerbots`), Content Scaling (`mod-coa-content-scaling`), the Manager (`coa-server-manager`) and the renderer
-(`modern-wow-renderer`). It is **written by whoever makes the change** (a person, Claude, Gemini, ChatGPT) in the same
-format, and **assembled at release time** into `CHANGELOG.md`, a ready-to-post Discord text and `changelog.json`.
+Changes use one shared fragment format, but **release histories are separate**:
+
+- [Server changelog](https://github.com/Corfirean/coa-server-build/blob/main/CHANGELOG.md): shipped server packages, companions and server modules.
+- [Manager changelog](https://github.com/Corfirean/coa-server-manager/blob/master/CHANGELOG.md): published Manager versions, including client-patch installation changes delivered by that app.
+
+Each repository's `changelog/history.json` is its reviewed history. `CHANGELOG.md` and GitHub release notes render from that same source, so the two public views agree. Original combined records are retained under `changelog/archive/` for provenance, not used as a public release history.
 
 ## How it works
 
-1. You finish a change that a player or a server owner would notice.
-2. In the **same repository and the same commit** you add one small file to `changelog.d/` (format below).
-3. When a release goes out, someone runs the **changelog-release** workflow in `coa-server-build` (Actions tab, "Run
-   workflow"), giving the release id and the versions that shipped. It reads the fragments of all five repositories,
-   skips the ones already released, and commits `CHANGELOG.md`, `changelog/discord/<id>.txt` and
-   `changelog/changelog.json`.
-4. The Discord text is copied from `changelog/discord/<id>.txt` (it is already split into messages under 2000 characters).
+1. Add a player-facing fragment in the same commit as the change, in the repository that ships it.
+2. Prepare and test the frozen candidate. Fragments on an unreleased branch are not published notes.
+3. After publication, the component's changelog workflow finds **actual published stable releases**. Manager reads fragments at each immutable release tag; server reads only its core/bot/scaling/build SHAs from that candidate's release lock. It never collects Manager changes into the server history or reads moving source branches.
+4. The workflow appends only previously unreleased fragments, updates its own `CHANGELOG.md` and synchronizes GitHub release notes. It skips drafts, prereleases and missing historical tags. Existing reviewed history is preserved; repeated runs make no duplicate entries.
+5. Manager's workflow runs after its installer release workflow or a published release. Server's runs after promotion, including publication by an Actions token that does not produce another release event. Both can also be dispatched manually.
 
-Because each change is its own file, several AIs and people can write at the same time without conflicts, and nothing
-has to be remembered at release time.
+Manual recovery commands (run from the matching repository):
+
+```powershell
+# Server
+gh workflow run changelog-release.yml -R Corfirean/coa-server-build
+# Manager
+gh workflow run changelog.yml -R Corfirean/coa-server-manager
+```
+
+For a historical correction, edit the matching record in `changelog/history.json`, render locally with
+`python changelog/sync_history.py --render-only` (server) or `python tools/sync_history.py --render-only` (Manager), then review and commit both files. The next synchronization updates the matching GitHub notes. Do not silently edit released fragments or claim imported upstream work as our own authored fixes.
+
+The old combined `changelog.py release` command is disabled in the production build repository. Its parser/check/new/sync-instructions commands remain useful for authoring fragments. Do not use the archived combined JSON or Discord files as the current changelog.
 
 ## The file
 
@@ -61,31 +72,13 @@ The text after the second `---` is the optional **body**: a single paragraph, En
 | `Улучшен интерфейс` | `The Browse tab lists every online bot` |
 | `Added stuff to the Manager.` | `Delete an account from the Players page` |
 
-## Commands (optional, the script is plain Python 3, no packages)
+## Fragment authoring commands
 
-```
-python changelog.py new --area bots --type fixed --audience players --title "..." [--body "..."]
-python changelog.py check --dir changelog.d          # in a repository: is my file valid?
-python changelog.py status --remote                  # all repositories: what is waiting for the next release?
-python changelog.py release --id 2026-10-03 --server 0.261002.13 --manager 0.4.0 --addon 2.1.1 --dry-run
+```powershell
+python changelog/changelog.py check --dir changelog.d
+python changelog/changelog.py new --area manager --type fixed --audience admins --title "Updates recover safely"
 ```
 
-Get the script: https://raw.githubusercontent.com/Corfirean/coa-server-build/main/changelog/changelog.py
+Player-facing notes should be short and understandable. Source hashes, internal paths and test output belong in evidence and release metadata, not public bullet points. A module update may name its new version, but must not relabel the upstream authors' features as our fixes.
 
-Every repository also runs `check` in CI when `changelog.d/` changes, so a malformed file is reported on the commit.
-
-## Release ids
-
-Usually the date, `2026-10-03`. A second release on the same day is `2026-10-03-2`. Versions (all optional): `--server`,
-`--manager`, `--addon`, `--renderer`.
-
-## For a chat that cannot see the repository
-
-Paste `changelog/prompt.md` into ChatGPT or Gemini, then describe what you changed; it answers with the file name and
-the file content to save as `changelog.d/<name>`.
-
-## Adding a repository
-
-Add it to `changelog/sources.json` (name, repo, default branch), run
-`python changelog.py sync-instructions PATH_TO_REPO` in it (creates `changelog.d/`, the AGENTS/CLAUDE/GEMINI instruction
-files and the shared rules section) and add `.github/workflows/changelog.yml` (see any existing repository).
+The standalone synchronizer and its tests are vendored into Manager as `tools/sync_history.py` and `tools/test_sync_history.py`. Keep those copies identical when changing the shared generator; both projects test them independently.

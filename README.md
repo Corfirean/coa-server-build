@@ -68,10 +68,11 @@ It is only needed by the hourly `sync-fork` workflow. Without `COA_SIGNING_KEY` 
 are refused by every Manager anyway).
 
 ## Changelog
-The changelog of every CoA project lives here: [CHANGELOG.md](CHANGELOG.md). Each repository (server fork, bots, Content Scaling,
-Manager, renderer) keeps one small `changelog.d/` file per change, written in the same format by people and AIs alike;
-the **changelog-release** workflow collects them at release time and also produces the Discord text. Rules, format and
-examples: [changelog/GUIDE.md](changelog/GUIDE.md).
+[Server changelog](CHANGELOG.md) · [Manager changelog](https://github.com/Corfirean/coa-server-manager/blob/master/CHANGELOG.md).
+
+Each repository keeps a separate history of its published versions. Fragments share one format, but release notes
+are collected only from that component's immutable shipped sources. Automatic changelog workflows keep Markdown
+and GitHub release notes in sync. Rules and recovery commands: [changelog/GUIDE.md](changelog/GUIDE.md).
 
 ## Base package
 The base contains game data and a database built from the maintainer's repack, so it is produced on the maintainer's
