@@ -13,5 +13,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - run: python3 -m unittest test_changelog
+      - run: python3 -m unittest discover -p 'test_*.py'
         working-directory: changelog
