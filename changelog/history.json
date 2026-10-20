@@ -410,6 +410,16 @@
           ]
         }
       }
+    },
+    {
+      "version": "0.2.0",
+      "tag": "legacy-base-0.2.0",
+      "date": "2026-09-30",
+      "legacy": true,
+      "url": "https://github.com/Corfirean/coa-server-build/releases/tag/base",
+      "notes": [
+        "Initial signed base package for installing a clean server through CoA Server Manager"
+      ]
     }
   ]
 }

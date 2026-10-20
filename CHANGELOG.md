@@ -166,3 +166,9 @@ Dates follow GitHub publication (UTC); legacy records retain their archived date
 - Optional fee for the NPC Enchanter.
 
 [Archived release record](https://github.com/Corfirean/coa-server-build/blob/main/changelog/archive/releases/2026-10-02.json)
+
+## 0.2.0 — 2026-09-30
+
+- Initial signed base package for installing a clean server through CoA Server Manager.
+
+[Archived release record](https://github.com/Corfirean/coa-server-build/releases/tag/base)
