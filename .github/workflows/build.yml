@@ -3,6 +3,10 @@ name: build
 on:
   workflow_call:
     inputs:
+      experimental_portable:
+        description: Include owner-approved experimental portable characters in the frozen candidate
+        type: boolean
+        default: false
       allow_historical_sql:
         description: Explicitly authorize imported upstream SQL outside pending migrations
         type: boolean
@@ -53,6 +57,10 @@ on:
         required: false
   workflow_dispatch:
     inputs:
+      experimental_portable:
+        description: Include owner-approved experimental portable characters in the frozen candidate
+        type: boolean
+        default: false
       allow_historical_sql:
         description: Explicitly authorize imported upstream SQL outside pending migrations
         type: boolean
@@ -113,6 +121,7 @@ jobs:
       SQUID_REF: ${{ inputs.squid_ref || 'latest-release' }}
       MANAGER_REF: ${{ inputs.manager_ref || 'master' }}
       RACES_REF: ${{ inputs.races_ref || 'latest-release' }}
+      EXPERIMENTAL_PORTABLE: ${{ inputs.experimental_portable }}
     outputs:
       core: ${{ steps.lock.outputs.core }}
       bots: ${{ steps.lock.outputs.bots }}
@@ -140,6 +149,10 @@ jobs:
     if: inputs.binaries_run_id == ''
     uses: ./.github/workflows/server-binaries.yml
     with:
+      experimental_portable:
+        description: Include owner-approved experimental portable characters in the frozen candidate
+        type: boolean
+        default: false
       allow_historical_sql: ${{ inputs.allow_historical_sql || false }}
       core_ref: ${{ needs.resolve.outputs.core }}
       bots_ref: ${{ needs.resolve.outputs.bots }}
