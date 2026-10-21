@@ -201,6 +201,12 @@ Measured reference: the2026-10-19 persistent-PC verification-only run39268500611
 That is not a cold-cache guarantee and does not include server compilation or local gameplay acceptance. Normal
 promotion should reuse both tools and packages; only missing/changed verified assets need downloading.
 
+## Persistent PC network preparation
+
+On this PC the existing runner's `.env` also enables `ACTIONS_RUNNER_ACTION_ARCHIVE_CACHE=C:/games/coa-build-runner/action-archive-cache` and `DOTNET_SYSTEM_NET_DISABLEIPV6=1`. These are process settings, not Windows network policy changes. The official runner reads ZIP archives from `<cache>/<owner>_<repository>/<resolved-commit>.zip`; keep exact immutable commit archives and validate the ZIP before caching it. The2026-10-21 preparation found repeated100-second action downloads, while an isolated .NET download took107.421 seconds normally and1.380 seconds with IPv6 disabled. See Microsoft's [.NET IPv6 configuration](https://learn.microsoft.com/en-us/dotnet/framework/network-programming/internet-protocol-version-6) and the official [runner action manager](https://github.com/actions/runner/blob/main/src/Runner.Worker/ActionManager.cs).
+
+Windows compilation fetches only the frozen core commit; the separate POSIX job retains full-history source verification. If network preparation needs a local Git object cache, prepare a valid detached checkout of that exact SHA while the runner is idle, before dispatching. An unborn repository is discarded by checkout and loses its cache. Never change an active checkout or use a different source revision to avoid a download. Do not restart a runner during compilation. Preserve the source lock, existing compiler outputs and actual attempt diagnostics when recovering a failed network preparation.
+
 ## Handoff between agents
 
 Leave these facts in the current chat before stopping: pipeline branch/commit and PR; core integration branch/commit
