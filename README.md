@@ -130,6 +130,23 @@ Linux retains both BuildKit `mode=max` cache and an independently restored/saved
 is pinned and compiler identity is checked by content. Cargo and Boost/MySQL caches remain separate.
 Cache availability never becomes a release requirement; compilation can run without restored objects.
 
+For a dedicated Windows runner, set the repository variable `COA_WINDOWS_RUNNER` to a JSON label array such as
+`["self-hosted","Windows","X64","coa-persistent"]`. Without the variable, Windows compilation uses hosted runners.
+Only the binary build moves to this runner; packaging and database qualification keep their independent hosted jobs.
+The runner needs Visual Studio C++ tools with CMake/Ninja, PowerShell 7, Python and Git. Boost 1.87 and MySQL 8.4.9
+are installed once by the existing dependency step. OpenSSL development files must be present; the local vcpkg static
+installation is supported as a fallback.
+
+Dedicated builds keep Ninja outputs in `RUNNER_WORKSPACE/_coa-build-state/`, outside the checkout cleaned by Actions.
+Compiler and linker binary hashes select the state directory. After checkouts and module copying, unchanged source
+bytes recover their previous timestamps; changed bytes keep new timestamps, and CMake refreshes the source graph on
+every run. A compiler probe matches Ninja's dependency prefix to the actual MSVC language and encoding so header dependencies
+remain tracked on localized Windows installations.
+The build keeps the same RelWithDebInfo, embedded debug information, static scripts/modules and unit checks.
+Dedicated builds use the core verifier's default worker count and do not upload the local build tree or compiler
+cache. The compilation/unit duration and cold/incremental mode appear in the job summary and diagnostics artifact.
+Use `verify-server` with exact component SHAs for a compilation-only qualification without publishing a release.
+
 `compiler-cache-benchmark` measures cold and warm MSVC compilation on different hosted runners with the same pinned
 sccache and flags. Its artifact records timing, compiler identity, misses and hits and checks the 2x target for that
 fixture. This is not a measurement of a full server build. Full build summaries and the

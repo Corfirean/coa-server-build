@@ -15,6 +15,7 @@ on:
         description: Exact SQUID commit
         required: true
 permissions:
+  actions: read
   contents: read
 concurrency:
   group: verify-server
