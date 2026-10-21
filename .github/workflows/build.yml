@@ -1,6 +1,6 @@
 name: build
 # Nightly (and on demand): compile the fork + bots module, assemble a signed cumulative update package
-# and publish it to the moving "edge" release. Promote a good build with the "promote" workflow.
+# and publish it to the moving "edge" release. A successful build is then promoted to "stable" automatically (promote workflow; it re-verifies signature and schema).
 on:
   schedule:
     - cron: '30 1 * * *'
@@ -159,3 +159,9 @@ jobs:
           $keep = $files.Name
           foreach ($n in $old) { if ($keep -notcontains $n) { gh release delete-asset edge $n --yes --repo $env:GITHUB_REPOSITORY } }
           gh release edit edge --notes "Version $env:VERSION`ncore $env:CORE_SHA`nbots $env:BOTS_SHA`nscaling $env:SCALING_SHA`nsquid $env:SQUID_SHA" --repo $env:GITHUB_REPOSITORY
+
+  promote:
+    needs: package
+    uses: ./.github/workflows/promote.yml
+    permissions:
+      contents: write

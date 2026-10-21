@@ -1,7 +1,13 @@
 name: promote
 # Copy the current edge build to the "stable" release that players' Managers follow.
+# Runs automatically after every successful nightly build (called from build.yml) and can still be run by hand.
 on:
   workflow_dispatch:
+  workflow_call:
+
+concurrency:
+  group: stable-promotion
+  cancel-in-progress: false
 
 permissions:
   contents: write
