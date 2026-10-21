@@ -149,10 +149,6 @@ jobs:
     if: inputs.binaries_run_id == ''
     uses: ./.github/workflows/server-binaries.yml
     with:
-      experimental_portable:
-        description: Include owner-approved experimental portable characters in the frozen candidate
-        type: boolean
-        default: false
       allow_historical_sql: ${{ inputs.allow_historical_sql || false }}
       core_ref: ${{ needs.resolve.outputs.core }}
       bots_ref: ${{ needs.resolve.outputs.bots }}
