@@ -14,7 +14,7 @@ SQUID is `Zyth45/mod-playerbots`, highest stable numeric `v*` tag. Manager tooli
 1. Fetch the relevant repositories. Record exact upstream, race tag/commit, SQUID tag/commit and companion/scaling SHAs.
 2. On an isolated core branch based on `origin/coa-bots`, merge the fetched upstream and race release. Resolve conflicts
    by examining both changes and their callers. Review new race SQL and convert required changes to immutable pending
-   migrations under the core repository's rules. Do not merge the excluded portable-character/session branches.
+   migrations under the core repository's rules. Keep portable-character/session branches excluded unless the owner explicitly requests an experimental Portable Characters candidate. For that candidate, integrate both the Manager and core bridge, and pass `experimental_portable=true` to `build.yml`; its frozen lock records the experimental feature instead of listing those branches as excluded. Never imply stable promotion from this option.
    Inspect mandatory SQL shipped under module `base/` and nested `updates/` directories as well: the release
    collector does not automatically apply either location to an existing installation. Port required, reviewed
    schema/data changes into pending migrations. Keep authored snapshot ordering, ownership guards and player data;
