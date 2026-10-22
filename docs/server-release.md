@@ -62,6 +62,20 @@ Packaging verifies signatures and frozen fixtures, applies SQL in an isolated da
 qualifies a clean installer, and tests representative direct Manager upgrades. The full historical upgrade matrix is
 separate (`direct-upgrade-tests.yml`). Report the actual tested scope; an unrun gate is never a pass.
 
+When the owner requests compatibility with every previous version, run the full historical matrix against the
+exact newly published candidate, not the current stable by default:
+
+```powershell
+gh workflow run direct-upgrade-tests.yml -R Corfirean/coa-server-build --ref <reviewed-pipeline-ref> `
+  -f manager_ref=<candidate-locked-manager-sha> -f target_version=<candidate-version>
+```
+
+This does not promote stable or compile the server again. Preserve `direct-upgrade-lock.json` and require the final
+`report` job to pass for every frozen source. Each source must have its own passing Manager transaction, database
+schema/startup and preservation report; a manifest/hash audit alone is not update qualification. Report the actual
+number and range of available signed Windows versions. Unknown imported installations, removed historical packages
+and manually modified databases are not covered merely by a version label. Keep their limits explicit.
+
 For an upstream integration, preflight SQL locally on a disposable copy of the exact signed base with the pinned
 Manager's `extract-schema-base`, `schema-contract` and `qualify-startup` commands before the final GitHub build.
 Keep a pristine fixture for retries after a failed migration; do not repair its ledger manually. Assign free ports
