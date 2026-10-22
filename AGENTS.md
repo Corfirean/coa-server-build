@@ -4,7 +4,8 @@ Public changelogs are component-scoped: this repository's `CHANGELOG.md` is serv
 Manager maintains its own `CHANGELOG.md`. Read `changelog/GUIDE.md`. Publish only changes present in
 the immutable released sources, never pending Manager features or moving-branch fragments. The
 automatic changelog workflow synchronizes the reviewed `changelog/history.json`, Markdown and
-GitHub release notes. Legacy combined records are archived and must not be used as current notes.
+GitHub release notes for every published release, including clearly marked Pre-release candidates.
+Promotion updates the same version entry; previews never consume stable-release notes. Legacy combined records are archived and must not be used as current notes.
 
 Read [the release runbook](docs/server-release.md) before integrating sources, compiling, packaging, publishing or
 promoting a server. It defines the repositories, frozen source lock, verification gates and handoff information.

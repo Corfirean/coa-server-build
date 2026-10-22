@@ -4,7 +4,27 @@ Server packages, companions and server modules only. Manager releases have their
 
 [Manager changelog](https://github.com/Corfirean/coa-server-manager/blob/master/CHANGELOG.md)
 
+Published releases and previews. Pre-release entries do not change the stable update channel.
+
 Dates follow GitHub publication (UTC); legacy records retain their archived dates. Newest releases first.
+
+## 0.261022.75 (Pre-release) — 2026-10-22
+
+**Portable Characters are experimental and may contain bugs.**
+
+- Added experimental server support for Portable Characters, used with Manager 0.7.0 on compatible realms.
+- Integrated the latest reviewed CoA upstream changes.
+- Updated SQUID Playerbots to 2.6.
+- Improved combat and healing behavior for multiple classes and specializations.
+- Bots choose equipment for the stats their specialization uses.
+- Improved party following and dungeon pathfinding.
+- Tanks wait for the group to catch up and recover.
+- Damage dealers and healers bring attacking enemies back to the tank.
+- Bots recover from dungeon deaths and stay behind when the leader is a ghost.
+- Improved battleground participation and matching bots to the correct level bracket.
+- Added separate creature health settings for the open world, dungeons, raids, ordinary enemies and bosses.
+
+[Release](https://github.com/Corfirean/coa-server-build/releases/tag/server-0.261022.75) · [Source changes](https://github.com/Corfirean/coa-server-build/compare/server-0.261018.70...server-0.261022.75)
 
 ## 0.261018.70 — 2026-10-19
 
@@ -47,6 +67,14 @@ Dates follow GitHub publication (UTC); legacy records retain their archived date
 - Requires Manager 0.6.15 or newer for large server updates.
 
 [Release](https://github.com/Corfirean/coa-server-build/releases/tag/server-0.261012.800008)
+
+## 0.261012.800007 (Pre-release) — 2026-10-11
+
+Superseded by server-0.261012.800008: the minimum Manager metadata needs correction. The navigation payload passed all three Manager upgrade scenarios, but this release must not be installed with Managers older than 0.6.15.
+
+- Withdrawn preview with incorrect minimum Manager version metadata.
+
+[Release](https://github.com/Corfirean/coa-server-build/releases/tag/server-0.261012.800007)
 
 ## 0.261011.800006 — 2026-10-11
 

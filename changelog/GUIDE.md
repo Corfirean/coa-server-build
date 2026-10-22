@@ -11,9 +11,9 @@ Each repository's `changelog/history.json` is its reviewed history. `CHANGELOG.m
 
 1. Add a player-facing fragment in the same commit as the change, in the repository that ships it.
 2. Prepare and test the frozen candidate. Fragments on an unreleased branch are not published notes.
-3. After publication, the component's changelog workflow finds **actual published stable releases**. Manager reads fragments at each immutable release tag; server reads only its core/bot/scaling/build SHAs from that candidate's release lock. It never collects Manager changes into the server history or reads moving source branches.
-4. The workflow appends only previously unreleased fragments, updates its own `CHANGELOG.md` and synchronizes GitHub release notes. It skips drafts, prereleases and missing historical tags. Existing reviewed history is preserved; repeated runs make no duplicate entries.
-5. Manager's workflow runs after its installer release workflow or a published release. Server's runs after promotion, including publication by an Actions token that does not produce another release event. Both can also be dispatched manually.
+3. After publication, the component's changelog workflow finds **actual published releases, including Pre-release candidates**. Manager reads fragments at each immutable release tag; server reads only its core/bot/scaling/build SHAs from that candidate's release lock. It never collects Manager changes into the server history or reads moving source branches.
+4. The workflow appends only previously unreleased fragments, updates its own `CHANGELOG.md` and synchronizes GitHub release notes. It skips drafts and missing historical tags. Published previews are marked Pre-release in both views; promotion updates the same version record without duplicating or recollecting its reviewed notes. Existing reviewed history is preserved; repeated runs make no duplicate entries.
+5. Manager's workflow runs after its installer release workflow or a published release. Server's runs after build, daily publication, prepared-candidate publication and promotion, including publication by an Actions token that does not produce another release event. Both can also be dispatched manually.
 
 Manual recovery commands (run from the matching repository):
 
@@ -23,6 +23,19 @@ gh workflow run changelog-release.yml -R Corfirean/coa-server-build
 # Manager
 gh workflow run changelog.yml -R Corfirean/coa-server-manager
 ```
+
+Preview fragments are retained on the preview record and do not consume the stable history. A stable hotfix can
+therefore be recorded after a higher preview version without losing its changes. Preview notes describe changes
+against the stable history available when that preview is published. Promoting the preview consumes its recorded
+fragments and removes only the Pre-release marker; it does not rebuild or change package assets or update channels.
+
+Keep reviewed player-facing summaries, experimental warnings, withdrawn-build notices and useful documentation
+links in the version record. The renderer preserves these in both `CHANGELOG.md` and GitHub release notes. Portable
+Characters must remain clearly marked experimental wherever that release includes the experimental feature.
+
+An immutable historical fragment that predates the shared format can be normalized through the reviewed
+`fragmentOverrides` map, keyed by `repository:exact-Git-blob-SHA`. This cannot hide a malformed new or changed
+fragment. Never edit frozen release sources or silently skip parser failures.
 
 For a historical correction, edit the matching record in `changelog/history.json`, render locally with
 `python changelog/sync_history.py --render-only` (server) or `python tools/sync_history.py --render-only` (Manager), then review and commit both files. The next synchronization updates the matching GitHub notes. Do not silently edit released fragments or claim imported upstream work as our own authored fixes.
@@ -69,7 +82,7 @@ The text after the second `---` is the optional **body**: a single paragraph, En
 |---|---|
 | `Fix BotMgr::UpdateTrades null deref` | `Bots no longer crash the server when a trade is cancelled` |
 | `Refactor config cache` | (no file) |
-| `Улучшен интерфейс` | `The Browse tab lists every online bot` |
+| `РЈР»СѓС‡С€РµРЅ РёРЅС‚РµСЂС„РµР№СЃ` | `The Browse tab lists every online bot` |
 | `Added stuff to the Manager.` | `Delete an account from the Players page` |
 
 ## Fragment authoring commands
