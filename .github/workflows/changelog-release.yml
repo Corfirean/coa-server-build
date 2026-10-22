@@ -6,9 +6,9 @@ on:
   pull_request:
     paths: [changelog/sync_history.py, changelog/test_sync_history.py, changelog/history.json, .github/workflows/changelog-release.yml]
   release:
-    types: [published, released]
+    types: [published, prereleased, released]
   workflow_run:
-    workflows: [promote]
+    workflows: [build, daily-release, publish-prepared, promote]
     types: [completed]
   workflow_dispatch:
 permissions:
