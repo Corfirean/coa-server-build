@@ -58,12 +58,13 @@ def fragment_note(text, areas):
     return title
 
 
-def remote_fragments(repo, sha, seen, areas, excluded_blobs=(), overrides=None):
+def remote_fragments(repo, sha, seen, areas, excluded_blobs=(), overrides=None, *, excluded_names=()):
     if not re.fullmatch(r'[0-9a-f]{40}', sha):
         raise ValueError('Changelog collection requires an immutable source SHA')
     listing = api(f'repos/{repo}/contents/changelog.d?ref={sha}')
     files = [f for f in listing if re.fullmatch(r'\d{8}-[a-z0-9-]+\.md', f['name'])]
-    new = [f for f in files if repo + ':' + f['name'] not in seen and f['sha'] not in excluded_blobs]
+    new = [f for f in files if repo + ':' + f['name'] not in seen
+           and f['sha'] not in excluded_blobs and f['name'] not in excluded_names]
 
     def read(item):
         reviewed = (overrides or {}).get(repo + ':' + item['sha'])
@@ -100,17 +101,21 @@ def collect_manager(root, tag, seen):
     return notes, [repo + ':' + Path(p).name for p in paths], source
 
 
-def upstream_fragment_blobs(lock):
+def upstream_fragment_entries(lock):
     upstream = lock['components'].get('upstream')
     if not upstream:
-        return set()
+        return []
     prefix = 'repos/' + upstream['repository'] + '/git/trees/'
     tree = api(prefix + upstream['sha'])['tree']
     directory = next((item for item in tree if item['path'] == 'changelog.d' and item['type'] == 'tree'), None)
     if not directory:
-        return set()
+        return []
     files = api(prefix + directory['sha'])['tree']
-    return {item['sha'] for item in files if item['type'] == 'blob' and re.fullmatch(r'\d{8}-[a-z0-9-]+\.md', item['path'])}
+    return [item for item in files if item['type'] == 'blob' and re.fullmatch(r'\d{8}-[a-z0-9-]+\.md', item['path'])]
+
+
+def upstream_fragment_blobs(lock):
+    return {item['sha'] for item in upstream_fragment_entries(lock)}
 
 
 def collect_server(repo, tag, seen, previous, overrides=None):
@@ -118,7 +123,9 @@ def collect_server(repo, tag, seen, previous, overrides=None):
         subprocess.run(['gh', 'release', 'download', tag, '--repo', repo, '--pattern', 'release-lock.json', '--dir', folder], check=True)
         lock = json.loads((Path(folder) / 'release-lock.json').read_text(encoding='utf-8-sig'))
     notes, ids = [], []
-    imported_blobs = upstream_fragment_blobs(lock)
+    imported = upstream_fragment_entries(lock)
+    imported_blobs = {item['sha'] for item in imported}
+    imported_names = {item['path'] for item in imported}
     for role in ('core', 'bots', 'scaling', 'build'):
         item = lock['components'].get(role)
         if not item:
@@ -126,7 +133,8 @@ def collect_server(repo, tag, seen, previous, overrides=None):
         if item['repository'] == 'Corfirean/coa-server-manager':
             raise ValueError('A Manager source cannot supply server release notes')
         entries, found = remote_fragments(item['repository'], item['sha'], seen, SERVER_AREAS,
-                                         imported_blobs if role == 'core' else (), overrides)
+                                         imported_blobs if role == 'core' else (), overrides,
+                                         excluded_names=imported_names if role == 'core' else ())
         notes.extend(entries)
         ids.extend(found)
     old = previous.get('components', {})

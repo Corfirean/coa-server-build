@@ -151,6 +151,16 @@ class ComponentHistoryTests(unittest.TestCase):
                 sync.remote_fragments('owner/core', 'a' * 40, set(), sync.SERVER_AREAS,
                                       overrides={'owner/core:different-blob': 'Must not hide malformed notes'})
 
+    def test_shortened_upstream_note_keeps_its_origin_when_its_blob_changes(self):
+        listing = [{'name': '20261020-sunken-temple.md', 'sha': 'shortened-local-blob'}]
+        with patch.object(sync, 'api', return_value=listing) as calls:
+            notes, consumed = sync.remote_fragments(
+                'owner/core', 'a' * 40, set(), sync.SERVER_AREAS, {'original-upstream-blob'},
+                excluded_names={'20261020-sunken-temple.md'})
+        self.assertEqual(notes, [])
+        self.assertEqual(consumed, ['owner/core:20261020-sunken-temple.md'])
+        self.assertEqual(calls.call_count, 1)
+
     def test_upstream_exclusions_use_the_frozen_source_tree(self):
         lock = {'components': {'upstream': {'repository': 'upstream/core', 'sha': 'frozen'}}}
         with patch.object(sync, 'api', side_effect=[{'tree': [{'path': 'changelog.d', 'type': 'tree', 'sha': 'notes-tree'}]}, {'tree': [{'path': '20261021-imported.md', 'type': 'blob', 'sha': 'imported'}, {'path': 'README.md', 'type': 'blob', 'sha': 'readme'}]}]) as calls:
