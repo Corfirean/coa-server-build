@@ -19,7 +19,7 @@ def freeze(manager_ref, version, output):
     if target is None or target['role'] == 'base':
         raise RuntimeError('Target must be an available signed server release')
     manager = json.loads(subprocess.check_output(
-        ['gh', 'api', 'repos/Corfirean/coa-server-manager/commits/' + manager_ref], text=True))['sha']
+        ['gh', 'api', 'repos/Corfirean/coa-server-manager/commits/' + manager_ref], encoding='utf-8'))['sha']
     if not re.fullmatch('[0-9a-f]{40}', manager):
         raise RuntimeError('Manager must resolve to an exact revision')
     eligible = [s for s in sources if tuple(map(int, s['version'].split('.'))) <= tuple(map(int, target['version'].split('.')))]
