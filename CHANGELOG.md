@@ -8,6 +8,18 @@ Published releases and previews. Pre-release entries do not change the stable up
 
 Dates follow GitHub publication (UTC); legacy records retain their archived dates. Newest releases first.
 
+## 0.261023.76 (Pre-release) — 2026-10-23
+
+**Portable Characters are experimental and may contain bugs.**
+
+- Guardian Tower Formation no longer blocks shield abilities.
+- The Auction House Bot has one switch.
+- Content Scaling takes over dungeon and raid health and damage when it is enabled.
+- Dungeon trash no longer has several health boosts stacked on top of each other.
+- Updated the reviewed CoA upstream snapshot.
+
+[Release](https://github.com/Corfirean/coa-server-build/releases/tag/server-0.261023.76) · [Source changes](https://github.com/Corfirean/coa-server-build/compare/server-0.261022.75...server-0.261023.76)
+
 ## 0.261022.75 — 2026-10-22
 
 **Portable Characters are experimental and may contain bugs.**
