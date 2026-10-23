@@ -14,7 +14,7 @@ SQUID is `Zyth45/mod-playerbots`, highest stable numeric `v*` tag. Manager tooli
 1. Fetch the relevant repositories. Record exact upstream, race tag/commit, SQUID tag/commit and companion/scaling SHAs.
 2. On an isolated core branch based on `origin/coa-bots`, merge the fetched upstream and race release. Resolve conflicts
    by examining both changes and their callers. Review new race SQL and convert required changes to immutable pending
-   migrations under the core repository's rules. Do not merge the excluded portable-character/session branches.
+   migrations under the core repository's rules. Keep portable-character/session branches excluded unless the owner explicitly requests an experimental Portable Characters candidate. For that candidate, integrate both the Manager and core bridge, and pass `experimental_portable=true` to `build.yml`; its frozen lock records the experimental feature instead of listing those branches as excluded. Never imply stable promotion from this option.
    Inspect mandatory SQL shipped under module `base/` and nested `updates/` directories as well: the release
    collector does not automatically apply either location to an existing installation. Port required, reviewed
    schema/data changes into pending migrations. Keep authored snapshot ordering, ownership guards and player data;
@@ -62,6 +62,20 @@ Packaging verifies signatures and frozen fixtures, applies SQL in an isolated da
 qualifies a clean installer, and tests representative direct Manager upgrades. The full historical upgrade matrix is
 separate (`direct-upgrade-tests.yml`). Report the actual tested scope; an unrun gate is never a pass.
 
+When the owner requests compatibility with every previous version, run the full historical matrix against the
+exact newly published candidate, not the current stable by default:
+
+```powershell
+gh workflow run direct-upgrade-tests.yml -R Corfirean/coa-server-build --ref <reviewed-pipeline-ref> `
+  -f manager_ref=<candidate-locked-manager-sha> -f target_version=<candidate-version>
+```
+
+This does not promote stable or compile the server again. Preserve `direct-upgrade-lock.json` and require the final
+`report` job to pass for every frozen source. Each source must have its own passing Manager transaction, database
+schema/startup and preservation report; a manifest/hash audit alone is not update qualification. Report the actual
+number and range of available signed Windows versions. Unknown imported installations, removed historical packages
+and manually modified databases are not covered merely by a version label. Keep their limits explicit.
+
 For an upstream integration, preflight SQL locally on a disposable copy of the exact signed base with the pinned
 Manager's `extract-schema-base`, `schema-contract` and `qualify-startup` commands before the final GitHub build.
 Keep a pristine fixture for retries after a failed migration; do not repair its ledger manually. Assign free ports
@@ -87,6 +101,8 @@ gh workflow run release.yml -R Corfirean/coa-server-manager --ref <manager-ref> 
 Preserve `prepared-manager-windows` (installer, updater signature, `latest.json`, source/hash metadata). On the owner's
 publication command, verify those hashes/signatures and publish the exact prepared assets under `v<manager-version>`
 if a compatible Manager is not already available. Never run a publishing workflow just to test installer compilation.
+
+Creating a Manager release can also emit a tag-push event. The Manager release-intent guard must preserve an already published release, including its prerelease status and exact prepared assets. For a candidate, use `--prerelease --latest=false` and verify `/releases/latest` still names the prior stable Manager. If an old prepared source predates that guard, prevent its duplicate tag-triggered publishing job from overwriting the candidate; do not treat an automatic publishing run as authorization to replace prepared assets or mark the candidate stable.
 
 After the owner explicitly approves the identified prepared candidate, dispatch `publish-prepared.yml` with its build
 run ID. It verifies source-run identity, signed metadata, installer and package contents, then publishes the exact
@@ -200,6 +216,12 @@ required merely because optional local acceptance or Linux checks were not run.
 Measured reference: the2026-10-19 persistent-PC verification-only run39268500611 took83 seconds with a warm cache.
 That is not a cold-cache guarantee and does not include server compilation or local gameplay acceptance. Normal
 promotion should reuse both tools and packages; only missing/changed verified assets need downloading.
+
+## Persistent PC network preparation
+
+On this PC the existing runner's `.env` also enables `ACTIONS_RUNNER_ACTION_ARCHIVE_CACHE=C:/games/coa-build-runner/action-archive-cache` and `DOTNET_SYSTEM_NET_DISABLEIPV6=1`. These are process settings, not Windows network policy changes. The official runner reads ZIP archives from `<cache>/<owner>_<repository>/<resolved-commit>.zip`; keep exact immutable commit archives and validate the ZIP before caching it. The 2026-10-21 preparation found repeated 100-second action downloads, while an isolated .NET download took 107.421 seconds normally and 1.380 seconds with IPv6 disabled. See Microsoft's [.NET IPv6 configuration](https://learn.microsoft.com/en-us/dotnet/framework/network-programming/internet-protocol-version-6) and the official [runner action manager](https://github.com/actions/runner/blob/main/src/Runner.Worker/ActionManager.cs).
+
+Windows compilation fetches only the frozen core commit; the separate POSIX job retains full-history source verification. If network preparation needs a local Git object cache, prepare a valid detached checkout of that exact SHA while the runner is idle, before dispatching. An unborn repository is discarded by checkout and loses its cache. Never change an active checkout or use a different source revision to avoid a download. Do not restart a runner during compilation. Preserve the source lock, existing compiler outputs and actual attempt diagnostics when recovering a failed network preparation.
 
 ## Handoff between agents
 

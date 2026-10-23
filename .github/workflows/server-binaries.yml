@@ -77,7 +77,7 @@ jobs:
         with:
           repository: Corfirean/azerothcore-wotlk-coa
           ref: ${{ inputs.core_ref || 'coa-bots' }}
-          fetch-depth: 0
+          fetch-depth: 1
       - name: Locate PowerShell 7 on the dedicated runner
         if: runner.environment == 'self-hosted'
         shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}

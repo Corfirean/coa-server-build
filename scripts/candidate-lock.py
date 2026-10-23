@@ -26,7 +26,8 @@ def freeze(path):
     else:
         lock = daily.resolve(refs['core'], refs['manager'], refs['bots'], refs['scaling'], refs['squid'],
                              upstream_ref=os.environ.get('UPSTREAM_REF') or 'main',
-                             races_ref=os.environ.get('RACES_REF') or 'latest-release')
+                             races_ref=os.environ.get('RACES_REF') or 'latest-release',
+                             experimental_portable=os.environ.get('EXPERIMENTAL_PORTABLE') == 'true')
         daily.check_integration(lock)
         # Coverage is not an updater allowlist. Keep full history for independent
         # parallel acceptance, with three representative upgrades in packaging.

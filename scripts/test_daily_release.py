@@ -36,6 +36,20 @@ class IntegrationTests(unittest.TestCase):
             lock = daily.resolve(races_ref='coa-custom-1.8')
         self.assertEqual(lock['components']['races']['sha'], 'refs/tags/coa-custom-1.8')
 
+    def test_experimental_portable_is_explicit_in_candidate_metadata(self):
+        def api(endpoint):
+            if '/releases/' in endpoint:
+                return {'tag_name': 'coa-custom-1.8', 'assets': []}
+            if '/tags?' in endpoint:
+                return [{'name': 'v2.6', 'commit': {'sha': 'squid-sha'}}]
+            raise AssertionError(endpoint)
+        with patch.object(daily, 'gh', side_effect=api), patch.object(daily, 'revision', return_value='frozen'):
+            normal = daily.resolve()
+            experimental = daily.resolve(experimental_portable=True)
+        self.assertEqual(normal['excludedBranches'], ['feat/portable-characters', 'feat/portable-session-bridge'])
+        self.assertEqual(experimental['excludedBranches'], [])
+        self.assertEqual(experimental['experimentalFeatures'], ['portable-characters'])
+
     def lock(self):
         return {"components": {
             "core": {"repository": "owner/core", "sha": "candidate"},

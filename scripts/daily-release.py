@@ -15,7 +15,7 @@ def revision(repo, ref):
     return gh(f"repos/{repo}/commits/{ref}")["sha"]
 
 
-def resolve(core_ref="coa-bots", manager_ref="master", bots_ref="master", scaling_ref="main", squid_ref="latest-release", upstream_ref="main", races_ref="latest-release"):
+def resolve(core_ref="coa-bots", manager_ref="master", bots_ref="master", scaling_ref="main", squid_ref="latest-release", upstream_ref="main", races_ref="latest-release", experimental_portable=False):
     races_path = "latest" if races_ref == "latest-release" else "tags/" + races_ref
     races = gh("repos/ilusixn/azerothcore-wotlk-coa/releases/" + races_path)
     tags = gh("repos/Zyth45/mod-playerbots/tags?per_page=100")
@@ -51,7 +51,9 @@ def resolve(core_ref="coa-bots", manager_ref="master", bots_ref="master", scalin
     if navigation.exists():
         components['navigation'] = json.loads(navigation.read_text(encoding='utf-8'))
     lock = {"schema": 1, "components": components,
-            "excludedBranches": ["feat/portable-characters", "feat/portable-session-bridge"]}
+            "excludedBranches": [] if experimental_portable else ["feat/portable-characters", "feat/portable-session-bridge"]}
+    if experimental_portable:
+        lock["experimentalFeatures"] = ["portable-characters"]
     lock["snapshot"] = snapshot(components)
     return lock
 
