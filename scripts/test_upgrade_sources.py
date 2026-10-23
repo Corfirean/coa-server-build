@@ -57,6 +57,19 @@ class SourceTests(unittest.TestCase):
                 sources.download(lock, Path('unused'))
             fetch.assert_not_called()
 
+    def test_matrix_downloads_only_base_and_selected_stable(self):
+        lock = self.lock()
+        with tempfile.TemporaryDirectory() as directory, patch.object(sources, 'fetch', return_value=b'original') as fetch:
+            folder = Path(directory)
+            sources.download(lock, folder, ['base', 'stable-2'])
+            self.assertEqual(fetch.call_count, 4)
+            self.assertTrue((folder / 'base/manifest.json').exists())
+            self.assertTrue((folder / 'stable-2/manifest.json').exists())
+            self.assertFalse((folder / 'stable-1').exists())
+        self.assertEqual([s['role'] for s in sources.selected_sources(lock, ['base', 'base'])], ['base'])
+        with self.assertRaises(RuntimeError):
+            sources.selected_sources(lock, ['../outside'])
+
     def lock(self):
         return {'upgradeSources': [{'role': role, 'assets': {name: {
             'url': 'https://github.com/Corfirean/coa-server-build/releases/download/stable/' + name,

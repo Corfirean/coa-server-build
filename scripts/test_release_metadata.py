@@ -20,6 +20,50 @@ promote = load('promote-channel')
 
 
 class MetadataTests(unittest.TestCase):
+    def collect_windows(self, altered_role=None, missing_step=None):
+        self.lock['upgradeSources'] = [
+            {'role': role, 'version': '0.261010.' + str(index), 'manifestSha256': role + '-manifest'}
+            for index, role in enumerate(('base', 'stable-1', 'stable-2'))]
+        self.manifest['compatibility']['sourceDatabases'] = {
+            source['version']: {'schemaSha256': source['role'] + '-schema'}
+            for source in self.lock['upgradeSources']}
+        (self.folder / 'manifest.json').write_text(json.dumps(self.manifest))
+        for source in self.lock['upgradeSources']:
+            report = {'result': 'passed', 'toVersion': self.manifest['version'],
+                      'fromVersion': source['version'], 'fromManifestSha256': source['manifestSha256'],
+                      'fromSchemaSha256': source['role'] + '-schema',
+                      'candidateManifestSha256': metadata.digest(self.folder / 'manifest.json')}
+            if source['role'] == altered_role:
+                report['candidateManifestSha256'] = 'different-candidate'
+            (self.folder / (source['role'] + '.json')).write_text(json.dumps(report))
+        lock_path = self.folder / 'input-lock.json'
+        lock_path.write_text(json.dumps(self.lock))
+        def steps(repo, run, names):
+            jobs = [{'html_url': 'https://github.com/owner/repo/actions/runs/1/job/' + gate,
+                     'steps': [{'name': name, 'number': 1, 'conclusion': 'success'}]}
+                    for name, gate in {name: gate for gate, name in names.items()}.items() if name != missing_step]
+            with patch.object(metadata, 'api', return_value={'jobs': jobs}):
+                return original_steps(repo, run, names)
+        original_steps = metadata.evidence_steps
+        with patch.dict('os.environ', {'GITHUB_REPOSITORY': 'owner/repo', 'GITHUB_RUN_ID': '1'}), \
+                patch.object(metadata, 'evidence_steps', side_effect=steps), patch.object(metadata, 'validate'):
+            metadata.collect(self.folder, lock_path, 'windows-x86_64', self.folder, '')
+        return metadata.read(self.folder / 'qualification.json')['platforms']['windows-x86_64']
+
+    def test_matrix_reports_keep_individual_successful_job_evidence(self):
+        checks = self.collect_windows()
+        self.assertEqual(len(checks['manager-update']['scenarios']), 3)
+        for role in ('base', 'stable-1', 'stable-2'):
+            self.assertIn('/job/upgrade-' + role, checks['upgrade-' + role]['evidence'])
+
+    def test_same_version_report_from_other_candidate_is_rejected(self):
+        with self.assertRaisesRegex(RuntimeError, 'different candidate: stable-1'):
+            self.collect_windows(altered_role='stable-1')
+
+    def test_missing_matrix_job_blocks_publication(self):
+        with self.assertRaisesRegex(RuntimeError, 'Missing or ambiguous successful step'):
+            self.collect_windows(missing_step='Qualify Manager upgrade from stable-2')
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
