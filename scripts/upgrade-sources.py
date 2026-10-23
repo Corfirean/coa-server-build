@@ -98,10 +98,16 @@ def resolve():
     return result
 
 
-def download(lock, folder):
+def selected_sources(lock, roles=None):
     sources = lock['upgradeSources']
     validate_roles(sources)
-    for item in sources:
+    if roles is not None and (not roles or not set(roles) <= {s['role'] for s in sources}):
+        raise RuntimeError('Invalid requested upgrade fixture roles')
+    return [item for item in sources if roles is None or item['role'] in roles]
+
+
+def download(lock, folder, roles=None):
+    for item in selected_sources(lock, roles):
         package = folder / item['role']
         package.mkdir(parents=True, exist_ok=True)
         for name in ('manifest.json', 'manifest.json.sig'):
@@ -149,13 +155,11 @@ def download_part(url, target, size, digest):
             temporary.unlink(missing_ok=True)
 
 
-def download_packages(lock, folder, tool, role=None):
-    download(lock, folder)
-    if role is not None and role not in [s['role'] for s in lock['upgradeSources']]:
-        raise RuntimeError('Unknown upgrade fixture role')
-    for item in lock['upgradeSources']:
-        if role is not None and item['role'] != role:
-            continue
+def download_packages(lock, folder, tool, role=None, *, roles=None):
+    if role is not None:
+        roles = [role]
+    download(lock, folder, roles)
+    for item in selected_sources(lock, roles):
         package = folder / item['role']
         # Parse archive paths only after the Manager validates the manifest signature and structure.
         subprocess.run([str(tool), 'verify-manifest', '--dir', str(package)], check=True)
@@ -186,16 +190,19 @@ if __name__ == '__main__':
     parser.add_argument('--download', type=Path)
     parser.add_argument('--packages', action='store_true')
     parser.add_argument('--tool', type=Path)
-    parser.add_argument('--role', help='Download archives only for this frozen source; manifests remain complete')
+    parser.add_argument('--roles', help='Comma-separated frozen fixture roles to download')
+    parser.add_argument('--role', help='One frozen fixture role to download')
     args = parser.parse_args()
+    if args.role and args.roles:
+        parser.error('--role and --roles cannot be combined')
     lock = json.loads(args.lock.read_text(encoding='utf-8-sig'))
     if args.download:
         if args.packages:
             if not args.tool:
                 parser.error('--packages requires --tool')
-            download_packages(lock, args.download, args.tool.resolve(), args.role)
+            download_packages(lock, args.download, args.tool.resolve(), args.role, roles=args.roles.split(',') if args.roles else None)
         else:
-            download(lock, args.download)
+            download(lock, args.download, args.roles.split(',') if args.roles else None)
     else:
         if args.packages:
             parser.error('--packages requires --download')

@@ -98,6 +98,18 @@ the manual `manager_ref` input permits testing its branch without changing the p
 
 ## Candidate metadata and compiler caches
 
+Windows release jobs separate packaging, upgrade qualification and publication. Packaging preserves the signed
+candidate, the qualified installer and the exact release-tool executable as 14-day workflow artifacts. The installer
+is stored separately so the three upgrade jobs download only the update package. Each matrix job verifies the
+candidate manifest identity, downloads only its frozen base/source fixtures, and runs the real Manager transaction
+for `base`, `stable-1` or `stable-2`. A failure does not cancel the other scenarios.
+
+Publication requires packaging and every upgrade job to succeed. Each upgrade report must match the exact packaged
+manifest SHA256 as well as the frozen source manifest, version and database schema. The final signed qualification
+records the individual scenario job links. Failed jobs can be rerun from Actions without rebuilding successful binary
+or package jobs; the preserved candidate and fixture lock are reused. Artifact expiry requires a new build. Splitting
+the jobs adds artifact transfer and fixture downloads; the full server timing must be measured on a release run.
+
 Manual and daily builds freeze all source revisions and the three signed upgrade fixtures before compilation.
 Daily Windows/Linux jobs use the same snapshot; manual runs cannot bypass integration or compatibility checks.
 Every new candidate includes `release-lock.json`, `compatibility-matrix.json`, and `qualification.json`.
