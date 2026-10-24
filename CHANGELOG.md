@@ -8,6 +8,53 @@ Published releases and previews. Pre-release entries do not change the stable up
 
 Dates follow GitHub publication (UTC); legacy records retain their archived dates. Newest releases first.
 
+## 0.261024.79 (Pre-release) — 2026-10-24
+
+**Portable Characters are experimental and may contain bugs.**
+
+- TimeIsTime is included in server packages.
+- Hellfire Bellows replaces Flames of Xoroth for Knights of Xoroth.
+- Bulwark of Xoroth applies Torn Flesh with every Shieldgore rank.
+- Ranger Skinning no longer consumes a primary profession slot.
+- Glorious Execution returns mana based on the damage shown to the player.
+- Witch Hunters can use one-handed maces.
+- Flay Corpse leaves a pile of flesh.
+- Whispers of the Old Gods can trigger from Shadow Word: Pain.
+- Creatures on the classic continents stop scaling at level 63.
+- Mercenaries can attack members of their own faction.
+- Temporal Resilience triggers Temporally Warped.
+- Game masters can move equipped items to bags or mail with gear unequip.
+- Trainers refuse a new profession when both profession slots are occupied.
+- Tentacle of C'Thun uses its intended size, targets and armor.
+- Rivenruin Myrmidons and Sorceresses drop loot.
+- The Worldforged Grimtotem Bow rests on the ground at Three Totems.
+- Shadewell Spring has one Worldforged Shadewell Stabber pickup.
+- Presence of N'Zoth grows its tentacle from the caster.
+- Guiding Glow charges and Radiance cooldowns behave consistently.
+- Class bundles open when used.
+- Sigil collection companions can be summoned with their intended names.
+- Tiraxis uses revised prices for heirlooms and heirloom caches.
+- Legendary items stop dropping at level 45 and their powers stop at level 60.
+- Rocket Boots can launch a moving Tinker.
+- Full vanity collection grants skip companions that cannot be summoned.
+- Road to De Other Side returns with bosses, quests and dungeon difficulties.
+- Vanity Store prices follow the item category.
+- The Vanity Store no longer sells Felforged riding tomes.
+- The Fargodeep Mine marker appears at Fargodeep.
+- Goblin Salvage Project quests reward Lootbot 3000.
+- Discover Rolf's Fate scales with the other Elwynn quests.
+- Rank one of Taldaram's Torment triggers its Rage tick.
+- Mystic Enchant guides can learn enchants they do not yet know.
+- Goblin Salvage Project quests cover levels 30 through 60.
+- Goblin Salvage Project quest drops show in item tooltips.
+- Aliscar stops listing lessons when the player leaves early.
+- Road to De Other Side scales with the player like classic dungeons.
+- The Crash Site Proximity Bomb field is restored in Dun Morogh.
+- Switching specializations no longer clears action bars at login.
+- Updated the reviewed CoA upstream snapshot.
+
+[Release](https://github.com/Corfirean/coa-server-build/releases/tag/server-0.261024.79) · [Source changes](https://github.com/Corfirean/coa-server-build/compare/server-0.261023.76...server-0.261024.79)
+
 ## 0.261023.76 — 2026-10-23
 
 **Portable Characters are experimental and may contain bugs.**
