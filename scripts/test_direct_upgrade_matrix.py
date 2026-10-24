@@ -19,11 +19,39 @@ class DirectUpgradeTests(unittest.TestCase):
         self.sources = [{'role': role, 'version': version, 'manifestSha256': 'a' * 64} for role, version in
                         [('base', '0.2.0'), ('stable-1', '0.261015.58'), ('stable-2', '0.261013.54'), ('stable-3', '0.261005.0')]]
 
-    def freeze(self, version=''):
+    def freeze(self, version='', prepared=None):
         with patch.object(direct.upgrades, 'resolve', return_value=self.sources), \
              patch.object(direct.subprocess, 'check_output', return_value=json.dumps({'sha': 'b' * 40})), \
              patch.dict(os.environ, {'GITHUB_OUTPUT': str(self.root / 'outputs')}):
-            return direct.freeze('master', version, self.root / 'lock.json')
+            return direct.freeze('master', version, self.root / 'lock.json', prepared)
+
+    def prepared(self, manager='b' * 40):
+        folder = self.root / 'prepared'
+        folder.mkdir(exist_ok=True)
+        (folder / 'manifest.json').write_text(json.dumps({'kind': 'update', 'version': '0.261024.1'}))
+        (folder / 'release-lock.json').write_text(json.dumps({'components': {'manager': {'sha': manager}}}))
+        return folder
+
+    def test_unpublished_prepared_target_freezes_every_source_and_self_update(self):
+        folder = self.prepared()
+        lock = self.freeze(prepared=folder)
+        self.assertEqual(lock['targetVersion'], '0.261024.1')
+        self.assertEqual(lock['targetRole'], 'stable-4')
+        self.assertEqual(len(lock['testedRoles']), 5)
+        self.assertEqual(lock['upgradeSources'][-1]['manifestSha256'],
+                         direct.hashlib.sha256((folder / 'manifest.json').read_bytes()).hexdigest())
+
+    def test_prepared_target_rejects_different_manager_or_requested_version(self):
+        with self.assertRaisesRegex(RuntimeError, 'Manager differs'):
+            self.freeze(prepared=self.prepared('c' * 40))
+        with self.assertRaisesRegex(RuntimeError, 'version differs'):
+            self.freeze('0.261024.99', self.prepared())
+
+    def test_prepared_target_cannot_replace_different_published_bytes(self):
+        folder = self.prepared()
+        (folder / 'manifest.json').write_text(json.dumps({'kind': 'update', 'version': self.sources[1]['version']}))
+        with self.assertRaisesRegex(RuntimeError, 'differs from the published'):
+            self.freeze(prepared=folder)
 
     def test_latest_and_older_target_freeze_exact_manager_and_eligible_sources(self):
         lock = self.freeze()
