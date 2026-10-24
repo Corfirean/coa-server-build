@@ -8,8 +8,12 @@ on:
       target_version:
         description: Signed server version (empty selects current stable)
         default: ''
+      candidate_run_id:
+        description: Successful prepare-only build run (empty uses a published target)
+        default: ''
 permissions:
   contents: read
+  actions: read
 jobs:
   tool:
     runs-on: windows-latest
@@ -18,15 +22,34 @@ jobs:
       GH_TOKEN: ${{ github.token }}
     outputs:
       matrix: ${{ steps.freeze.outputs.matrix }}
+      target_role: ${{ steps.freeze.outputs.target_role }}
     steps:
       - uses: actions/checkout@v7
+      - name: Require a successful candidate preparation
+        if: inputs.candidate_run_id != ''
+        shell: pwsh
+        env:
+          CANDIDATE_RUN: ${{ inputs.candidate_run_id }}
+        run: |
+          if ($env:CANDIDATE_RUN -notmatch '^\d+$') { throw 'Invalid candidate run' }
+          $run = gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/$env:CANDIDATE_RUN" | ConvertFrom-Json
+          if ($LASTEXITCODE -or $run.conclusion -ne 'success' -or $run.path -ne '.github/workflows/build.yml') { throw 'Candidate must come from successful build preparation' }
+      - uses: actions/download-artifact@v4
+        if: inputs.candidate_run_id != ''
+        with:
+          name: windows-qualified-candidate
+          run-id: ${{ inputs.candidate_run_id }}
+          github-token: ${{ github.token }}
+          path: _prepared
       - name: Freeze all source manifests and the Manager revision
         id: freeze
         env:
           MANAGER_REF: ${{ inputs.manager_ref }}
           TARGET_VERSION: ${{ inputs.target_version }}
         shell: pwsh
-        run: python scripts/direct-upgrade-matrix.py
+        run: |
+          if (Test-Path _prepared) { python scripts/direct-upgrade-matrix.py --prepared _prepared }
+          else { python scripts/direct-upgrade-matrix.py }
       - uses: actions/checkout@v7
         with:
           repository: Corfirean/coa-server-manager
@@ -42,6 +65,29 @@ jobs:
           restore-keys: trusted-direct-tool-${{ runner.os }}-
       - name: Build the release verifier and production updater once
         run: cargo build --release --locked -p coa-release --manifest-path _manager/Cargo.toml
+      - name: Verify the exact signed prepared package
+        if: inputs.candidate_run_id != ''
+        shell: pwsh
+        run: |
+          & _manager/target/release/coa-release.exe verify --dir _prepared
+          if ($LASTEXITCODE) { throw 'Prepared signature or package verification failed' }
+          & _manager/target/release/coa-release.exe verify-install --dir _prepared
+          if ($LASTEXITCODE) { throw 'Prepared installer verification failed' }
+          python scripts/release-metadata.py --dir _prepared --verify
+          if ($LASTEXITCODE) { throw 'Prepared metadata verification failed' }
+      - uses: actions/upload-artifact@v4
+        if: inputs.candidate_run_id != ''
+        with:
+          name: prepared-direct-candidate
+          path: |
+            _prepared/base.tar.zst.*
+            _prepared/manifest.json
+            _prepared/manifest.json.sig
+            _prepared/release-lock.json
+            _prepared/qualification.json
+            _prepared/compatibility-matrix.json
+          if-no-files-found: error
+          retention-days: 7
       - uses: actions/upload-artifact@v4
         with:
           name: direct-upgrade-tool
@@ -65,12 +111,18 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: direct-upgrade-tool
+      - uses: actions/download-artifact@v4
+        if: inputs.candidate_run_id != ''
+        with:
+          name: prepared-direct-candidate
+          path: _sources/${{ needs.tool.outputs.target_role }}
       - name: Verify and qualify the direct update
         shell: pwsh
         run: |
           $lock = Get-Content direct-upgrade-lock.json -Raw | ConvertFrom-Json
           $tool = '_manager/target/release/coa-release.exe'
           foreach ($role in @('base', $lock.targetRole, $env:SOURCE_ROLE) | Select-Object -Unique) {
+            if (Test-Path "_sources/$role/qualification.json") { continue }
             python scripts/upgrade-sources.py --lock direct-upgrade-lock.json --download _sources --packages --role $role --tool $tool
             if ($LASTEXITCODE) { throw "Source verification failed: $role" }
           }
