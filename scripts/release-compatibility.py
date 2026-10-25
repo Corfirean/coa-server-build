@@ -71,6 +71,8 @@ def apply(folder, lock_path, sources_folder, platform, tool, schema_base=None):
 
 def minimum_manager(requested, client_patch_version):
     # Earlier public Managers treated test coverage as an exclusive allowlist.
+    if tuple(int(part) for part in client_patch_version.split('.')) >= (1, 9):
+        return max((requested, '0.8.1'), key=lambda version: tuple(int(part) for part in version.split('.')))
     floor = '0.6.22' if tuple(int(part) for part in client_patch_version.split('.')) >= (1, 8) else '0.6.21'
     return max((requested, floor), key=lambda version: tuple(int(part) for part in version.split('.')))
 
