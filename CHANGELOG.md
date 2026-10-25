@@ -12,11 +12,14 @@ Dates follow GitHub publication (UTC); legacy records retain their archived date
 
 **Portable Characters are experimental and may contain bugs.**
 
-- Custom races updated to CoA Custom 1.9.1.
-- SQUID bots updated to 2.7.
-- Updated Custom Races to 1.9.1.
-- Updated SQUID Playerbots to 2.7.
-- Updated the reviewed CoA upstream snapshot.
+- Updated CoA Custom to 1.9.1 with new races, racial abilities and appearance corrections.
+- Updated SQUID Playerbots to 2.7 with upstream raid tactics, resurrection and Reborn build improvements.
+- Imported upstream fixes for server crashes, raid and dungeon encounters, loot and quests.
+- Monster magic resistance is enabled by the upstream defaults.
+- Cross-faction trade and mail settings are restored by the upstream update.
+- Imported upstream filtering for offensive character names, including disguised spellings.
+- New upstream defaults reduce profession experience and disable experience from smelting.
+- Requires Manager 0.8.1 to install the matching custom-race client files.
 
 [Release](https://github.com/Corfirean/coa-server-build/releases/tag/server-0.261025.80) · [Source changes](https://github.com/Corfirean/coa-server-build/compare/server-0.261024.79...server-0.261025.80)
 
