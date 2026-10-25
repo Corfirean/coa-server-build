@@ -14,6 +14,8 @@ spec.loader.exec_module(compatibility)
 
 class CompatibilityTests(unittest.TestCase):
     def test_esteria_release_requires_matching_client_installer(self):
+        self.assertEqual(compatibility.minimum_manager('0.8.0', '1.9.1'), '0.8.1')
+        self.assertEqual(compatibility.minimum_manager('0.9.0', '1.9.1'), '0.9.0')
         self.assertEqual(compatibility.minimum_manager('0.6.21', '1.8'), '0.6.22')
         self.assertEqual(compatibility.minimum_manager('0.7.0', '1.8'), '0.7.0')
         self.assertEqual(compatibility.minimum_manager('0.6.20', '1.7'), '0.6.21')
