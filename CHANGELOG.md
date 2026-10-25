@@ -8,6 +8,18 @@ Published releases and previews. Pre-release entries do not change the stable up
 
 Dates follow GitHub publication (UTC); legacy records retain their archived dates. Newest releases first.
 
+## 0.261025.80 (Pre-release) — 2026-10-25
+
+**Portable Characters are experimental and may contain bugs.**
+
+- Custom races updated to CoA Custom 1.9.1.
+- SQUID bots updated to 2.7.
+- Updated Custom Races to 1.9.1.
+- Updated SQUID Playerbots to 2.7.
+- Updated the reviewed CoA upstream snapshot.
+
+[Release](https://github.com/Corfirean/coa-server-build/releases/tag/server-0.261025.80) · [Source changes](https://github.com/Corfirean/coa-server-build/compare/server-0.261024.79...server-0.261025.80)
+
 ## 0.261024.79 — 2026-10-24
 
 **Portable Characters are experimental and may contain bugs.**
