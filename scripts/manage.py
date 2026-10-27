@@ -428,7 +428,11 @@ def ra(command, config):
 def stop_all(config):
     world = process("world")
     if world:
-        print(ra("server shutdown 1s 0", config), flush=True)
+        try:
+            print(ra("server shutdown 1s 0", config), flush=True)
+        except (OSError, RuntimeError):
+            print("World console unavailable; stopping this repack's recorded world process.", flush=True)
+            terminate(world)
         if not wait_stopped(world, 90):
             raise RuntimeError("Worldserver is still stopping; its database has been left running.")
     supervisor = process("supervisor")
