@@ -62,5 +62,43 @@ class ShutdownDispatchTests(unittest.TestCase):
             self.assertNotIn(credentials["appPassword"], message)
 
 
+class StartingWorldShutdownTests(unittest.TestCase):
+    def shutdown(self, console_error=None, stopped=True):
+        source = ast.parse(Path(__file__).with_name("manage.py").read_text(encoding="utf-8"))
+        stop = next(node for node in source.body if isinstance(node, ast.FunctionDef) and node.name == "stop_all")
+        world = {"pid": 101, "created": 10}
+        database = {"pid": 102, "created": 20}
+        events = []
+        namespace = {
+            "process": lambda name: {"world": world, "mysql": database}.get(name),
+            "ra": Mock(side_effect=console_error, return_value="Shutdown requested"),
+            "terminate": Mock(side_effect=lambda record: events.append(("terminate", record))),
+            "wait_stopped": Mock(side_effect=lambda record, seconds: events.append(("wait", record)) or stopped),
+            "mysql": Mock(side_effect=lambda **kwargs: events.append(("mysql", kwargs))),
+        }
+        exec(compile(ast.Module(body=[stop], type_ignores=[]), "manage.py", "exec"), namespace)
+        return namespace, world, database, events
+
+    def test_unavailable_console_stops_owned_world_before_database(self):
+        for error in [RuntimeError("Start this repack's worldserver first."), OSError("Connection refused")]:
+            with self.subTest(error=type(error).__name__):
+                namespace, world, database, events = self.shutdown(error)
+                namespace["stop_all"]({})
+                self.assertEqual(events, [("terminate", world), ("wait", world), ("mysql", {"admin": "shutdown"}), ("wait", database)])
+
+    def test_a_world_that_does_not_stop_keeps_database_running(self):
+        namespace, world, _, events = self.shutdown(RuntimeError("Console unavailable"), False)
+        with self.assertRaisesRegex(RuntimeError, "database has been left running"):
+            namespace["stop_all"]({})
+        namespace["mysql"].assert_not_called()
+        self.assertEqual(events, [("terminate", world), ("wait", world)])
+
+    def test_healthy_world_keeps_graceful_shutdown(self):
+        namespace, world, database, events = self.shutdown()
+        namespace["stop_all"]({})
+        namespace["terminate"].assert_not_called()
+        self.assertEqual(events, [("wait", world), ("mysql", {"admin": "shutdown"}), ("wait", database)])
+
+
 if __name__ == "__main__":
     unittest.main()
