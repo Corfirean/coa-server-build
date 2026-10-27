@@ -12,10 +12,12 @@ Dates follow GitHub publication (UTC); legacy records retain their archived date
 
 **Portable Characters are experimental and may contain bugs.**
 
-- Update CoA Custom races with Hozen and Centaur corrections.
-- Update upstream class mechanics, quests and battlegrounds.
-- Updated Custom Races to 1.9.2.
-- Updated the reviewed CoA upstream snapshot.
+- Imported 115 upstream commits covering class abilities, quests, Molten Core, world placement, cross-faction battleground queues and open-world creature damage.
+- Imported upstream item-power changes: PvE and PvP Power use the matching client data when available.
+- Includes restored upstream Manastorm NPC objective icons and optional content-stage limits for cache progression; set Manastorm.FollowReleaseStage=1 to opt in.
+- Updated CoA Custom to 1.9.2, including Horde Hozen starts, Centaur visual corrections and custom-race reputation changes.
+- Requires Manager 0.8.2 to install the matching custom-race client files.
+- Custom-race bots remain experimental; the race upstream reports model and texture issues and client crashes for some races.
 
 [Release](https://github.com/Corfirean/coa-server-build/releases/tag/server-0.261026.81) · [Source changes](https://github.com/Corfirean/coa-server-build/compare/server-0.261025.80...server-0.261026.81)
 
