@@ -1306,7 +1306,7 @@
         "Bot economy errands skip groups, battlegrounds and dungeons",
         "Dungeon finder fills your group with bots that really join you",
         "Stop an unfinished server startup before restoring its database",
-        "Updated the reviewed CoA upstream snapshot"
+        "Imported 40 upstream commits with class, item and Pale Reach quest fixes, optional account-wide friends, and corrected Vanity purchases"
       ],
       "snapshot": "48632e51ca566bfc4b1d0bcd2753f73241231af241596ffe92ae1f8574b169ca",
       "components": {

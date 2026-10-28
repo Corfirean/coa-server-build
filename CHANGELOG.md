@@ -38,7 +38,7 @@ Dates follow GitHub publication (UTC); legacy records retain their archived date
 - Bot economy errands skip groups, battlegrounds and dungeons.
 - Dungeon finder fills your group with bots that really join you.
 - Stop an unfinished server startup before restoring its database.
-- Updated the reviewed CoA upstream snapshot.
+- Imported 40 upstream commits with class, item and Pale Reach quest fixes, optional account-wide friends, and corrected Vanity purchases.
 
 [Release](https://github.com/Corfirean/coa-server-build/releases/tag/server-0.261028.83) · [Source changes](https://github.com/Corfirean/coa-server-build/compare/server-0.261026.81...server-0.261028.83)
 
