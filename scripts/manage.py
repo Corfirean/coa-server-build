@@ -306,7 +306,7 @@ def mysql(sql=None, admin=None):
 def start_mysql(config):
     existing = process("mysql")
     if existing:
-        wait_ready("mysql", config["mysqlPort"], 60)
+        wait_ready("mysql", config["mysqlPort"], 300)
         mysql(admin="ping")
         print("MySQL is already running.", flush=True)
         return
@@ -316,7 +316,7 @@ def start_mysql(config):
     print("Starting MySQL...", flush=True)
     spawn("mysql", [ROOT / "mysql/bin/mysqld.exe", "--defaults-file=" + str(ROOT / "mysql/my.ini"), "--no-monitor"],
           ROOT / "mysql", ROOT / "mysql/logs/startup.log")
-    wait_ready("mysql", config["mysqlPort"], 60)
+    wait_ready("mysql", config["mysqlPort"], 300)
     mysql(admin="ping")
     mysql(f"UPDATE acore_auth.realmlist SET name='AzerothCore',address='127.0.0.1',"
           f"localAddress='127.0.0.1',port={config['worldPort']} WHERE id=1;")
