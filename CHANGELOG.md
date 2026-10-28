@@ -8,6 +8,40 @@ Published releases and previews. Pre-release entries do not change the stable up
 
 Dates follow GitHub publication (UTC); legacy records retain their archived dates. Newest releases first.
 
+## 0.261028.83 (Pre-release) — 2026-10-28
+
+**Portable Characters are experimental and may contain bugs.**
+
+- Restrict new characters by custom race without changing existing characters.
+- More class abilities, items and Pale Reach quests work as intended.
+- Witch Doctor and Guardian bots use their totems and standards, and fewer casts are refused.
+- Venomancer Fortitude tanks use their real defensive abilities.
+- Healer bots waste fewer big heals and tank bots spread their defensives.
+- Dungeon bots drink and rest until the tank is ready to go on.
+- Archery Rangers use Precision Shot and Brutal Shot.
+- Black Knight tank bots can pull in auto-dungeon mode.
+- Boltslinger bots use spells they actually know.
+- Bots with unsuitable gear are refitted at login.
+- Bots with full bags make room to hand in finished quests.
+- Bots pick weapons and shields for their combat spells, not for enchanting recipes.
+- Bots get their gear repaired and stop looping to the repairer.
+- Bots stay out of Outland and Northrend when those are not scaled to the level cap.
+- Bots plan long walks around areas too strong for them.
+- Dead bots run back to their bodies and come back healthy.
+- Meet travelling companions and rivals in dynamic open-world encounters.
+- New companions respect the server's custom race restrictions.
+- Ranged bots no longer stand still while Auto Shot or Shoot is active.
+- Battleground bots no longer travel in a straight line.
+- Far less server lag with hundreds of bots online.
+- Inspect the mana restoration spells recognized by an online companion.
+- Bots stop hitting mobs they cannot reach.
+- Bot economy errands skip groups, battlegrounds and dungeons.
+- Dungeon finder fills your group with bots that really join you.
+- Stop an unfinished server startup before restoring its database.
+- Updated the reviewed CoA upstream snapshot.
+
+[Release](https://github.com/Corfirean/coa-server-build/releases/tag/server-0.261028.83) · [Source changes](https://github.com/Corfirean/coa-server-build/compare/server-0.261026.81...server-0.261028.83)
+
 ## 0.261026.81 — 2026-10-27
 
 **Portable Characters are experimental and may contain bugs.**
