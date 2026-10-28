@@ -8,7 +8,7 @@ Published releases and previews. Pre-release entries do not change the stable up
 
 Dates follow GitHub publication (UTC); legacy records retain their archived dates. Newest releases first.
 
-## 0.261028.83 (Pre-release) — 2026-10-28
+## 0.261028.83 — 2026-10-28
 
 **Portable Characters are experimental and may contain bugs.**
 
