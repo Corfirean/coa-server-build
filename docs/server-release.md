@@ -166,7 +166,9 @@ required merely because optional local acceptance or Linux checks were not run.
    snapshot. Build/unit/startup/install/upgrade evidence is already produced by preparation; do not repeat the
    entire suite merely to move the channel. A relevant failure requires a fix and new candidate. Skipped local
    gameplay stays `not-run`; screenshots with mocked data do not establish compatibility or successful gameplay.
-4. **Publish the compatible Manager if needed.** An already prepared Manager installer should be published from
+4. **Prepare translated notes, then publish the compatible Manager if needed.** Before freezing a new Manager
+   source, complete the mandatory translated-notes checklist below for both components being prepared.
+   An already prepared Manager installer should be published from
    `prepared-manager-windows`, not rebuilt by dispatching `release.yml` again. Check `prepared-source.json` against
    the approved exact source/run/version, installer SHA-256 and `latest.json`; verify the updater signature with
    the matching released source's `src-tauri/tauri.conf.json` public key. Preserve the installer, `.sig`, `latest.json`
@@ -212,6 +214,35 @@ required merely because optional local acceptance or Linux checks were not run.
    the public pointer has refreshed. Player-facing release notes describe our authored changes; imported upstream
    or module changes must not be presented as our fixes. Prepare Discord text but send nothing without an explicit
    instruction to post it. Keep0.7.0 docs/screenshots awaiting review separate from a server release instruction.
+
+### Mandatory translated release notes during preparation
+
+- Review the exact English release record against the frozen shipped sources first. Server and Manager retain
+  separate canonical `changelog/history.json` records and English released fragments. Do not publish draft history
+  entries or edit released fragments to provide translations.
+- In the Manager source, prepare Russian, German, French, Spanish and Simplified Chinese translations of **every
+  note in each new reviewed record**, including server notes. English is the sixth supported language and remains
+  the source of truth. Store translations in `src/data/latest-note-translations.json`, under the correct component,
+  keyed by the exact English original. Preserve prior translations; a changed original needs a fresh translation.
+- Before building the Manager, refresh its bundled server-history snapshot from a pinned canonical build-repository
+  commit and record that provenance in `src/data/README.md`. If a server record is still a draft, translate the
+  reviewed record now and check it against the canonical record after publication; do not fabricate a published
+  entry to satisfy a test. Keep experimental notices equivalent in all six languages.
+- From the Manager checkout run `node --test tools/release-history.test.mjs`, `node tools/check-i18n.mjs` and
+  `npm run build`. Confirm complete translations of each new reviewed record, not only a passing check of the
+  previous bundled release. Review the history viewer in all six languages, the explicit English fallback for
+  older/untranslated records, and offline availability. Save exact source SHA and passed/failed/not-run scope.
+- Freeze these changes **before** preparing the Manager installer. After signing, never patch the installer or
+  rebuild verified bytes merely to update notes. A new Manager source requires a separately identified candidate
+  if that source must be delivered now.
+- Manager and server releases remain independent. Translations currently ship inside the Manager; fetching a new
+  canonical server history does not fetch new translations. For a server-only release, prepare its translation
+  change for the next Manager and record which shipped/prepared Manager contains it, or explicitly mark translation
+  delivery as pending. Do not claim existing Manager installations received new translations, force a Manager
+  publication, or rebuild the server just for notes. Untranslated records use the visible English fallback.
+- At handoff record both component versions, reviewed English record/source, translation commit, snapshot
+  provenance, checks, and the Manager version carrying the translations (or pending delivery). After publication
+  verify that canonical history, Markdown and GitHub notes match the reviewed originals used for translation.
 
 Measured reference: the2026-10-19 persistent-PC verification-only run39268500611 took83 seconds with a warm cache.
 That is not a cold-cache guarantee and does not include server compilation or local gameplay acceptance. Normal
