@@ -42,8 +42,8 @@ def validate_bots(root):
 
 
 def startup_timeout(root):
-    path, values = module_options(Path(root), "playerbots.conf")
-    return 1500 if path.exists() and enabled(values, "AiPlayerbot.Enabled") else 180
+    # CoA initialization can also exceed three minutes on slower disks.
+    return 1500
 
 
 def set_options(path, values):

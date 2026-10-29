@@ -13,7 +13,7 @@ from squid_playerbots import validate_bots, prepare_playerbots
 
 class IntegrationTests(unittest.TestCase):
     @unittest.skipUnless(os.name == "nt", "The repack launcher requires Windows")
-    def test_squid_world_can_become_ready_after_the_normal_startup_deadline(self):
+    def test_either_bot_system_can_become_ready_after_the_old_startup_deadline(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
             modules = root / "Core/configs/modules"
@@ -34,12 +34,28 @@ class IntegrationTests(unittest.TestCase):
                     ready=lambda name, port: state["time"] >= 200,
                     time=SimpleNamespace(monotonic=lambda: state["time"], sleep=sleep))
                 with patch("squid_playerbots.prepare_playerbots"):
-                    if enabled:
+                    launcher["start_world"]({"worldPort": 1, "raPort": 2}, 0)
+                    self.assertEqual(state["time"], 200)
+
+    @unittest.skipUnless(os.name == "nt", "The repack launcher requires Windows")
+    def test_existing_world_requires_console_and_both_ports_share_one_deadline(self):
+        for existing in (False, True):
+            with self.subTest(existing=existing), tempfile.TemporaryDirectory() as folder:
+                root = Path(folder)
+                launcher = runpy.run_path(str(Path(__file__).with_name("manage.py")))
+                state = {"time": 0, "spawned": existing}
+                def sleep(seconds): state["time"] += seconds
+                def spawn(*args): state["spawned"] = True
+                launcher["start_world"].__globals__.update(
+                    ROOT=root, STATE=root / ".state", start_mysql=lambda config: None,
+                    ensure_free=lambda port: None, wait_relay=lambda: None, spawn=spawn,
+                    process=lambda name: state["spawned"] if name in ("world", "supervisor") else None,
+                    ready=lambda name, port: state["time"] >= (1490 if port == 1 else 1510),
+                    time=SimpleNamespace(monotonic=lambda: state["time"], sleep=sleep))
+                with patch("squid_playerbots.prepare_playerbots"):
+                    with self.assertRaisesRegex(RuntimeError, "still starting"):
                         launcher["start_world"]({"worldPort": 1, "raPort": 2}, 0)
-                        self.assertEqual(state["time"], 200)
-                    else:
-                        with self.assertRaisesRegex(RuntimeError, "still starting"):
-                            launcher["start_world"]({"worldPort": 1, "raPort": 2}, 0)
+                self.assertEqual(state["time"], 1500)
 
     @unittest.skipUnless(os.name == "nt", "The repack launcher requires Windows")
     def test_large_import_does_not_use_the_normal_database_command_deadline(self):

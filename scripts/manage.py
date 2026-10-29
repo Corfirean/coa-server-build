@@ -345,7 +345,9 @@ def start_world(config, offset):
     if process("world"):
         if not process("supervisor"):
             raise RuntimeError("Worldserver has no repack supervisor. Use Stop_All_Server.bat before restarting it.")
+        until = time.monotonic() + seconds
         wait_ready("world", config["worldPort"], seconds)
+        wait_ready("world", config["raPort"], max(0, until - time.monotonic()))
         wait_relay()
         print("Worldserver and bug-report relay are already running.", flush=True)
         return
@@ -365,8 +367,9 @@ def start_world(config, offset):
         if not process("supervisor"):
             raise RuntimeError("World startup failed; check Core/Logs/supervisor.log.")
         time.sleep(0.25)
+    until = time.monotonic() + seconds
     wait_ready("world", config["worldPort"], seconds)
-    wait_ready("world", config["raPort"], seconds)
+    wait_ready("world", config["raPort"], max(0, until - time.monotonic()))
     wait_relay()
     print("Worldserver and automatic bug reporting are ready.", flush=True)
 
