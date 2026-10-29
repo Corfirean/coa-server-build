@@ -8,6 +8,19 @@ Published releases and previews. Pre-release entries do not change the stable up
 
 Dates follow GitHub publication (UTC); legacy records retain their archived dates. Newest releases first.
 
+## 0.261029.85 (Pre-release) — 2026-10-29
+
+**Portable Characters are experimental and may contain bugs.**
+
+- Dungeon scaling preserves the level differences between creatures.
+- Server includes newer upstream class, quest and dungeon updates.
+- Interactive World Map displays allied bots, guild tasks and events.
+- Normal Classic dungeons retain their authored damage at full party size.
+- Database startup allows time for slower hard drives.
+- Updated the reviewed CoA upstream snapshot.
+
+[Release](https://github.com/Corfirean/coa-server-build/releases/tag/server-0.261029.85) · [Source changes](https://github.com/Corfirean/coa-server-build/compare/server-0.261028.83...server-0.261029.85)
+
 ## 0.261028.83 — 2026-10-28
 
 **Portable Characters are experimental and may contain bugs.**
