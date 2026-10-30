@@ -8,6 +8,9 @@ spec.loader.exec_module(module)
 
 
 class BinaryReuse(unittest.TestCase):
+    def test_identical_sources_reuse_verified_binaries_without_recompilation(self):
+        module.validate_delta({'status': 'identical', 'files': []})
+
     def test_sql_only_delta_is_allowed(self):
         module.validate_delta({'status': 'ahead', 'files': [{'filename': 'data/sql/updates/pending_db_world/fix.sql'}]})
 
