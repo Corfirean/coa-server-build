@@ -3,6 +3,7 @@ import hashlib
 import json
 import shutil
 from pathlib import Path
+from migration_evidence import validate as validate_migrations
 
 
 def read(path):
@@ -60,6 +61,7 @@ def embed(installer, candidate, report):
     if (evidence.get('result') != 'passed' or evidence.get('version') != manifest['version']
             or evidence.get('manifestSha256') != digest(installer / 'manifest.json')):
         raise RuntimeError('Clean installation did not qualify these exact package bytes')
+    validate_migrations(evidence, release)
     files = {'install-manifest.json': installer / 'manifest.json',
              'install-manifest.json.sig': installer / 'manifest.json.sig',
              'install-qualification.json': report}
@@ -91,6 +93,7 @@ def validate(folder):
     if (report.get('result') != 'passed' or report.get('version') != release['version']
             or report.get('manifestSha256') != digest(folder / 'install-manifest.json')):
         raise RuntimeError('Installation qualification does not match the signed image')
+    validate_migrations(report, release)
 
 
 if __name__ == '__main__':

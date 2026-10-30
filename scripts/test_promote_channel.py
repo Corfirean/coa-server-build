@@ -60,12 +60,24 @@ class QualificationTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             promote.validate_report(report, 'candidate', 'version')
 
+    def test_recent_stable_policy_requires_both_stables_without_base(self):
+        report = self.report()
+        sources = ['0.261029.85', '0.261028.83']
+        for checks in report['platforms'].values():
+            checks.pop('upgrade-base', None)
+            for index, version in enumerate(sources, 1):
+                checks[f'upgrade-stable-{index}']['fromVersion'] = version
+        promote.validate_report(report, 'candidate', 'version', sources, upgrade_policy='recent-stable')
+        del report['platforms']['windows-x86_64']['upgrade-stable-2']
+        with self.assertRaises(RuntimeError):
+            promote.validate_report(report, 'candidate', 'version', sources, upgrade_policy='recent-stable')
+
     def test_upgrade_must_test_the_declared_source_version(self):
         report = self.report()
         sources = ['0.2.0', '0.261010.32', '0.261006.1']
         for checks in report['platforms'].values():
             for name, version in zip(('upgrade-base', 'upgrade-stable-1', 'upgrade-stable-2'), sources):
-                checks[name]['fromVersion'] = version
+                checks.setdefault(name, dict(checks['upgrade-stable-1']))['fromVersion'] = version
         promote.validate_report(report, 'candidate', 'version', sources)
         report['platforms']['windows-x86_64']['upgrade-stable-2']['fromVersion'] = '0.0.0'
         with self.assertRaises(RuntimeError):
@@ -77,7 +89,7 @@ class QualificationTests(unittest.TestCase):
         databases = {v: {'manifestSha256': 'a' * 64, 'schemaSha256': None} for v in sources}
         for checks in report['platforms'].values():
             for name, version in zip(('upgrade-base', 'upgrade-stable-1', 'upgrade-stable-2'), sources):
-                checks[name].update(fromVersion=version, fromManifestSha256='a' * 64, fromSchemaSha256=None)
+                checks.setdefault(name, dict(checks['upgrade-stable-1'])).update(fromVersion=version, fromManifestSha256='a' * 64, fromSchemaSha256=None)
         promote.validate_report(report, 'candidate', 'version', sources, databases)
         report['platforms']['windows-x86_64']['upgrade-base']['fromManifestSha256'] = 'b' * 64
         with self.assertRaises(RuntimeError):

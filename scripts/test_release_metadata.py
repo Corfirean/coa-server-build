@@ -4,6 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+from migration_evidence import inventory_digest
 from test_installer_package import installer, write_image, qualify
 
 
@@ -32,6 +33,8 @@ class MetadataTests(unittest.TestCase):
             report = {'result': 'passed', 'toVersion': self.manifest['version'],
                       'fromVersion': source['version'], 'fromManifestSha256': source['manifestSha256'],
                       'fromSchemaSha256': source['role'] + '-schema',
+                      'checks': ['migration-ledger', 'legacy-race-start-data'], 'migrationInventorySha256': inventory_digest(self.manifest),
+                      'migrations': {'CoA': {'total': 0, 'applied': 0, 'checksumVerified': 0, 'legacyUnknown': 0}},
                       'candidateManifestSha256': metadata.digest(self.folder / 'manifest.json')}
             if source['role'] == altered_role:
                 report['candidateManifestSha256'] = 'different-candidate'
@@ -56,6 +59,14 @@ class MetadataTests(unittest.TestCase):
         for role in ('base', 'stable-1', 'stable-2'):
             self.assertIn('/job/upgrade-' + role, checks['upgrade-' + role]['evidence'])
 
+    def test_recent_stable_collection_omits_base_upgrade_job(self):
+        self.lock['upgradePolicy'] = 'recent-stable'
+        checks = self.collect_windows()
+        self.assertNotIn('upgrade-base', checks)
+        self.assertEqual(len(checks['manager-update']['scenarios']), 2)
+        self.assertIn('upgrade-stable-1', checks)
+        self.assertIn('upgrade-stable-2', checks)
+
     def test_same_version_report_from_other_candidate_is_rejected(self):
         with self.assertRaisesRegex(RuntimeError, 'different candidate: stable-1'):
             self.collect_windows(altered_role='stable-1')
@@ -70,7 +81,7 @@ class MetadataTests(unittest.TestCase):
         self.folder = Path(self.temp.name)
         self.lock = {'schema': 1, 'components': {name: {'sha': 'a' * 40} for name in ('core', 'bots', 'scaling', 'squid', 'races')}}
         self.lock['snapshot'] = daily.snapshot(self.lock['components'])
-        self.manifest = {'kind': 'update', 'version': '0.261012.1', 'core': {'commit': 'a' * 40}, 'bots': {'commit': 'a' * 40},
+        self.manifest = {'migrations': [], 'kind': 'update', 'version': '0.261012.1', 'core': {'commit': 'a' * 40}, 'bots': {'commit': 'a' * 40},
                          'archive': {'parts': [{'sha256': 'b' * 64}]}, 'minManagerVersion': '0.6.13',
                          'compatibility': {'platform': 'windows-x86_64', 'moduleCommits': {
                              name: 'a' * 40 for name in ('bots', 'scaling', 'squid', 'races')}}}

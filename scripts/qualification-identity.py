@@ -3,6 +3,7 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+from migration_evidence import validate
 
 
 def bind(candidate, report_path, expected):
@@ -13,6 +14,9 @@ def bind(candidate, report_path, expected):
     manifest = json.loads((candidate / 'manifest.json').read_text(encoding='utf-8-sig'))
     if report.get('result') != 'passed' or report.get('toVersion') != manifest['version']:
         raise RuntimeError('Upgrade report did not qualify this candidate')
+    if report.get('toManifestSha256') != actual:
+        raise RuntimeError('Upgrade report tested different candidate bytes')
+    validate(report, manifest)
     report['candidateManifestSha256'] = actual
     report_path.write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
 

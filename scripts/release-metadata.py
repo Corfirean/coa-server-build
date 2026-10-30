@@ -5,11 +5,12 @@ import json
 import os
 import subprocess
 from pathlib import Path
+from migration_evidence import validate as validate_migrations
 
 
 FILES = ('release-lock.json', 'qualification.json', 'compatibility-matrix.json')
 WINDOWS_GATES = {'source', 'build', 'unit', 'schema-contract', 'auth-startup', 'world-startup',
-                 'upgrade-base', 'upgrade-stable-1', 'upgrade-stable-2', 'manager-update', 'fresh-install'}
+                 'upgrade-stable-1', 'upgrade-stable-2', 'manager-update', 'fresh-install'}
 LINUX_GATES = {'build', 'schema-contract', 'binary-version', 'module-config-layout'}
 
 
@@ -57,16 +58,19 @@ def collect(folder, lock_path, platform, reports, binary_run):
             'auth-startup': 'Start auth and world from the candidate in a disposable isolated server',
             'world-startup': 'Start auth and world from the candidate in a disposable isolated server',
             'fresh-install': 'Build and qualify full clean installation'}))
+        upgrade_sources = [source for source in lock['upgradeSources']
+                           if lock.get('upgradePolicy') != 'recent-stable' or source['role'] != 'base']
+        roles = [source['role'] for source in upgrade_sources]
         upgrades = evidence_steps(repo, run_id, {
             'upgrade-' + role: 'Qualify Manager upgrade from ' + role
-            for role in ('base', 'stable-1', 'stable-2')})
-        checks['manager-update'] = dict(upgrades['upgrade-base'],
+            for role in roles})
+        checks['manager-update'] = dict(upgrades['upgrade-' + roles[0]],
                                        scenarios=[upgrades['upgrade-' + role]['evidence']
-                                                  for role in ('base', 'stable-1', 'stable-2')])
+                                                  for role in roles])
         if binary_run:
             checks.update(evidence_steps(repo, run_id, {
                 'sql-only-binary-reuse': 'Validate verified binaries and SQL-only source delta'}))
-        for source in lock['upgradeSources']:
+        for source in upgrade_sources:
             report = read(reports / (source['role'] + '.json'))
             if report.get('candidateManifestSha256') != digest(folder / 'manifest.json'):
                 raise RuntimeError('Upgrade tested a different candidate: ' + source['role'])
@@ -74,6 +78,7 @@ def collect(folder, lock_path, platform, reports, binary_run):
                     or report['fromVersion'] != source['version']
                     or report['fromManifestSha256'] != source['manifestSha256']):
                 raise RuntimeError('Upgrade evidence differs from frozen source: ' + source['role'])
+            validate_migrations(report, manifest)
             gate = 'upgrade-' + source['role']
             expected_database = manifest['compatibility']['sourceDatabases'][source['version']]
             if report['fromSchemaSha256'] != expected_database['schemaSha256']:
@@ -81,7 +86,9 @@ def collect(folder, lock_path, platform, reports, binary_run):
             checks[gate] = dict(upgrades[gate], fromVersion=report['fromVersion'],
                                 candidateManifestSha256=report['candidateManifestSha256'],
                                 fromManifestSha256=report['fromManifestSha256'],
-                                fromSchemaSha256=report['fromSchemaSha256'])
+                                fromSchemaSha256=report['fromSchemaSha256'],
+                                migrationInventorySha256=report['migrationInventorySha256'],
+                                migrations=report['migrations'], checks=report['checks'])
     else:
         checks.update(evidence_steps(repo, run_id, {
             'build': 'Compile in Docker',
@@ -124,7 +131,8 @@ def validate(folder):
     platform = manifest['compatibility']['platform']
     if matrix['platforms'].get(platform) != manifest['compatibility'] or matrix['minManagerVersion'] != manifest['minManagerVersion']:
         raise RuntimeError('Standalone compatibility differs from signed manifest')
-    frozen_sources = lock.get('upgradeSources', [])
+    frozen_sources = [source for source in lock.get('upgradeSources', [])
+                      if lock.get('upgradePolicy') != 'recent-stable' or source['role'] != 'base']
     if frozen_sources and manifest['compatibility'].get('sourceVersions') != [s['version'] for s in frozen_sources]:
         raise RuntimeError('Compatibility omits or changes a frozen upgrade source')
     if manifest['core']['commit'] != lock['components']['core']['sha'] or manifest['bots']['commit'] != lock['components']['bots']['sha']:
@@ -138,7 +146,7 @@ def validate(folder):
     required = WINDOWS_GATES if platform == 'windows-x86_64' else LINUX_GATES
     if platform == 'windows-x86_64':
         sources = manifest['compatibility'].get('sourceVersions', [])
-        required = required | {f'upgrade-stable-{i}' for i in range(1, len(sources))}
+        required = required | {f'upgrade-stable-{i}' for i in range(1, len(sources) + (1 if lock.get('upgradePolicy') == 'recent-stable' else 0))}
     for gate in required:
         check = report['platforms'].get(platform, {}).get(gate, {})
         if check.get('result') != 'passed' or not check.get('evidence', '').startswith('https://github.com/'):
@@ -147,6 +155,7 @@ def validate(folder):
         for source in frozen_sources:
             gate = 'upgrade-' + source['role']
             check = report['platforms'][platform].get(gate, {})
+            validate_migrations(check, manifest)
             database = manifest['compatibility']['sourceDatabases'][source['version']]
             if (check.get('fromVersion') != source['version']
                     or check.get('fromManifestSha256') != source['manifestSha256']

@@ -390,7 +390,7 @@ jobs:
             if (-not $absolute.StartsWith($workspace, [StringComparison]::OrdinalIgnoreCase)) { throw 'Fixture cleanup escaped the workspace.' }
             Remove-Item -LiteralPath $absolute -Recurse -Force
           }
-          & $tool qualify-install --package _install-out --fixture coa-schema-fixture-clean-install --report _install-qualification.json
+          & $tool qualify-install --package _install-out --update _out --fixture coa-schema-fixture-clean-install --report _install-qualification.json
           if ($LASTEXITCODE) { throw "The full package failed clean installation qualification." }
           python scripts/installer-package.py embed --installer _install-out --candidate _out --report _install-qualification.json
           if ($LASTEXITCODE) { throw "Binding the qualified installer to the release failed." }
@@ -454,7 +454,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        role: [base, stable-1, stable-2]
+        role: [stable-1, stable-2]
     env:
       GH_TOKEN: ${{ github.token }}
       UPGRADE_ROLE: ${{ matrix.role }}

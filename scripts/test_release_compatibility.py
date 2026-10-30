@@ -58,6 +58,13 @@ class CompatibilityTests(unittest.TestCase):
         for source in self.sources[1:]:
             source['files'] = [{'path': 'Scripts/database-schema.json', 'sha256': 'b' * 64}]
 
+    def test_recent_stable_policy_excludes_base_from_declared_upgrade_coverage(self):
+        self.lock['upgradePolicy'] = 'recent-stable'
+        result = compatibility.matrix(self.manifest, self.lock, self.sources, 'windows-x86_64')
+        self.assertEqual(result['upgradePolicy'], 'recent-stable')
+        self.assertEqual(result['sourceVersions'], ['0.261010.32', '0.261006.1'])
+        self.assertNotIn('0.2.0', result['sourceDatabases'])
+
     def test_matrix_binds_all_revisions_and_upgrade_sources(self):
         result = compatibility.matrix(self.manifest, self.lock, self.sources, 'windows-x86_64')
         self.assertEqual(result['moduleCommits']['squid'], '4' * 40)

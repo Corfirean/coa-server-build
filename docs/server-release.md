@@ -62,6 +62,16 @@ Packaging verifies signatures and frozen fixtures, applies SQL in an isolated da
 qualifies a clean installer, and tests representative direct Manager upgrades. The full historical upgrade matrix is
 separate (`direct-upgrade-tests.yml`). Report the actual tested scope; an unrun gate is never a pass.
 
+Clean installation qualification uses the current release's full signed image directly, with
+`qualify-install --package <full-image> --update <matching-update> --fixture <new-coa-schema-fixture-directory> --report <report>`.
+The historical base remains a build input and an upgrade compatibility fixture; it is not the default fresh install.
+The mandatory upgrade matrix uses the two locked recent stable releases (`upgradePolicy: recent-stable`),
+excluding the historical base upgrade. The base remains a build fixture. Both installation and upgrade reports must include the ordered migration inventory digest and per-realm applied
+ledger counts. Legacy entries without a recorded checksum are reported separately, never as checksum-verified.
+Upgrade reports additionally bind the exact tested signed candidate manifest bytes. Missing or mismatched evidence
+blocks embedding the installer or binding qualification to a candidate.
+
+
 When the owner requests compatibility with every previous version, run the full historical matrix against the
 exact newly published candidate, not the current stable by default:
 
