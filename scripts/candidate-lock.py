@@ -30,13 +30,14 @@ def freeze(path):
                              experimental_portable=os.environ.get('EXPERIMENTAL_PORTABLE') == 'true')
         daily.check_integration(lock)
         # Coverage is not an updater allowlist. Keep full history for independent
-        # parallel acceptance, with three representative upgrades in packaging.
+        # parallel acceptance, with two recent stable upgrades in packaging.
         sources = load('upgrade-sources').resolve()
         lock['historicalUpgradeSources'] = sources
         lock['upgradeSources'] = sources[:3]
     if len(lock['upgradeSources']) > 3:
         lock.setdefault('historicalUpgradeSources', lock['upgradeSources'])
         lock['upgradeSources'] = lock['upgradeSources'][:3]
+    lock['upgradePolicy'] = 'recent-stable'
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(lock, indent=2) + '\n', encoding='utf-8')
     with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:

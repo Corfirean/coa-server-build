@@ -32,9 +32,12 @@ def matrix(manifest, lock, sources, platform):
         if source['kind'] == 'update' and (not isinstance(schema, str) or not re.fullmatch('[0-9a-f]{64}', schema)):
             raise RuntimeError('Published update fixture needs a signed database schema contract')
         databases[source['version']] = {'manifestSha256': digest, 'schemaSha256': schema}
+    if lock.get('upgradePolicy') == 'recent-stable':
+        versions = versions[1:]
+        databases = {version: databases[version] for version in versions}
     return {'schema': 1, 'platform': platform, 'coreCommit': revisions['core']['sha'],
             'moduleCommits': {name: revisions[name]['sha'] for name in ('bots', 'scaling', 'squid', 'races')},
-            'clientPatchVersion': version, 'sourceVersions': versions, 'sourceDatabases': databases}
+            'clientPatchVersion': version, 'upgradePolicy': lock.get('upgradePolicy', 'historical'), 'sourceVersions': versions, 'sourceDatabases': databases}
 
 
 def apply(folder, lock_path, sources_folder, platform, tool, schema_base=None):

@@ -3,6 +3,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from migration_evidence import inventory_digest
 
 spec = importlib.util.spec_from_file_location('installer', Path(__file__).with_name('installer-package.py'))
 installer = importlib.util.module_from_spec(spec)
@@ -22,7 +23,9 @@ def write_image(folder, release):
 def qualify(folder, report):
     (folder / 'manifest.json.sig').write_text('verified separately by the release tool')
     report.write_text(json.dumps({'schema': 1, 'result': 'passed', 'version': installer.read(folder / 'manifest.json')['version'],
-                                 'manifestSha256': installer.digest(folder / 'manifest.json')}))
+                                 'manifestSha256': installer.digest(folder / 'manifest.json'),
+                                 'checks': ['migration-ledger', 'legacy-race-start-data'], 'migrationInventorySha256': inventory_digest(installer.read(folder / 'manifest.json')),
+                                 'migrations': {'CoA': {'total': 0, 'applied': 0, 'checksumVerified': 0, 'legacyUnknown': 0}}}))
 
 
 class InstallerTests(unittest.TestCase):
@@ -34,7 +37,7 @@ class InstallerTests(unittest.TestCase):
         self.image.mkdir()
         self.release.mkdir()
         self.manifest = {'kind': 'update', 'version': '0.261014.1', 'core': {'commit': 'a' * 40},
-                         'bots': {'commit': 'b' * 40}, 'minManagerVersion': '0.6.16', 'compatibility': {}}
+                         'bots': {'commit': 'b' * 40}, 'minManagerVersion': '0.6.16', 'compatibility': {}, 'migrations': []}
         (self.release / 'manifest.json').write_text(json.dumps(self.manifest))
         write_image(self.image, self.manifest)
         self.report = root / 'report.json'
@@ -50,6 +53,16 @@ class InstallerTests(unittest.TestCase):
         (self.release / 'install-manifest.json').write_text('{}')
         with self.assertRaises((RuntimeError, KeyError)):
             installer.validate(self.release)
+
+    def test_missing_migration_evidence_blocks_embedding_before_any_asset_is_copied(self):
+        installer.prepare(self.image, self.release)
+        qualify(self.image, self.report)
+        evidence = installer.read(self.report)
+        evidence.pop('migrations')
+        self.report.write_text(json.dumps(evidence))
+        with self.assertRaisesRegex(RuntimeError, 'realm evidence'):
+            installer.embed(self.image, self.release, self.report)
+        self.assertFalse((self.release / 'install-manifest.json').exists())
 
     def test_old_or_incomplete_images_and_stale_qualification_are_rejected(self):
         image = installer.read(self.image / 'manifest.json')

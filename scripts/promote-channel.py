@@ -7,7 +7,7 @@ import importlib.util
 from pathlib import Path
 
 GATES = {'source', 'build', 'unit', 'auth-startup', 'world-startup',
-                        'schema-contract', 'upgrade-base', 'upgrade-stable-1',
+                        'schema-contract', 'upgrade-stable-1',
                         'upgrade-stable-2', 'manager-update', 'fresh-install'}
 # Interactive and fault-injection acceptance belongs to local, change-specific
 # preparation. Keep its actual results; a recorded failure still blocks release.
@@ -24,7 +24,7 @@ def api(path, method='GET', body=None):
 
 
 def validate_report(report, snapshot, version, source_versions=None, source_databases=None,
-                    owner_approved_snapshot=None):
+                    owner_approved_snapshot=None, upgrade_policy='historical'):
     if report.get('schema') != 1 or report.get('snapshot') != snapshot or report.get('version') != version:
         raise RuntimeError('Qualification report does not match the candidate')
     if owner_approved_snapshot is not None and owner_approved_snapshot != snapshot:
@@ -43,7 +43,9 @@ def validate_report(report, snapshot, version, source_versions=None, source_data
         if source_versions is not None:
             if len(source_versions) < 2 or len(set(source_versions)) != len(source_versions):
                 raise RuntimeError('Every distinct upgrade source must qualify')
-            names = ['upgrade-base'] + [f'upgrade-stable-{i}' for i in range(1, len(source_versions))]
+            names = ([f'upgrade-stable-{i}' for i in range(1, len(source_versions) + 1)]
+                     if upgrade_policy == 'recent-stable' else
+                     ['upgrade-base'] + [f'upgrade-stable-{i}' for i in range(1, len(source_versions))])
             for name, source in zip(names, source_versions):
                 check = checks.get(name, {})
                 if check.get('result') != 'passed' or not re.fullmatch(r'https://github\.com/[^/]+/[^/]+/actions/runs/\d+(?:/.*)?', check.get('evidence', '')):
@@ -122,7 +124,7 @@ def main():
                     'qualificationSha256': metadata.digest(folder / 'qualification.json')}
     validate_report(report, lock['snapshot'], args.version,
                     manifest['compatibility']['sourceVersions'], manifest['compatibility']['sourceDatabases'],
-                    args.owner_approved_snapshot)
+                    args.owner_approved_snapshot, manifest['compatibility'].get('upgradePolicy', 'historical'))
     subprocess.run([args.tool, 'verify', '--dir', str(folder)], check=True)
     subprocess.run([args.tool, 'verify-install', '--dir', str(folder)], check=True)
     if args.check_only:

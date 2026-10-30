@@ -34,6 +34,7 @@ class CandidateLockTests(unittest.TestCase):
                     candidate.freeze(root / 'lock.json')
                 result = json.loads((root / 'lock.json').read_text())
                 self.assertEqual(result['upgradeSources'], sources[:3])
+                self.assertEqual(result['upgradePolicy'], 'recent-stable')
                 self.assertEqual(result['historicalUpgradeSources'], sources)
 
 
