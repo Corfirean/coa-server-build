@@ -19,20 +19,26 @@ def validate_delta(comparison):
             raise RuntimeError('A non-SQL input was renamed')
 
 
+
+def verified_build_job(jobs):
+    for name in ('binaries / source', 'binaries / build'):
+        if not any(j['name'] == name and j['conclusion'] == 'success' for j in jobs):
+            raise RuntimeError('The selected run lacks successful source and binary verification')
+    return next(j for j in jobs if j['name'] == 'binaries / build' and j['conclusion'] == 'success')
+
+
 def main():
     repo = os.environ['GITHUB_REPOSITORY']
     run = os.environ['RUN_ID']
     jobs = api(f'repos/{repo}/actions/runs/{run}/jobs?per_page=100')['jobs']
-    for name in ('binaries / source', 'binaries / build'):
-        if not any(j['name'] == name and j['conclusion'] == 'success' for j in jobs):
-            raise RuntimeError('The selected run lacks successful source and binary verification')
+    build = verified_build_job(jobs)
     pins = {'core_sha': os.environ['NEW_CORE'], 'bots_sha': os.environ['BOTS'],
             'scaling_sha': os.environ['SCALING'],
             'squid_sha': api('repos/Zyth45/mod-playerbots/commits/' + os.environ['SQUID'])['sha']}
     for sha in [os.environ['OLD_CORE'], *pins.values()]:
         if not re.fullmatch('[0-9a-f]{40}', sha):
             raise RuntimeError('Exact source SHAs are required')
-    log = subprocess.check_output(['gh', 'run', 'view', run, '--repo', repo, '--log'], encoding='utf-8')
+    log = subprocess.check_output(['gh', 'run', 'view', run, '--repo', repo, '--job', str(build['id']), '--log'], encoding='utf-8')
     for label, sha in (('core commit:', os.environ['OLD_CORE']), ('bots commit:', pins['bots_sha']),
                        ('scaling commit:', pins['scaling_sha']), ('squid_sha=', pins['squid_sha'])):
         if not re.search(re.escape(label) + r'\s*' + sha + r'\b', log):
