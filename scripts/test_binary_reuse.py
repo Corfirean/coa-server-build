@@ -8,6 +8,17 @@ spec.loader.exec_module(module)
 
 
 class BinaryReuse(unittest.TestCase):
+    def test_cancelled_package_does_not_hide_successful_binary_job(self):
+        jobs = [{'id': 1, 'name': 'binaries / source', 'conclusion': 'success'},
+                {'id': 2, 'name': 'binaries / build', 'conclusion': 'success'},
+                {'id': 3, 'name': 'package', 'conclusion': 'cancelled'}]
+        self.assertEqual(module.verified_build_job(jobs)['id'], 2)
+        for index in (0, 1):
+            altered = [dict(job) for job in jobs]
+            altered[index]['conclusion'] = 'cancelled'
+            with self.assertRaises(RuntimeError):
+                module.verified_build_job(altered)
+
     def test_identical_sources_reuse_verified_binaries_without_recompilation(self):
         module.validate_delta({'status': 'identical', 'files': []})
 
