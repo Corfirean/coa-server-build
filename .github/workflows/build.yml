@@ -181,7 +181,7 @@ jobs:
   package:
     if: ${{ !cancelled() && (needs.binaries.result == 'success' || needs.reuse.result == 'success') }}
     needs: [resolve, binaries, reuse]
-    runs-on: windows-latest
+    runs-on: ${{ fromJSON(vars.COA_WINDOWS_RUNNER || '["self-hosted","Windows","X64","coa-persistent"]') }}
     timeout-minutes: 210
     outputs:
       manifest_sha256: ${{ steps.candidate.outputs.manifest_sha256 }}
@@ -193,6 +193,16 @@ jobs:
       BOTS_SHA: ${{ needs.binaries.outputs.bots_sha || needs.reuse.outputs.bots_sha }}
       SCALING_SHA: ${{ needs.binaries.outputs.scaling_sha || needs.reuse.outputs.scaling_sha }}
     steps:
+      - name: Locate PowerShell 7 on the dedicated runner
+        if: runner.environment == 'self-hosted'
+        shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+        run: |
+          $locations = @((Join-Path $env:ProgramFiles 'PowerShell/7'), 'C:/tools/PowerShell/7')
+          $shell = Get-Command pwsh.exe -ErrorAction SilentlyContinue
+          if ($shell) { $locations = @((Split-Path $shell.Source)) + $locations }
+          $directory = $locations | Where-Object { Test-Path (Join-Path $_ 'pwsh.exe') } | Select-Object -First 1
+          if (-not $directory) { throw 'Install PowerShell 7 before using this dedicated runner.' }
+          $directory | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
       - uses: actions/checkout@v7
       - name: Load frozen source lock
         uses: actions/download-artifact@v4
@@ -229,6 +239,27 @@ jobs:
             ~/.cargo/git
             _manager/target
           key: trusted-release-cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('_manager/Cargo.lock') }}-${{ github.run_id }}
+      - name: Seed exact core history from the verified local object cache
+        if: runner.environment == 'self-hosted'
+        shell: pwsh
+        env:
+          CORE_OBJECT_CACHE: ${{ vars.COA_CORE_OBJECT_CACHE }}
+        run: |
+          if (-not $env:CORE_OBJECT_CACHE -or -not (Test-Path -LiteralPath $env:CORE_OBJECT_CACHE)) { exit 0 }
+          if ($env:CORE_SHA -notmatch '^[0-9a-f]{40}$') { throw 'An immutable core SHA is required.' }
+          $root = [IO.Path]::GetFullPath($env:GITHUB_WORKSPACE).TrimEnd('\') + '\'
+          $target = [IO.Path]::GetFullPath((Join-Path $root '_core'))
+          if (-not $target.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)) { throw 'Core cache target escaped the workspace.' }
+          if (Test-Path -LiteralPath $target) { exit 0 }
+          & git -C $env:CORE_OBJECT_CACHE cat-file -e "$($env:CORE_SHA)^{commit}"
+          if ($LASTEXITCODE) { throw 'The exact frozen core commit is not in the local cache.' }
+          & git clone --shared --no-checkout $env:CORE_OBJECT_CACHE $target
+          if ($LASTEXITCODE) { throw 'Local core cache preparation failed.' }
+          & git -C $target remote set-url origin https://github.com/Corfirean/azerothcore-wotlk-coa.git
+          if ($LASTEXITCODE) { throw 'Core source origin configuration failed.' }
+          & git -C $target config core.alternateRefsPrefixes refs/heads/release-core
+          & git -C $target checkout --detach $env:CORE_SHA
+          if ($LASTEXITCODE) { throw 'The exact cached core could not be checked out.' }
       - name: Core sources at the exact commit (full history, SQL order comes from it)
         uses: actions/checkout@v7
         with:
@@ -446,7 +477,7 @@ jobs:
   qualify-upgrade:
     needs: package
     if: ${{ !cancelled() && needs.package.result == 'success' }}
-    runs-on: windows-latest
+    runs-on: ${{ fromJSON(vars.COA_WINDOWS_RUNNER || '["self-hosted","Windows","X64","coa-persistent"]') }}
     timeout-minutes: 90
     permissions:
       actions: read
@@ -460,6 +491,16 @@ jobs:
       UPGRADE_ROLE: ${{ matrix.role }}
       EXPECTED_MANIFEST_SHA256: ${{ needs.package.outputs.manifest_sha256 }}
     steps:
+      - name: Locate PowerShell 7 on the dedicated runner
+        if: runner.environment == 'self-hosted'
+        shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+        run: |
+          $locations = @((Join-Path $env:ProgramFiles 'PowerShell/7'), 'C:/tools/PowerShell/7')
+          $shell = Get-Command pwsh.exe -ErrorAction SilentlyContinue
+          if ($shell) { $locations = @((Split-Path $shell.Source)) + $locations }
+          $directory = $locations | Where-Object { Test-Path (Join-Path $_ 'pwsh.exe') } | Select-Object -First 1
+          if (-not $directory) { throw 'Install PowerShell 7 before using this dedicated runner.' }
+          $directory | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
       - uses: actions/checkout@v7
       - uses: actions/download-artifact@v4
         with:
@@ -519,12 +560,22 @@ jobs:
   publish:
     needs: [package, qualify-upgrade]
     if: ${{ !cancelled() && needs.package.result == 'success' && needs.qualify-upgrade.result == 'success' }}
-    runs-on: windows-latest
+    runs-on: ${{ fromJSON(vars.COA_WINDOWS_RUNNER || '["self-hosted","Windows","X64","coa-persistent"]') }}
     timeout-minutes: 45
     env:
       GH_TOKEN: ${{ github.token }}
       EXPECTED_MANIFEST_SHA256: ${{ needs.package.outputs.manifest_sha256 }}
     steps:
+      - name: Locate PowerShell 7 on the dedicated runner
+        if: runner.environment == 'self-hosted'
+        shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+        run: |
+          $locations = @((Join-Path $env:ProgramFiles 'PowerShell/7'), 'C:/tools/PowerShell/7')
+          $shell = Get-Command pwsh.exe -ErrorAction SilentlyContinue
+          if ($shell) { $locations = @((Split-Path $shell.Source)) + $locations }
+          $directory = $locations | Where-Object { Test-Path (Join-Path $_ 'pwsh.exe') } | Select-Object -First 1
+          if (-not $directory) { throw 'Install PowerShell 7 before using this dedicated runner.' }
+          $directory | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
       - uses: actions/checkout@v7
       - uses: actions/download-artifact@v4
         with:
