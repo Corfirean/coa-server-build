@@ -240,27 +240,14 @@ jobs:
             _manager/target
           key: trusted-release-cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('_manager/Cargo.lock') }}-${{ github.run_id }}
       - name: Seed exact core history from the verified local object cache
+        id: cached-package-core
         if: runner.environment == 'self-hosted'
         shell: pwsh
         env:
           CORE_OBJECT_CACHE: ${{ vars.COA_CORE_OBJECT_CACHE }}
-        run: |
-          if (-not $env:CORE_OBJECT_CACHE -or -not (Test-Path -LiteralPath $env:CORE_OBJECT_CACHE)) { exit 0 }
-          if ($env:CORE_SHA -notmatch '^[0-9a-f]{40}$') { throw 'An immutable core SHA is required.' }
-          $root = [IO.Path]::GetFullPath($env:GITHUB_WORKSPACE).TrimEnd('\') + '\'
-          $target = [IO.Path]::GetFullPath((Join-Path $root '_core'))
-          if (-not $target.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)) { throw 'Core cache target escaped the workspace.' }
-          if (Test-Path -LiteralPath $target) { exit 0 }
-          & git -C $env:CORE_OBJECT_CACHE cat-file -e "$($env:CORE_SHA)^{commit}"
-          if ($LASTEXITCODE) { throw 'The exact frozen core commit is not in the local cache.' }
-          & git clone --shared --no-checkout $env:CORE_OBJECT_CACHE $target
-          if ($LASTEXITCODE) { throw 'Local core cache preparation failed.' }
-          & git -C $target remote set-url origin https://github.com/Corfirean/azerothcore-wotlk-coa.git
-          if ($LASTEXITCODE) { throw 'Core source origin configuration failed.' }
-          & git -C $target config core.alternateRefsPrefixes refs/heads/release-core
-          & git -C $target checkout --detach $env:CORE_SHA
-          if ($LASTEXITCODE) { throw 'The exact cached core could not be checked out.' }
+        run: python -B scripts/prime_core_cache.py
       - name: Core sources at the exact commit (full history, SQL order comes from it)
+        if: steps.cached-package-core.outputs.ready != 'true'
         uses: actions/checkout@v7
         with:
           repository: Corfirean/azerothcore-wotlk-coa
