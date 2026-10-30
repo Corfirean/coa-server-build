@@ -37,7 +37,7 @@ def matrix(manifest, lock, sources, platform):
         databases = {version: databases[version] for version in versions}
     return {'schema': 1, 'platform': platform, 'coreCommit': revisions['core']['sha'],
             'moduleCommits': {name: revisions[name]['sha'] for name in ('bots', 'scaling', 'squid', 'races')},
-            'clientPatchVersion': version, 'upgradePolicy': lock.get('upgradePolicy', 'historical'), 'sourceVersions': versions, 'sourceDatabases': databases}
+            'clientPatchVersion': version, 'sourceVersions': versions, 'sourceDatabases': databases}
 
 
 def apply(folder, lock_path, sources_folder, platform, tool, schema_base=None):
