@@ -18,4 +18,4 @@ jobs:
           repository: Corfirean/coa-server-build
           path: _changelog_tools
       - name: Check changelog.d
-        run: python3 _changelog_tools/changelog/changelog.py check --dir changelog.d --name "${{ github.event.repository.name }}"
+        run: python3 _changelog_tools/scripts/check_fragment_changes.py --parser _changelog_tools/changelog/changelog.py
