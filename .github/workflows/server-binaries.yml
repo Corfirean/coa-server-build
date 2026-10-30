@@ -56,7 +56,7 @@ jobs:
           path: .cache/verify-all/
   build:
     needs: source
-    runs-on: ${{ fromJSON(vars.COA_WINDOWS_RUNNER || '["windows-latest"]') }}
+    runs-on: ${{ fromJSON(vars.COA_WINDOWS_RUNNER || '["self-hosted","Windows","X64","coa-persistent"]') }}
     permissions:
       actions: read
       contents: read
@@ -73,7 +73,35 @@ jobs:
       SCCACHE_CACHE_SIZE: 8G
       SCCACHE_IGNORE_SERVER_IO_ERROR: '1'
     steps:
+      - name: Reuse only the exact clean core checkout on the persistent runner
+        id: cached-core
+        if: runner.environment == 'self-hosted'
+        shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+        env:
+          CORE_REF: ${{ inputs.core_ref }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $reuse = $false
+          $workspace = [IO.Path]::GetFullPath($env:GITHUB_WORKSPACE).TrimEnd('\')
+          $runnerRoot = [IO.Path]::GetFullPath($env:RUNNER_WORKSPACE).TrimEnd('\') + '\'
+          if (-not $workspace.StartsWith($runnerRoot, [StringComparison]::OrdinalIgnoreCase)) { throw 'Cached checkout escaped the runner workspace.' }
+          if ($env:CORE_REF -match '^[0-9a-f]{40}$' -and (Test-Path -LiteralPath (Join-Path $workspace '.git'))) {
+            $head = & git -C $workspace rev-parse --verify HEAD 2>$null
+            if ($LASTEXITCODE -eq 0 -and $head -eq $env:CORE_REF) {
+              $origin = & git -C $workspace remote get-url origin
+              $origin = $origin.TrimEnd('/') -replace '\.git$', ''
+              if ($LASTEXITCODE -eq 0 -and $origin -eq 'https://github.com/Corfirean/azerothcore-wotlk-coa') {
+                $changes = @(& git -C $workspace status --porcelain --untracked-files=all)
+                $statusOk = $LASTEXITCODE -eq 0
+                $leftovers = @(& git -C $workspace clean -n -d -x)
+                $reuse = $statusOk -and $LASTEXITCODE -eq 0 -and $changes.Count -eq 0 -and $leftovers.Count -eq 0
+              }
+            }
+          }
+          "reuse=$($reuse.ToString().ToLowerInvariant())" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          if ($reuse) { Write-Host "Using verified clean cached core $env:CORE_REF; no network checkout is needed." }
       - uses: actions/checkout@v7
+        if: steps.cached-core.outputs.reuse != 'true'
         with:
           repository: Corfirean/azerothcore-wotlk-coa
           ref: ${{ inputs.core_ref || 'coa-bots' }}

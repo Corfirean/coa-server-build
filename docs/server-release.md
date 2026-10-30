@@ -37,9 +37,18 @@ gh run view <run-id> -R Corfirean/coa-server-build --json status,conclusion,jobs
 
 ## Compilation and qualification
 
+On the owner's installation, native server compilation uses the existing registered runner at
+`C:/games/coa-build-runner`. Hosted runners have previously exhausted resources with the full module set;
+do not move native compilation to hosted Windows because checkout is slow or stuck unless the owner explicitly
+requests that change. Treat checkout stalls as transport failures. Preserve the local compiler outputs, repair the
+fetch or prepare the exact frozen checkout while the runner is idle, and resume the same qualified inputs.
+The persistent-runner preflight skips network checkout only for the exact immutable SHA, expected repository,
+clean tracked/untracked state and no ignored leftovers within the verified runner workspace. All source,
+build, unit and package qualification gates still run.
+
 `server-binaries.yml` runs POSIX source checks and Windows build/unit verification. `verify-server.yml` compiles the
 same frozen components without packaging. A repository variable `COA_WINDOWS_RUNNER` can select a registered dedicated
-runner with a JSON label array such as `["self-hosted","Windows","X64","coa-persistent"]`; the default is hosted Windows.
+runner with a JSON label array such as `["self-hosted","Windows","X64","coa-persistent"]`; native compilation defaults to that persistent runner.
 The dedicated runner needs PowerShell 7 on PATH, in `C:/Program Files/PowerShell/7` or `C:/tools/PowerShell/7`,
 along with Visual Studio C++ tools, Boost and MySQL development files. The workflow locates PowerShell before
 using its shell. Its bootstrap uses a process-scoped execution policy; the machine policy stays unchanged. On the dedicated runner Ninja outputs live outside the cleaned checkout in `RUNNER_WORKSPACE/_coa-build-state`.
