@@ -364,7 +364,7 @@ jobs:
           if ($LASTEXITCODE) { throw "pack-update failed" }
           $manifestPath = '_out/manifest.json'
           $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
-          $manifest.minManagerVersion = '0.6.15'
+          $manifest.minManagerVersion = '0.9.5'
           $manifest | ConvertTo-Json -Depth 100 | Set-Content $manifestPath -Encoding utf8NoBOM
           python scripts/release-compatibility.py --dir _out --lock _release-lock/release-lock.json --sources _upgrade-sources --schema-base _schema-base --platform windows-x86_64 --tool $tool
           if ($LASTEXITCODE) { throw "Release compatibility validation failed" }
