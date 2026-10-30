@@ -8,6 +8,18 @@ Published releases and previews. Pre-release entries do not change the stable up
 
 Dates follow GitHub publication (UTC); legacy records retain their archived dates. Newest releases first.
 
+## 0.261030.90 (Pre-release) — 2026-10-30
+
+**Portable Characters are experimental and may contain bugs.**
+
+- Prevent crashes while players update Apex Hunt quest markers on different maps.
+- Thin Human and Leper Troll characters retain their starting data after updates.
+- Companions avoid rejected names and recover from forced rename login failures.
+- Updated SQUID Playerbots to 2.8.2.
+- Updated the reviewed CoA upstream snapshot.
+
+[Release](https://github.com/Corfirean/coa-server-build/releases/tag/server-0.261030.90) · [Source changes](https://github.com/Corfirean/coa-server-build/compare/server-0.261029.85...server-0.261030.90)
+
 ## 0.261029.85 — 2026-10-29
 
 **Portable Characters are experimental and may contain bugs.**
