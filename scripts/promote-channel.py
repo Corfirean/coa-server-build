@@ -124,7 +124,7 @@ def main():
                     'qualificationSha256': metadata.digest(folder / 'qualification.json')}
     validate_report(report, lock['snapshot'], args.version,
                     manifest['compatibility']['sourceVersions'], manifest['compatibility']['sourceDatabases'],
-                    args.owner_approved_snapshot, manifest['compatibility'].get('upgradePolicy', 'historical'))
+                    args.owner_approved_snapshot, lock.get('upgradePolicy', 'historical'))
     subprocess.run([args.tool, 'verify', '--dir', str(folder)], check=True)
     subprocess.run([args.tool, 'verify-install', '--dir', str(folder)], check=True)
     if args.check_only:
