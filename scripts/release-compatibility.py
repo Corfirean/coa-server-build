@@ -68,11 +68,14 @@ def apply(folder, lock_path, sources_folder, platform, tool, schema_base=None):
     manifest = json.loads(path.read_text(encoding='utf-8-sig'))
     compatibility = matrix(manifest, lock, sources, platform)
     manifest['compatibility'] = compatibility
-    manifest['minManagerVersion'] = minimum_manager(manifest.get('minManagerVersion', '0.0.0'), compatibility['clientPatchVersion'])
+    manifest['minManagerVersion'] = minimum_manager(manifest.get('minManagerVersion', '0.0.0'), compatibility['clientPatchVersion'],
+                                                   isolated_validation='dungeon-clear' in lock['components'])
     path.write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
 
 
-def minimum_manager(requested, client_patch_version):
+def minimum_manager(requested, client_patch_version, isolated_validation=False):
+    if isolated_validation:
+        return max((requested, '0.9.8'), key=lambda version: tuple(int(part) for part in version.split('.')))
     # Earlier public Managers treated test coverage as an exclusive allowlist.
     if tuple(int(part) for part in client_patch_version.split('.')) >= (1, 9, 2):
         return max((requested, '0.8.2'), key=lambda version: tuple(int(part) for part in version.split('.')))
