@@ -95,6 +95,35 @@ index cbbcafd6b87b71ee2653108f5e56cfcb982befca..d0be1d507496a06c67eb46da7415485a
   *
   * With it set to 0 the module is compiled and linked but completely inert:
   *
+diff --git a/t/TestBlackwingLair.cpp b/t/TestBlackwingLair.cpp
+index d818677876d90f3bd0fe8d85aa7751a89d2e45eb..c9ba545e44f4a6f750c8ab76010b857584f792be 100644
+--- a/t/TestBlackwingLair.cpp
++++ b/t/TestBlackwingLair.cpp
+@@ -785,11 +785,11 @@ TEST(DungeonEventBlackwingLairTest, TheElectionBreaksTiesOnTheWalkToTheOrb)
+     // second of a freed Razorgore, and the new runner's WALK is nearly all of it.
+     // Among candidates of equal rank the election therefore takes the one already
+     // closest to the ledge.
+-    DcRazorgore::RunnerCandidate near = Bot(90);  near.isRanged = true;  near.distToOrb = 5.0f;
+-    DcRazorgore::RunnerCandidate far = Bot(10);   far.isRanged = true;   far.distToOrb = 70.0f;
+-    EXPECT_EQ(DcRazorgore::SelectRunner({near, far}), 0)
++    DcRazorgore::RunnerCandidate nearCandidate = Bot(90);  nearCandidate.isRanged = true;  nearCandidate.distToOrb = 5.0f;
++    DcRazorgore::RunnerCandidate farCandidate = Bot(10);   farCandidate.isRanged = true;   farCandidate.distToOrb = 70.0f;
++    EXPECT_EQ(DcRazorgore::SelectRunner({nearCandidate, farCandidate}), 0)
+         << "the lower GUID is 70yd away; distance decides before GUID does";
+-    EXPECT_EQ(DcRazorgore::SelectRunner({far, near}), 1);
++    EXPECT_EQ(DcRazorgore::SelectRunner({farCandidate, nearCandidate}), 1);
+ 
+     // RANK STILL WINS OUTRIGHT. A healer standing on the orb does not displace a
+     // ranged DPS across the room: losing the healer to a 90s root is how the raid
+@@ -797,7 +797,7 @@ TEST(DungeonEventBlackwingLairTest, TheElectionBreaksTiesOnTheWalkToTheOrb)
+     DcRazorgore::RunnerCandidate healerAtOrb = Bot(1);
+     healerAtOrb.isHealer = true;
+     healerAtOrb.distToOrb = 0.0f;
+-    EXPECT_EQ(DcRazorgore::SelectRunner({healerAtOrb, far}), 1);
++    EXPECT_EQ(DcRazorgore::SelectRunner({healerAtOrb, farCandidate}), 1);
+ 
+     // And the bucket is coarse on purpose: two bots standing together must not
+     // trade the job back and forth as they shuffle, so inside one bucket the GUID
 diff --git a/tools/check_config_reads.py b/tools/check_config_reads.py
 index 1eaa7beb2b8b6af83dabc23e96b8296c90456aba..f9e3a40ce0565419237180460c1d289b20e3cf76 100644
 --- a/tools/check_config_reads.py
