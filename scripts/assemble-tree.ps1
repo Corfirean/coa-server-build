@@ -38,6 +38,14 @@ Copy-Item "$PSScriptRoot/manage.py", "$PSScriptRoot/squid_playerbots.py" "$Out/S
 $settingsJson = "$Core/modules/mod-playerbots/conf/playerbots.conf.settings.json"
 if (Test-Path $settingsJson) { Copy-Item $settingsJson "$Out/Core/configs/modules/playerbots.conf.settings.json" -Force }
 Copy-Item "$Core/modules/mod-playerbots/LICENSE" "$Out/Licenses/mod-playerbots-LICENSE.txt" -Force
+Copy-Item "$Core/modules/mod-dungeon-clear/LICENSE" "$Out/Licenses/mod-dungeon-clear-LICENSE.txt" -Force
+New-Item -ItemType Directory -Force -Path "$Out/Extras/DungeonClear" | Out-Null
+Copy-Item "$Core/modules/mod-dungeon-clear/README.md" "$Out/Extras/DungeonClear/UPSTREAM-README.md" -Force
+$external = Get-Content "$PSScriptRoot/../external-modules.json" -Raw | ConvertFrom-Json
+Copy-Item "$PSScriptRoot/../external-modules.json" "$Out/Extras/DungeonClear/sources.json" -Force
+$dungeonSha = $external.modules.'dungeon-clear'.sha
+$pipelineSha = & git -C "$PSScriptRoot/.." rev-parse HEAD
+if ($LASTEXITCODE -ne 0) { throw 'Cannot identify the pipeline source for module patches.' }
 # Every module reads configs/modules/<name>.conf. Ship an active copy of each .dist (created only when missing on
 # install/update, never overwritten) so a fresh server runs with the documented defaults instead of warnings.
 Get-ChildItem "$Out/Core/configs/modules/*.conf.dist" | ForEach-Object {
@@ -79,7 +87,9 @@ CoA Server Manager - notice
 Server binaries (Core\worldserver.exe, Core\authserver.exe) were built from:
   core  https://github.com/Corfirean/azerothcore-wotlk-coa   commit $CoreSha
   bots  https://github.com/Corfirean/mod-coa-playerbots       commit $BotsSha
-  squid https://github.com/Zyth45/mod-playerbots             commit $SquidSha (unchanged upstream source)
+  squid https://github.com/Zyth45/mod-playerbots             commit $SquidSha (with the CoA validation patch)
+  dungeon-clear https://github.com/Zyth45/mod-dungeon-clear  commit $dungeonSha (with the CoA activation guard)
+  patches https://github.com/Corfirean/coa-server-build/tree/$pipelineSha/patches
   scaling https://github.com/Corfirean/mod-coa-content-scaling commit $ScalingSha (with its TBC and WotLK content packs)
 The core keeps its upstream licences (GPL-2.0-or-later for the MaNGOS-derived parts, AGPL-3.0 for AzerothCore-original
 files); the bots module and CoA Server Manager are AGPL-3.0; the Content Scaling module is GPL-2.0. The complete corresponding source is at the links above.

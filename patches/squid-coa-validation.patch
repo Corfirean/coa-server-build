@@ -1,0 +1,55 @@
+diff --git a/src/PlayerbotAIConfig.cpp b/src/PlayerbotAIConfig.cpp
+index 732ccc1e..d05c35ea 100644
+--- a/src/PlayerbotAIConfig.cpp
++++ b/src/PlayerbotAIConfig.cpp
+@@ -948,6 +948,16 @@ bool PlayerbotAIConfig::Initialize()
+     selfBotLevel = sConfigMgr->GetOption<int32>("AiPlayerbot.SelfBotLevel", 1);
+     botTextLocale = sConfigMgr->GetOption<int32>("AiPlayerbot.BotTextLocale", -1);
+ 
++    validationMode = sConfigMgr->GetOption<bool>("CoA.ValidationMode", false, false);
++    if (validationMode)
++    {
++        randomBotAutologin = false;
++        botAutologin = false;
++        AiObjectContext::BuildAllSharedContexts();
++        LOG_INFO("server.loading", "SQUID validation: bot population creation and login are suspended for this startup");
++        return true;
++    }
++
+     RandomPlayerbotFactory::CreateRandomBots();
+     if (World::IsStopped())
+     {
+diff --git a/src/PlayerbotAIConfig.h b/src/PlayerbotAIConfig.h
+index 34b6e2be..1db6d031 100644
+--- a/src/PlayerbotAIConfig.h
++++ b/src/PlayerbotAIConfig.h
+@@ -108,6 +108,7 @@ public:
+     bool IsInPvpProhibitedArea(uint32 id);
+ 
+     bool enabled;
++    bool validationMode = false;
+     bool disabledWithoutRealPlayer;
+     bool EnableICCBuffs;
+     bool allowAccountBots, allowGuildBots, allowTrustedAccountBots;
+diff --git a/src/Script/Playerbots.cpp b/src/Script/Playerbots.cpp
+index 3efd1513..64afdecb 100644
+--- a/src/Script/Playerbots.cpp
++++ b/src/Script/Playerbots.cpp
+@@ -460,6 +460,8 @@ public:
+ 
+     void OnUpdate(uint32 diff) override
+     {
++        if (sPlayerbotAIConfig.validationMode)
++            return;
+         PlayerbotWorldThreadProcessor::instance().Update(diff);
+         sRandomPlayerbotMgr.UpdateAI(diff);  // World thread only
+         sRandomPlayerbotMgr.CoaReleaseOrphanGroups();
+@@ -538,6 +540,8 @@ public:
+ 
+     void OnPlayerbotUpdate(uint32 /*diff*/) override
+     {
++        if (sPlayerbotAIConfig.validationMode)
++            return;
+         sRandomPlayerbotMgr.UpdateSessions();  // Per-bot updates only
+     }
+ 

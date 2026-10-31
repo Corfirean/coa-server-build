@@ -249,6 +249,9 @@ jobs:
           repository: Zyth45/mod-playerbots
           ref: ${{ steps.squid.outputs.squid_sha }}
           path: modules/mod-playerbots
+      - name: Prepare pinned Dungeon Clear and reviewed validation patches
+        shell: pwsh
+        run: python -B _pipeline/scripts/prepare-external-modules.py --core .
       - name: Place the modules where the core expects them
         id: shas
         shell: pwsh
@@ -472,3 +475,12 @@ jobs:
             ${{ env.BIN_DIR }}/authserver.exe
             ${{ env.BIN_DIR }}/*.dll
           retention-days: 14
+      - name: Preserve matching native symbols for startup and shutdown diagnostics
+        uses: actions/upload-artifact@v4
+        with:
+          name: coa-server-symbols
+          path: |
+            ${{ env.BIN_DIR }}/worldserver.pdb
+            ${{ env.BIN_DIR }}/authserver.pdb
+          retention-days: 14
+          if-no-files-found: error

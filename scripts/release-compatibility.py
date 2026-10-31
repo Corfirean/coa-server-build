@@ -36,7 +36,7 @@ def matrix(manifest, lock, sources, platform):
         versions = versions[1:]
         databases = {version: databases[version] for version in versions}
     return {'schema': 1, 'platform': platform, 'coreCommit': revisions['core']['sha'],
-            'moduleCommits': {name: revisions[name]['sha'] for name in ('bots', 'scaling', 'squid', 'races')},
+            'moduleCommits': {name: revisions[name]['sha'] for name in ('bots', 'scaling', 'squid', 'races', 'dungeon-clear') if name in revisions},
             'clientPatchVersion': version, 'sourceVersions': versions, 'sourceDatabases': databases}
 
 

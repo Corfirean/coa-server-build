@@ -137,7 +137,7 @@ def validate(folder):
         raise RuntimeError('Compatibility omits or changes a frozen upgrade source')
     if manifest['core']['commit'] != lock['components']['core']['sha'] or manifest['bots']['commit'] != lock['components']['bots']['sha']:
         raise RuntimeError('Release differs from source lock')
-    for name in ('bots', 'scaling', 'squid', 'races'):
+    for name in ('bots', 'scaling', 'squid', 'races') + (('dungeon-clear',) if 'dungeon-clear' in lock['components'] else ()):
         if manifest['compatibility'].get('moduleCommits', {}).get(name) != lock['components'][name]['sha']:
             raise RuntimeError('Module differs from source lock: ' + name)
     if report.get('binaryProvenance'):

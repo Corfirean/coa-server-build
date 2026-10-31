@@ -1,4 +1,6 @@
 import importlib.util
+import copy
+import json
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -9,6 +11,11 @@ spec.loader.exec_module(daily)
 
 
 class IntegrationTests(unittest.TestCase):
+    def setUp(self):
+        override = patch.object(daily, 'freeze_external')
+        override.start()
+        self.addCleanup(override.stop)
+
     def test_resolve_freezes_selected_upstream_and_checks_its_ancestry(self):
         def api(endpoint):
             if endpoint.endswith('/releases/latest'):
@@ -69,6 +76,22 @@ class IntegrationTests(unittest.TestCase):
         with patch.object(daily, "gh", return_value={"status": "ahead"}) as api:
             daily.check_integration(self.lock())
             self.assertEqual(api.call_count, 2)
+
+
+class ExternalLockTests(unittest.TestCase):
+    def test_external_patch_and_dungeon_revision_are_part_of_snapshot(self):
+        config = json.loads((Path(__file__).resolve().parents[1] / 'external-modules.json').read_text())
+        components = {'squid': {'sha': config['modules']['squid']['sha']}}
+        daily.freeze_external(components)
+        self.assertEqual(components['dungeon-clear']['sha'], config['modules']['dungeon-clear']['sha'])
+        before = daily.snapshot(components)
+        changed = copy.deepcopy(components)
+        changed['squid']['patchSha256'] = 'f' * 64
+        self.assertNotEqual(before, daily.snapshot(changed))
+
+    def test_unreviewed_squid_revision_is_rejected(self):
+        with self.assertRaisesRegex(RuntimeError, 'compatibility review'):
+            daily.freeze_external({'squid': {'sha': 'a' * 40}})
 
 
 if __name__ == "__main__":

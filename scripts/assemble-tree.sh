@@ -41,6 +41,12 @@ printf '{\n  "schema": 1,\n  "tag": "%s",\n  "commit": "%s"\n}\n' "$squid_tag" "
 settings_json="$core/modules/mod-playerbots/conf/playerbots.conf.settings.json"
 [ -f "$settings_json" ] && cp "$settings_json" "$out/Core/configs/modules/playerbots.conf.settings.json"
 cp "$core/modules/mod-playerbots/LICENSE" "$out/Licenses/mod-playerbots-LICENSE.txt"
+cp "$core/modules/mod-dungeon-clear/LICENSE" "$out/Licenses/mod-dungeon-clear-LICENSE.txt"
+mkdir -p "$out/Extras/DungeonClear"
+cp "$core/modules/mod-dungeon-clear/README.md" "$out/Extras/DungeonClear/UPSTREAM-README.md"
+cp "$(dirname "$0")/../external-modules.json" "$out/Extras/DungeonClear/sources.json"
+dungeon_sha=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["modules"]["dungeon-clear"]["sha"])' "$(dirname "$0")/../external-modules.json")
+pipeline_sha=$(git -C "$(dirname "$0")/.." rev-parse HEAD)
 # Only the .dist files are shipped: coa-release leaves active .conf files out of the package, and the Manager creates
 # them from the .dist ones.
 cp -r "$bots"/dist/reference/. "$out/Core/reference/"
@@ -64,7 +70,9 @@ CoA Server Manager - notice
 Server binaries (Core/worldserver, Core/authserver) were built from:
   core  https://github.com/Corfirean/azerothcore-wotlk-coa   commit $core_sha
   bots  https://github.com/Corfirean/mod-coa-playerbots       commit $bots_sha
-  squid https://github.com/Zyth45/mod-playerbots             commit $squid_sha (unchanged upstream source)
+  squid https://github.com/Zyth45/mod-playerbots             commit $squid_sha (with the CoA validation patch)
+  dungeon-clear https://github.com/Zyth45/mod-dungeon-clear  commit $dungeon_sha (with the CoA activation guard)
+  patches https://github.com/Corfirean/coa-server-build/tree/$pipeline_sha/patches
   scaling https://github.com/Corfirean/mod-coa-content-scaling commit $scaling_sha (with its TBC and WotLK content packs)
 The core keeps its upstream licences (GPL-2.0-or-later for the MaNGOS-derived parts, AGPL-3.0 for AzerothCore-original
 files); the bots module and CoA Server Manager are AGPL-3.0; the Content Scaling module is GPL-2.0. The complete corresponding source is at the links above.

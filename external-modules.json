@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "modules": {
+    "squid": {
+      "repository": "Zyth45/mod-playerbots",
+      "sha": "fa4cfd31997367b3e574a2b89b858c4669ff53fb",
+      "patch": "patches/squid-coa-validation.patch",
+      "patchSha256": "4a82d2a458eee246ac604b4b2b8b0e45b30589820fc2600314a26da704b022a9"
+    },
+    "dungeon-clear": {
+      "repository": "Zyth45/mod-dungeon-clear",
+      "sha": "9a9d09cf512e0a883af9cda6973445b81c123b13",
+      "patch": "patches/dungeon-clear-coa-validation.patch",
+      "patchSha256": "568ace4fadce584b00fa8825f993ceedd94453a2d04d71f6abeb4db7e984e162"
+    }
+  }
+}

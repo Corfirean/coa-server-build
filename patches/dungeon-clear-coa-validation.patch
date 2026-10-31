@@ -1,0 +1,87 @@
+diff --git a/conf/mod_dungeon_clear.conf.dist b/conf/mod_dungeon_clear.conf.dist
+index fb1c82f..51773bf 100644
+--- a/conf/mod_dungeon_clear.conf.dist
++++ b/conf/mod_dungeon_clear.conf.dist
+@@ -51,7 +51,7 @@
+ 
+ #
+ #    DungeonClear.Enable
+-#        1 (default): mod-dungeon-clear is active.
++#        1: mod-dungeon-clear is active when SQUID bots are enabled.
+ #        0: the module stays compiled and linked but is COMPLETELY INERT. It
+ #        registers no strategies, actions, triggers or values with
+ #        mod-playerbots, so no bot's AI engine can even name one; no bot is ever
+@@ -72,10 +72,10 @@
+ #        worldserver for a new value to take effect. Every OTHER setting in this
+ #        file is still honoured live on `.reload config`.
+ #
+-#        Default: 1
++#        Default: 0
+ #
+ 
+-DungeonClear.Enable = 1
++DungeonClear.Enable = 0
+ 
+ ########################################
+ # GENERAL SETTINGS  (per-player overridable — see note above)
+diff --git a/src/Ai/Dungeon/DungeonClear/Settings/DcSettingsRegistry.h b/src/Ai/Dungeon/DungeonClear/Settings/DcSettingsRegistry.h
+index 424eb51..3aeec9b 100644
+--- a/src/Ai/Dungeon/DungeonClear/Settings/DcSettingsRegistry.h
++++ b/src/Ai/Dungeon/DungeonClear/Settings/DcSettingsRegistry.h
+@@ -104,7 +104,7 @@ inline constexpr DcSettingDef kDcSettings[] =
+     //
+     // Server-only: a master switch is an admin decision, never something an
+     // addon override may reach.
+-    { "Enable",                DcType::Bool,   1,   0,   1,  false },
++    { "Enable",                DcType::Bool,   0,   0,   1,  false },
+ 
+     { "LootMinQuality",        DcType::UInt,   0,   0,   6,  true  },
+ 
+diff --git a/src/DcModuleEnable.cpp b/src/DcModuleEnable.cpp
+index 75beb50..8c7c079 100644
+--- a/src/DcModuleEnable.cpp
++++ b/src/DcModuleEnable.cpp
+@@ -9,6 +9,7 @@
+ 
+ #include "Log.h"
+ #include "ObjectGuid.h"
++#include "Config.h"
+ 
+ #include "Ai/Dungeon/DungeonClear/Settings/DcSettings.h"
+ 
+@@ -22,7 +23,9 @@ namespace
+ 
+     bool ReadConf()
+     {
+-        return DcSettings::GetBool(ObjectGuid::Empty, "Enable");
++        return sConfigMgr->GetOption<bool>("AiPlayerbot.Enabled", false, false)
++            && !sConfigMgr->GetOption<bool>("CoA.ValidationMode", false, false)
++            && DcSettings::GetBool(ObjectGuid::Empty, "Enable");
+     }
+ }
+ 
+diff --git a/src/DcModuleEnable.h b/src/DcModuleEnable.h
+index cbbcafd..d0be1d5 100644
+--- a/src/DcModuleEnable.h
++++ b/src/DcModuleEnable.h
+@@ -2,7 +2,7 @@
+  * mod-dungeon-clear — DcModuleEnable.h
+  *
+  * The module's master switch: `DungeonClear.Enable` in
+- * mod_dungeon_clear.conf (1 by default).
++ * mod_dungeon_clear.conf (0 by default). Requires enabled SQUID bots.
+  *
+  * With it set to 0 the module is compiled and linked but completely inert:
+  *
+diff --git a/tools/check_config_reads.py b/tools/check_config_reads.py
+index 1eaa7be..f9e3a40 100644
+--- a/tools/check_config_reads.py
++++ b/tools/check_config_reads.py
+@@ -43,6 +43,7 @@ ACCESSOR = "Settings/DcSettings.cpp"
+ # does not apply. Both entries are the TestRun driver's identity — a character
+ # name and the account that owns it — read once per driver resolve, not per tick.
+ ALLOWLIST = {
++    "DungeonClear.AllowedDifficulties",
+     "DungeonClear.TestRun.DriverCharacter",
+     "DungeonClear.TestRun.DriverAccount",
+ }

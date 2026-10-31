@@ -106,7 +106,7 @@ def main():
         raise RuntimeError('Stable requires a signed Windows package')
     if manifest['compatibility']['coreCommit'] != lock['components']['core']['sha']:
         raise RuntimeError('Compatibility matrix differs from the source lock')
-    for name in ('bots', 'scaling', 'squid', 'races'):
+    for name in ('bots', 'scaling', 'squid', 'races') + (('dungeon-clear',) if 'dungeon-clear' in lock['components'] else ()):
         if manifest['compatibility']['moduleCommits'].get(name) != lock['components'][name]['sha']:
             raise RuntimeError(f'Module compatibility differs from source lock: {name}')
     report = json.loads((folder / 'qualification.json').read_text())

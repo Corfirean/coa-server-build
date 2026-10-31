@@ -118,8 +118,41 @@ def listeners():
 
 
 def ensure_free(port):
-    if any(p == port for p, _ in listeners()):
-        raise RuntimeError(f"Port {port} is already used. Stop the other server or change Settings/repack.json.")
+    # A PID-zero TCP row can outlive a stopped server on Windows. It is not
+    # sufficient evidence that another application owns the port. Confirm with
+    # an exclusive bind, never SO_REUSEADDR, before allowing startup.
+    deadline = time.monotonic() + 30
+    announced = False
+    while True:
+        owners = sorted({pid for p, pid in listeners() if p == port})
+        if not owners:
+            return
+        if any(pid != 0 for pid in owners):
+            raise RuntimeError(
+                f"Port {port} is already used (PID {', '.join(map(str, owners))}). "
+                "Stop the other server or change Settings/repack.json.")
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+                probe.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+                probe.bind(('0.0.0.0', port))
+        except OSError as error:
+            if error.winerror not in (10013, 10048):
+                raise
+            if time.monotonic() >= deadline:
+                raise RuntimeError(
+                    f"Port {port} remains unavailable after 30 seconds "
+                    f"(Windows reports PID 0; bind error {error.winerror}). "
+                    "No process was stopped. Retry after the previous database shutdown "
+                    "has finished, or check the Windows port reservation.") from error
+            if not announced:
+                print(f"Waiting for Windows to release port {port} (PID 0)...", flush=True)
+                announced = True
+            time.sleep(0.25)
+        else:
+            # The test socket has already closed. The normal server bind remains
+            # authoritative if another process races with startup after this check.
+            return
+
 
 
 def ready(name, port):
@@ -139,7 +172,7 @@ def wait_ready(name, port, seconds=180):
 
 
 @contextmanager
-def control_lock():
+def control_lock(seconds=30):
     STATE.mkdir(parents=True, exist_ok=True)
     with (STATE / "control.lock").open("a+b") as lock:
         lock.seek(0, 2)
@@ -147,15 +180,36 @@ def control_lock():
             lock.write(b"0")
             lock.flush()
         lock.seek(0)
+        deadline = time.monotonic() + seconds
+        owner_path = STATE / "control-owner.json"
+        announced = False
+        while True:
+            try:
+                msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
+                break
+            except OSError:
+                try:
+                    owner = read_json(owner_path)
+                    detail = f" PID {owner['pid']}, action {owner['action']}."
+                except (OSError, ValueError, KeyError, TypeError):
+                    detail = " Owner information is unavailable."
+                if time.monotonic() >= deadline:
+                    raise RuntimeError("Another start/stop action is in progress." + detail) from None
+                if not announced:
+                    print("Waiting for the current server action." + detail, flush=True)
+                    announced = True
+                time.sleep(0.25)
         try:
-            msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
-        except OSError:
-            raise RuntimeError("Another start/stop action is in progress.") from None
-        try:
+            atomic_json(owner_path, {"pid": os.getpid(),
+                                    "action": sys.argv[1] if len(sys.argv) > 1 else "unknown",
+                                    "started": time.time()})
             yield
         finally:
-            lock.seek(0)
-            msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
+            try:
+                owner_path.unlink(missing_ok=True)
+            finally:
+                lock.seek(0)
+                msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
 
 
 def native_root():
@@ -332,7 +386,7 @@ def start_auth(config):
     # An interrupted world startup can leave flag 3, which authserver excludes.
     mysql("UPDATE acore_auth.realmlist SET flag=0 WHERE id=1;")
     print("Starting authserver...", flush=True)
-    spawn("auth", [ROOT / "Core/authserver.exe", "-c", ROOT / "Core/configs/authserver.conf"],
+    spawn("auth", [ROOT / "Core/authserver.exe", "-c", "configs/authserver.conf"],
           ROOT / "Core", ROOT / "Core/Logs/auth-console.log")
     wait_ready("auth", config["authPort"], 60)
 
@@ -459,7 +513,7 @@ def stop_all(config):
 def watch_world():
     from squid_playerbots import validate_bots
     validate_bots(ROOT)
-    world = spawn("world", [ROOT / "Core/worldserver.exe", "-c", ROOT / "Core/configs/worldserver.conf"],
+    world = spawn("world", [ROOT / "Core/worldserver.exe", "-c", "configs/worldserver.conf"],
                   ROOT / "Core", ROOT / "Core/Logs/world-console.log")
     relay = None
     try:
