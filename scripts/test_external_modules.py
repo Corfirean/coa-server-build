@@ -30,7 +30,8 @@ class ExternalModuleTests(unittest.TestCase):
                              "commit", "-m", "Fixture")
                 sha = external.git(target, "rev-parse", "HEAD").decode().strip()
                 (target / "source.txt").write_bytes(b"patched\n")
-                patch = external.git(target, "diff", "--binary", "HEAD", "--")
+                patch = external.git(target, "diff", "--binary", "--full-index", "HEAD", "--")
+                external.git(target, "config", "core.abbrev", "20")
                 (target / "source.txt").write_bytes(b"original\n")
                 filename = "patches/" + name + ".patch"
                 (pipeline / filename).write_bytes(patch)

@@ -1,5 +1,5 @@
 diff --git a/conf/mod_dungeon_clear.conf.dist b/conf/mod_dungeon_clear.conf.dist
-index fb1c82f..51773bf 100644
+index fb1c82f80c8f404d2243e643151a1588424a2dbe..51773bf4eaf247cc6f71832856e3943ecccda6ae 100644
 --- a/conf/mod_dungeon_clear.conf.dist
 +++ b/conf/mod_dungeon_clear.conf.dist
 @@ -51,7 +51,7 @@
@@ -25,7 +25,7 @@ index fb1c82f..51773bf 100644
  ########################################
  # GENERAL SETTINGS  (per-player overridable — see note above)
 diff --git a/src/Ai/Dungeon/DungeonClear/Settings/DcSettingsRegistry.h b/src/Ai/Dungeon/DungeonClear/Settings/DcSettingsRegistry.h
-index 424eb51..3aeec9b 100644
+index 424eb51f49baa5fec7e75368c27753757d0b5a49..3aeec9be7793ca450f3033d62d8e6628ef5357c1 100644
 --- a/src/Ai/Dungeon/DungeonClear/Settings/DcSettingsRegistry.h
 +++ b/src/Ai/Dungeon/DungeonClear/Settings/DcSettingsRegistry.h
 @@ -104,7 +104,7 @@ inline constexpr DcSettingDef kDcSettings[] =
@@ -38,7 +38,7 @@ index 424eb51..3aeec9b 100644
      { "LootMinQuality",        DcType::UInt,   0,   0,   6,  true  },
  
 diff --git a/src/DcModuleEnable.cpp b/src/DcModuleEnable.cpp
-index 75beb50..8c7c079 100644
+index 75beb50dc89d9d2bc5f19db810650ad020c9e1d9..8c7c0791d6c2b929511b625af0bf499a902df47f 100644
 --- a/src/DcModuleEnable.cpp
 +++ b/src/DcModuleEnable.cpp
 @@ -9,6 +9,7 @@
@@ -61,7 +61,7 @@ index 75beb50..8c7c079 100644
  }
  
 diff --git a/src/DcModuleEnable.h b/src/DcModuleEnable.h
-index cbbcafd..d0be1d5 100644
+index cbbcafd6b87b71ee2653108f5e56cfcb982befca..d0be1d507496a06c67eb46da7415485a6f511e38 100644
 --- a/src/DcModuleEnable.h
 +++ b/src/DcModuleEnable.h
 @@ -2,7 +2,7 @@
@@ -74,7 +74,7 @@ index cbbcafd..d0be1d5 100644
   * With it set to 0 the module is compiled and linked but completely inert:
   *
 diff --git a/tools/check_config_reads.py b/tools/check_config_reads.py
-index 1eaa7be..f9e3a40 100644
+index 1eaa7beb2b8b6af83dabc23e96b8296c90456aba..f9e3a40ce0565419237180460c1d289b20e3cf76 100644
 --- a/tools/check_config_reads.py
 +++ b/tools/check_config_reads.py
 @@ -43,6 +43,7 @@ ACCESSOR = "Settings/DcSettings.cpp"

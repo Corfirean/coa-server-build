@@ -50,7 +50,7 @@ def prepare(core):
         if git(path, "rev-parse", "HEAD").decode().strip() != module["sha"]:
             raise RuntimeError("External module revision needs compatibility review: " + name)
         patch = PIPELINE / module["patch"]
-        changes = git(path, "diff", "--binary", "HEAD", "--")
+        changes = git(path, "diff", "--binary", "--full-index", "HEAD", "--")
         if changes:
             if changes != patch.read_bytes():
                 raise RuntimeError("External module contains unexpected changes: " + name)

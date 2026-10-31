@@ -1,5 +1,5 @@
 diff --git a/src/PlayerbotAIConfig.cpp b/src/PlayerbotAIConfig.cpp
-index 732ccc1e..d05c35ea 100644
+index 732ccc1e20ca438f7ef673558b1a90e54364b325..d05c35eac06bdf80f1eedf1fc9a95a938cd1d883 100644
 --- a/src/PlayerbotAIConfig.cpp
 +++ b/src/PlayerbotAIConfig.cpp
 @@ -948,6 +948,16 @@ bool PlayerbotAIConfig::Initialize()
@@ -20,7 +20,7 @@ index 732ccc1e..d05c35ea 100644
      if (World::IsStopped())
      {
 diff --git a/src/PlayerbotAIConfig.h b/src/PlayerbotAIConfig.h
-index 34b6e2be..1db6d031 100644
+index 34b6e2be67e14f69d94622b68b8283b9befd9731..1db6d0318526ccba126f7be8b4f3781b4df003d8 100644
 --- a/src/PlayerbotAIConfig.h
 +++ b/src/PlayerbotAIConfig.h
 @@ -108,6 +108,7 @@ public:
@@ -32,7 +32,7 @@ index 34b6e2be..1db6d031 100644
      bool EnableICCBuffs;
      bool allowAccountBots, allowGuildBots, allowTrustedAccountBots;
 diff --git a/src/Script/Playerbots.cpp b/src/Script/Playerbots.cpp
-index 3efd1513..64afdecb 100644
+index 3efd151359c6a851d5e890cd48dec187194060f6..64afdecb98559fcef26025e08c5aee2212438d62 100644
 --- a/src/Script/Playerbots.cpp
 +++ b/src/Script/Playerbots.cpp
 @@ -460,6 +460,8 @@ public:
