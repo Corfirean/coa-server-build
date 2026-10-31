@@ -353,6 +353,7 @@ jobs:
           }
           cmake -S . -B "$build" -G Ninja @opensslArgs `
             -DCMAKE_BUILD_TYPE=RelWithDebInfo `
+            -DCMAKE_NINJA_FORCE_RESPONSE_FILE=ON `
             -DBUILD_TESTING=ON `
             -DCMAKE_JOB_POOLS=link_pool=1 `
             -DCMAKE_JOB_POOL_LINK=link_pool `
@@ -377,7 +378,7 @@ jobs:
         shell: pwsh
         run: |
           $build = if ($env:COA_BUILD_DIRECTORY) { $env:COA_BUILD_DIRECTORY } else { 'build' }
-          ninja -C "$build" -t commands | python _pipeline/scripts/validate-msvc-cache.py
+          ninja -C "$build" -t compdb -x | python _pipeline/scripts/validate-msvc-cache.py
           if ($LASTEXITCODE) { throw 'Generated compiler flags violate the cache configuration.' }
       - name: Reset compiler cache counters
         if: steps.sccache.outcome == 'success'
