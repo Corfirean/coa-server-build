@@ -504,8 +504,14 @@ def stop_all(config):
             raise RuntimeError("Authserver did not stop.")
     database = process("mysql")
     if database:
-        mysql(admin="shutdown")
+        shutdown_error = None
+        try:
+            mysql(admin="shutdown")
+        except (OSError, RuntimeError, subprocess.SubprocessError) as error:
+            shutdown_error = error
         if not wait_stopped(database, 60):
+            if shutdown_error is not None:
+                raise shutdown_error
             raise RuntimeError("MySQL is still stopping; wait before copying the repack.")
     print("All services from this repack are stopped. It is safe to move or copy this folder.", flush=True)
 
