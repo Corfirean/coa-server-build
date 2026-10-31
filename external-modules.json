@@ -11,7 +11,7 @@
       "repository": "Zyth45/mod-dungeon-clear",
       "sha": "9a9d09cf512e0a883af9cda6973445b81c123b13",
       "patch": "patches/dungeon-clear-coa-validation.patch",
-      "patchSha256": "55259d9fec70d68b84533ace5ad8c03b2f8dacb300943a667aae1eeeddd09f73"
+      "patchSha256": "97dab764b36a448fbf6fb6932b6bed9bb06bffcffb1bb7eeef20f75cbf5a0c2d"
     }
   }
 }

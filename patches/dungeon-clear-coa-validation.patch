@@ -24,6 +24,20 @@ index fb1c82f80c8f404d2243e643151a1588424a2dbe..51773bf4eaf247cc6f71832856e3943e
  
  ########################################
  # GENERAL SETTINGS  (per-player overridable — see note above)
+diff --git a/mod-dungeon-clear.cmake b/mod-dungeon-clear.cmake
+index fe28ae6b11bcc21c197229563d140d51d08f1b7a..948b8ac244c462f8965e5190b35ece15922f4e68 100644
+--- a/mod-dungeon-clear.cmake
++++ b/mod-dungeon-clear.cmake
+@@ -192,7 +192,8 @@ if (BUILD_TESTING)
+         # test TUs include the core's Position.h too. Same empty-value spelling,
+         # same reason (see the C4005 note above).
+         if (MSVC)
+-            target_compile_options(dungeon_clear_tests PRIVATE /D_USE_MATH_DEFINES=)
++            target_compile_options(dungeon_clear_tests PRIVATE /D_USE_MATH_DEFINES= /utf-8)
++            target_compile_definitions(dungeon_clear_tests PRIVATE NOMINMAX)
+         endif()
+ 
+         # Link the necessary targets
 diff --git a/src/Ai/Dungeon/DungeonClear/Settings/DcSettingsRegistry.h b/src/Ai/Dungeon/DungeonClear/Settings/DcSettingsRegistry.h
 index 424eb51f49baa5fec7e75368c27753757d0b5a49..3aeec9be7793ca450f3033d62d8e6628ef5357c1 100644
 --- a/src/Ai/Dungeon/DungeonClear/Settings/DcSettingsRegistry.h
