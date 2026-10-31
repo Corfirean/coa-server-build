@@ -677,6 +677,82 @@ def main():
         print("Use Stop_All_Server.bat to shut down this repack safely.")
 
 
+def _install_diagnostics():
+    import datetime
+    import functools
+    import hashlib
+
+    actions = {"start-all", "start-mysql", "start-auth", "start-world", "stop-all",
+               "force-stop-all", "prepare", "watch-world"}
+    action = next((arg for arg in sys.argv[1:] if arg in actions), None)
+    if action is None:
+        return
+    directory = STATE / "diagnostics"
+    timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d-%H%M%S-%f")
+    path = directory / f"manage-{timestamp}-{os.getpid()}.jsonl"
+    initialized = False
+
+    def emit(event, **fields):
+        nonlocal initialized
+        try:
+            directory.mkdir(parents=True, exist_ok=True)
+            if not initialized:
+                previous = sorted(directory.glob("manage-*.jsonl"), key=lambda p: p.stat().st_mtime, reverse=True)
+                for old in previous[19:]:
+                    old.unlink(missing_ok=True)
+                initialized = True
+            if path.exists() and path.stat().st_size >= 1024 * 1024:
+                return
+            record = {"utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                      "pid": os.getpid(), "action": action, "event": event, **fields}
+            with path.open("a", encoding="utf-8") as stream:
+                stream.write(json.dumps(record, ensure_ascii=False) + "\n")
+        except (OSError, ValueError):
+            pass
+
+    def wrap(name):
+        original = globals()[name]
+
+        @functools.wraps(original)
+        def traced(*args, **kwargs):
+            began = time.monotonic()
+            detail = {}
+            if name in ("wait_ready", "spawn") and args:
+                detail["service"] = args[0]
+            port = args[0] if name == "ensure_free" and args else args[1] if name == "wait_ready" and len(args) > 1 else None
+            if port is not None:
+                detail["port"] = port
+            emit(name + ".begin", **detail)
+            try:
+                result = original(*args, **kwargs)
+            except BaseException as error:
+                if port is not None:
+                    try:
+                        detail["listeners"] = [list(row) for row in listeners() if row[0] == port]
+                    except OSError:
+                        pass
+                emit(name + ".error", duration_seconds=round(time.monotonic() - began, 6),
+                     error_type=type(error).__name__, **detail)
+                raise
+            emit(name + ".ok", duration_seconds=round(time.monotonic() - began, 6), **detail)
+            return result
+
+        globals()[name] = traced
+
+    for name in ("main", "prepare", "ensure_free", "wait_ready", "spawn", "start_mysql",
+                 "start_auth", "start_world", "watch_world", "stop_all", "terminate", "wait_stopped"):
+        wrap(name)
+    try:
+        digest = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+    except OSError:
+        digest = None
+    emit("diagnostics.started", root=str(ROOT), parent_pid=os.getppid(),
+         source_sha256=digest, python=sys.version)
+
+
+_install_diagnostics()
+
+
 if __name__ == "__main__":
     try:
         main()
