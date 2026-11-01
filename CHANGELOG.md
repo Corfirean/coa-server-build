@@ -8,6 +8,19 @@ Published releases and previews. Pre-release entries do not change the stable up
 
 Dates follow GitHub publication (UTC); legacy records retain their archived dates. Newest releases first.
 
+## 0.261101.92 (Pre-release) — 2026-11-01
+
+- Concurrent server actions wait briefly and identify the action still running.
+- Dungeon Clear is available as an optional extension for SQUID bots.
+- Server launchers accept configuration paths in folders with spaces.
+- Startup and shutdown keep bounded diagnostics of launcher stages.
+- Database shutdown succeeds when MySQL closes its connection before replying.
+- Database restarts recover from ownerless Windows port entries.
+- Server validation skips creating and logging in SQUID bots.
+- Updated the reviewed CoA upstream snapshot.
+
+[Release](https://github.com/Corfirean/coa-server-build/releases/tag/server-0.261101.92) · [Source changes](https://github.com/Corfirean/coa-server-build/compare/server-0.261030.90...server-0.261101.92)
+
 ## 0.261030.90 — 2026-10-30
 
 **Portable Characters are experimental and may contain bugs.**
