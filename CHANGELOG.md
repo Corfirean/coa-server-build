@@ -8,7 +8,7 @@ Published releases and previews. Pre-release entries do not change the stable up
 
 Dates follow GitHub publication (UTC); legacy records retain their archived dates. Newest releases first.
 
-## 0.261101.92 (Pre-release) — 2026-11-01
+## 0.261101.92 — 2026-11-01
 
 - Concurrent server actions wait briefly and identify the action still running.
 - Dungeon Clear is available as an optional extension for SQUID bots.
