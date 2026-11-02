@@ -1,0 +1,169 @@
+name: preview-build
+# Dedicated CoA Modules Preview build pipeline.
+# Compiles the modular AzerothCore host (preview/dynamic-plugin-host),
+# exports the CoA Plugin SDK, and builds official dynamic DLL plugins.
+# Stable release pipeline (main) is completely isolated and untouched.
+
+on:
+  workflow_dispatch:
+    inputs:
+      core_ref:
+        description: 'Core branch/commit (defaults to preview/dynamic-plugin-host)'
+        default: 'preview/dynamic-plugin-host'
+        type: string
+      package_preview:
+        description: 'Whether to assemble the complete preview distribution bundle'
+        default: true
+        type: boolean
+  workflow_call:
+    inputs:
+      core_ref:
+        type: string
+        default: 'preview/dynamic-plugin-host'
+      package_preview:
+        type: boolean
+        default: true
+    outputs:
+      core_sha:
+        value: ${{ jobs.build_modular_host.outputs.core_sha }}
+      abi_fingerprint:
+        value: ${{ jobs.build_modular_host.outputs.abi_fingerprint }}
+      bundle_artifact:
+        value: ${{ jobs.package_preview_bundle.outputs.bundle_artifact }}
+
+concurrency:
+  group: preview-build-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build_modular_host:
+    name: Build Modular Host & SDK
+    runs-on: windows-latest
+    timeout-minutes: 180
+    outputs:
+      core_sha: ${{ steps.core_meta.outputs.sha }}
+      abi_fingerprint: ${{ steps.sdk_meta.outputs.fingerprint }}
+    env:
+      BOOST_ROOT: C:\local\boost_1_87_0
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: builder
+
+      - uses: actions/checkout@v7
+        with:
+          repository: Corfirean/azerothcore-wotlk-coa
+          ref: ${{ inputs.core_ref || 'preview/dynamic-plugin-host' }}
+          path: core
+          fetch-depth: 1
+
+      - name: Cache Boost & MySQL
+        uses: actions/cache@v6
+        with:
+          path: |
+            C:\local\boost_1_87_0
+            C:\tools\mysql\current
+          key: winbuild-deps:boost-1.87.0:mysql-8.4.9
+
+      - name: Record Core Metadata
+        id: core_meta
+        shell: pwsh
+        run: |
+          cd core
+          $sha = (git rev-parse HEAD).Trim()
+          Write-Output "sha=$sha" >> $env:GITHUB_OUTPUT
+          Write-Host "Modular Core HEAD: $sha"
+
+      - name: Build Modular Host & Generate SDK
+        shell: pwsh
+        run: |
+          powershell -ExecutionPolicy Bypass -File builder/scripts/preview-build.ps1 `
+            -CoreDir "$PWD/core" `
+            -OutputDir "$PWD/artifacts/server" `
+            -SdkOutputDir "$PWD/artifacts/sdk"
+
+      - name: Extract SDK Fingerprint
+        id: sdk_meta
+        shell: pwsh
+        run: |
+          $sdkJson = Get-Content "artifacts/sdk/sdk.json" -Raw | ConvertFrom-Json
+          $fp = $sdkJson.abiFingerprint
+          Write-Output "fingerprint=$fp" >> $env:GITHUB_OUTPUT
+          Write-Host "Preview SDK ABI Fingerprint: $fp"
+
+      - name: Upload Host & SDK Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview-host-and-sdk
+          path: artifacts/
+          retention-days: 7
+
+  build_official_plugins:
+    name: Build Official DLL Plugins
+    needs: build_modular_host
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: builder
+
+      - name: Download Host & SDK
+        uses: actions/download-artifact@v4
+        with:
+          name: preview-host-and-sdk
+          path: artifacts/
+
+      - name: Build Dynamic Plugins
+        shell: pwsh
+        run: |
+          powershell -ExecutionPolicy Bypass -File builder/scripts/preview-build-plugins.ps1 `
+            -SdkDir "$PWD/artifacts/sdk" `
+            -OutputDir "$PWD/artifacts/plugins"
+
+      - name: Upload Dynamic Plugin Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview-official-plugins
+          path: artifacts/plugins/
+          retention-days: 7
+
+  package_preview_bundle:
+    name: Package Preview Distribution
+    needs: [build_modular_host, build_official_plugins]
+    runs-on: windows-latest
+    outputs:
+      bundle_artifact: preview-server-bundle
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: builder
+
+      - name: Download Host & SDK
+        uses: actions/download-artifact@v4
+        with:
+          name: preview-host-and-sdk
+          path: artifacts/
+
+      - name: Download Plugins
+        uses: actions/download-artifact@v4
+        with:
+          name: preview-official-plugins
+          path: artifacts/plugins/
+
+      - name: Assemble Preview Server Package
+        shell: pwsh
+        run: |
+          powershell -ExecutionPolicy Bypass -File builder/scripts/preview-package.ps1 `
+            -ServerDir "$PWD/artifacts/server" `
+            -SdkDir "$PWD/artifacts/sdk" `
+            -PluginsDir "$PWD/artifacts/plugins" `
+            -CandidateLock "builder/candidate-lock.json" `
+            -OutputDir "$PWD/dist"
+
+      - name: Upload Preview Server Bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview-server-bundle
+          path: dist/
+          retention-days: 14

@@ -1,0 +1,29 @@
+name: preview-verify
+# Qualification and verification pipeline for CoA Modules Preview.
+# Validates ABI compatibility, DLL import contracts, absence of static/dynamic module duplication,
+# and server startup/shutdown under the dynamic plugin host.
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  verify_modular_preview:
+    name: Verify Preview Qualification Matrix
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Run Qualification Script
+        shell: pwsh
+        run: |
+          powershell -ExecutionPolicy Bypass -File scripts/preview-verify.ps1 `
+            -CandidateLock "candidate-lock.json" `
+            -ReportOut "PREVIEW_BUILDER_QUALIFICATION.md"
+
+      - name: Upload Verification Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview-verification-report
+          path: PREVIEW_BUILDER_QUALIFICATION.md

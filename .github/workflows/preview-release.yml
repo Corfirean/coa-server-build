@@ -1,0 +1,53 @@
+name: preview-release
+# Release preparation and publication workflow for CSM Modules Preview.
+# Publishes to the dedicated preview distribution channel.
+# NEVER touches the Stable release pointer (latest.json) or stable branch.
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish_to_testers:
+        description: 'Publish candidate to Preview distribution channel'
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  build_candidate:
+    uses: ./.github/workflows/preview-build.yml
+    with:
+      core_ref: 'preview/dynamic-plugin-host'
+      package_preview: true
+
+  verify_candidate:
+    needs: build_candidate
+    uses: ./.github/workflows/preview-verify.yml
+
+  publish_preview:
+    name: Publish Preview Channel Candidate
+    needs: [build_candidate, verify_candidate]
+    runs-on: windows-latest
+    if: inputs.publish_to_testers == true
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Generate Preview Channel Index
+        shell: pwsh
+        run: |
+          powershell -ExecutionPolicy Bypass -File scripts/preview-package.ps1 -GenerateChannelIndex
+
+      - name: Publish to GitHub Releases (Preview Channel Only)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $ver = (Get-Content candidate-lock.json -Raw | ConvertFrom-Json).version
+          $tag = "preview-v$ver"
+          gh release create "$tag" `
+            --prerelease `
+            --title "CSM Modules Preview $ver" `
+            --notes-file "docs/preview-distribution.md" `
+            dist/*
