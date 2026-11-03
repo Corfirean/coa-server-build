@@ -1,8 +1,11 @@
 import re
 import sys
+import json
 
 
 def validate(commands):
+    if commands.lstrip().startswith('['):
+        commands = '\n'.join(entry['command'] for entry in json.loads(commands))
     compiles = [line for line in commands.splitlines() if re.search(r'(?:^|\s)[/-]c(?:\s|$)', line)]
     if not compiles:
         raise RuntimeError('No MSVC compilation commands were generated')

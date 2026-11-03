@@ -2,6 +2,7 @@
 import argparse
 import ast
 import re
+import subprocess
 import tempfile
 from contextlib import nullcontext
 from pathlib import Path
@@ -70,6 +71,7 @@ class StartingWorldShutdownTests(unittest.TestCase):
         database = {"pid": 102, "created": 20}
         events = []
         namespace = {
+            "subprocess": subprocess,
             "process": lambda name: {"world": world, "mysql": database}.get(name),
             "ra": Mock(side_effect=console_error, return_value="Shutdown requested"),
             "terminate": Mock(side_effect=lambda record: events.append(("terminate", record))),
@@ -98,6 +100,22 @@ class StartingWorldShutdownTests(unittest.TestCase):
         namespace["stop_all"]({})
         namespace["terminate"].assert_not_called()
         self.assertEqual(events, [("wait", world), ("mysql", {"admin": "shutdown"}), ("wait", database)])
+
+    def test_database_shutdown_connection_loss_is_accepted_only_after_owned_process_exits(self):
+        namespace, _, database, _ = self.shutdown()
+        namespace["mysql"].side_effect = RuntimeError("Lost connection during shutdown")
+        namespace["stop_all"]({})
+        namespace["wait_stopped"].assert_any_call(database, 60)
+
+    def test_failed_database_shutdown_does_not_hide_a_still_running_process(self):
+        namespace, world, database, _ = self.shutdown()
+        error = RuntimeError("Shutdown denied")
+        namespace["mysql"].side_effect = error
+        namespace["wait_stopped"].side_effect = lambda record, seconds: record == world
+        with self.assertRaises(RuntimeError) as raised:
+            namespace["stop_all"]({})
+        self.assertIs(raised.exception, error)
+        namespace["wait_stopped"].assert_any_call(database, 60)
 
 
 if __name__ == "__main__":

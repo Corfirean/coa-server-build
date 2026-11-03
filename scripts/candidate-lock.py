@@ -1,4 +1,5 @@
 import importlib.util
+import copy
 import json
 import os
 from pathlib import Path
@@ -34,6 +35,10 @@ def freeze(path):
         sources = load('upgrade-sources').resolve()
         lock['historicalUpgradeSources'] = sources
         lock['upgradeSources'] = sources[:3]
+    expected_components = copy.deepcopy(lock['components'])
+    daily.freeze_external(expected_components)
+    if expected_components != lock['components']:
+        raise RuntimeError('Shared snapshot differs from the pinned external modules and patches')
     if len(lock['upgradeSources']) > 3:
         lock.setdefault('historicalUpgradeSources', lock['upgradeSources'])
         lock['upgradeSources'] = lock['upgradeSources'][:3]

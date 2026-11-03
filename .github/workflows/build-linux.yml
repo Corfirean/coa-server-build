@@ -168,6 +168,8 @@ jobs:
           repository: Zyth45/mod-playerbots
           ref: ${{ steps.squid.outputs.squid_sha }}
           path: _core/modules/mod-playerbots
+      - name: Prepare pinned Dungeon Clear and reviewed validation patches
+        run: python3 -B scripts/prepare-external-modules.py --core _core
       - name: Record the exact commits
         env:
           SQUID_RESOLVED_TAG: ${{ steps.squid.outputs.squid_tag }}

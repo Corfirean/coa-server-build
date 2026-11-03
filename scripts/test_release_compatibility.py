@@ -13,6 +13,10 @@ spec.loader.exec_module(compatibility)
 
 
 class CompatibilityTests(unittest.TestCase):
+    def test_population_safe_validation_requires_the_new_manager_without_lowering_a_newer_floor(self):
+        self.assertEqual(compatibility.minimum_manager('0.9.7', '1.9.2', isolated_validation=True), '0.9.8')
+        self.assertEqual(compatibility.minimum_manager('0.10.0', '1.9.2', isolated_validation=True), '0.10.0')
+
     def test_esteria_release_requires_matching_client_installer(self):
         self.assertEqual(compatibility.minimum_manager('0.8.1', '1.9.2'), '0.8.2')
         self.assertEqual(compatibility.minimum_manager('0.9.0', '1.9.2'), '0.9.0')

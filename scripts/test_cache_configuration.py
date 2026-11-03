@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import unittest
 from pathlib import Path
 
@@ -8,6 +9,11 @@ spec.loader.exec_module(flags)
 
 
 class CacheFlagsTests(unittest.TestCase):
+    def test_expanded_response_file_commands_keep_flag_validation(self):
+        flags.validate(json.dumps([{'command': 'cl.exe /c /Z7 /O2 sample.cpp /Fooutput.obj'}]))
+        with self.assertRaises(RuntimeError):
+            flags.validate(json.dumps([{'command': 'cl.exe /c /Zi sample.cpp /Fooutput.obj'}]))
+
     def test_embedded_debug_is_cacheable(self):
         flags.validate('sccache cl.exe /c /Z7 /O2 sample.cpp /Fooutput.obj')
 

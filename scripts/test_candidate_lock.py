@@ -25,7 +25,7 @@ class CandidateLockTests(unittest.TestCase):
                     lock['upgradeSources'] = sources
                     (root / 'lock.json').write_text(json.dumps(lock))
                 daily = SimpleNamespace(snapshot=lambda _: 'frozen', resolve=lambda *args, **kwargs: lock,
-                                        check_integration=lambda _: None)
+                                        check_integration=lambda _: None, freeze_external=lambda _: None)
                 upgrades = SimpleNamespace(resolve=lambda: sources)
                 env = {name.upper() + '_REF': 'a' * 40 for name in components}
                 env['GITHUB_OUTPUT'] = str(root / 'output')

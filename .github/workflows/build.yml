@@ -272,6 +272,9 @@ jobs:
           repository: Zyth45/mod-playerbots
           ref: ${{ env.SQUID_SHA }}
           path: _core/modules/mod-playerbots
+      - name: Prepare pinned Dungeon Clear and reviewed validation patches
+        shell: pwsh
+        run: python -B scripts/prepare-external-modules.py --core _core
       - name: Place Content Scaling and its content packs into the core tree (their SQL and configs ship with the release)
         shell: pwsh
         run: |

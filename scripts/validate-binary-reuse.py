@@ -2,6 +2,8 @@ import json
 import os
 import re
 import subprocess
+import importlib.util
+from pathlib import Path
 
 
 def api(path):
@@ -39,6 +41,11 @@ def main():
         if not re.fullmatch('[0-9a-f]{40}', sha):
             raise RuntimeError('Exact source SHAs are required')
     log = subprocess.check_output(['gh', 'run', 'view', run, '--repo', repo, '--job', str(build['id']), '--log'], encoding='utf-8')
+    spec = importlib.util.spec_from_file_location('external_modules', Path(__file__).with_name('prepare-external-modules.py'))
+    external = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(external)
+    if 'external modules identity: ' + external.identity() not in log:
+        raise RuntimeError('Verified binaries do not include the pinned external modules and patches')
     for label, sha in (('core commit:', os.environ['OLD_CORE']), ('bots commit:', pins['bots_sha']),
                        ('scaling commit:', pins['scaling_sha']), ('squid_sha=', pins['squid_sha'])):
         if not re.search(re.escape(label) + r'\s*' + sha + r'\b', log):

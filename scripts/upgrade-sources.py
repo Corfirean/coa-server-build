@@ -1,9 +1,12 @@
 import argparse
 import base64
 import hashlib
+import http.client
 import json
 import re
 import subprocess
+import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -124,6 +127,16 @@ def download(lock, folder, roles=None):
 
 
 def download_part(url, target, size, digest):
+    for attempt in range(3):
+        try:
+            return download_part_once(url, target, size, digest)
+        except (TimeoutError, ConnectionError, http.client.IncompleteRead, urllib.error.URLError) as error:
+            if isinstance(error, urllib.error.HTTPError) or attempt == 2:
+                raise
+            time.sleep(2 ** attempt)
+
+
+def download_part_once(url, target, size, digest):
     if not url.startswith(f'https://github.com/{REPO}/releases/download/'):
         raise RuntimeError('Upgrade archive must come from the server release repository')
     if target.exists():

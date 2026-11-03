@@ -129,6 +129,34 @@ class SourceTests(unittest.TestCase):
                 sources.download_part(url, target, 4, hashlib.sha256(b'good').hexdigest())
             self.assertEqual(partial.read_bytes(), b'other download')
 
+    def test_archive_read_timeout_retries_without_reusing_partial_bytes(self):
+        class Interrupted(io.BytesIO):
+            def read(self, count=-1):
+                if self.tell():
+                    raise TimeoutError('interrupted read')
+                return super().read(2)
+
+        url = 'https://github.com/Corfirean/coa-server-build/releases/download/stable/part'
+        with tempfile.TemporaryDirectory() as directory, \
+             patch.object(sources.urllib.request, 'urlopen', side_effect=[Interrupted(b'bad'), io.BytesIO(b'good')]) as fetch, \
+             patch.object(sources.time, 'sleep'):
+            target = Path(directory) / 'part'
+            sources.download_part(url, target, 4, hashlib.sha256(b'good').hexdigest())
+            self.assertEqual(target.read_bytes(), b'good')
+            self.assertEqual(fetch.call_count, 2)
+            self.assertFalse(target.with_name('part.partial').exists())
+
+    def test_archive_timeout_retries_are_bounded(self):
+        url = 'https://github.com/Corfirean/coa-server-build/releases/download/stable/part'
+        with tempfile.TemporaryDirectory() as directory, \
+             patch.object(sources.urllib.request, 'urlopen', side_effect=TimeoutError('offline')) as fetch, \
+             patch.object(sources.time, 'sleep'):
+            target = Path(directory) / 'part'
+            with self.assertRaises(TimeoutError):
+                sources.download_part(url, target, 4, hashlib.sha256(b'good').hexdigest())
+            self.assertEqual(fetch.call_count, 3)
+            self.assertFalse(target.exists())
+
     def test_invalid_signature_stops_before_archive_download(self):
         with tempfile.TemporaryDirectory() as directory, patch.object(sources, 'download'), \
              patch.object(sources.subprocess, 'run', side_effect=subprocess.CalledProcessError(1, 'verify-manifest')), \

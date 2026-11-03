@@ -15,6 +15,18 @@ def revision(repo, ref):
     return gh(f"repos/{repo}/commits/{ref}")["sha"]
 
 
+def freeze_external(components):
+    external = json.loads((Path(__file__).resolve().parents[1] / 'external-modules.json').read_text(encoding='utf-8'))
+    for name, module in external['modules'].items():
+        if name == 'squid':
+            if components[name]['sha'] != module['sha']:
+                raise RuntimeError('The selected SQUID revision needs validation patch compatibility review')
+            components[name]['patch'] = module['patch']
+            components[name]['patchSha256'] = module['patchSha256']
+        else:
+            components[name] = dict(module, ref=module['sha'])
+
+
 def resolve(core_ref="coa-bots", manager_ref="master", bots_ref="master", scaling_ref="main", squid_ref="latest-release", upstream_ref="main", races_ref="latest-release", experimental_portable=False):
     races_path = "latest" if races_ref == "latest-release" else "tags/" + races_ref
     races = gh("repos/ilusixn/azerothcore-wotlk-coa/releases/" + races_path)
@@ -38,6 +50,7 @@ def resolve(core_ref="coa-bots", manager_ref="master", bots_ref="master", scalin
     for name, component in components.items():
         ref = "refs/tags/" + component["ref"] if name == "races" else component["ref"]
         component["sha"] = revision(component["repository"], ref)
+    freeze_external(components)
     components['squid']['ref'] = next((t['name'] for t in stable
                                      if t['commit']['sha'] == components['squid']['sha']), components['squid']['ref'])
     components["races"]["assets"] = [
