@@ -9,7 +9,7 @@ param(
     [string] $ChannelDir = "",
     [string] $ManagerVersion = "0.7.1",
     [string] $ManagerSignature = "",
-    [switch] $GenerateChannelIndex,
+    [switch] $ValidatePublishable,
     [switch] $RequireAllOfficialModules
 )
 
@@ -40,7 +40,7 @@ if (-not $CandidateLock) {
     }
 }
 if (-not $CandidateLock -or -not (Test-Path $CandidateLock)) {
-    throw "Candidate lock not found. Please provide -CandidateLock path."
+    throw "FATAL: Candidate lock not found. Please provide -CandidateLock path."
 }
 
 if (-not $ServerDir) {
@@ -100,21 +100,55 @@ if (-not $SdkDir -or -not (Test-Path "$SdkDir/sdk.json")) {
     throw "Mandatory metadata missing: sdk.json not found in '$SdkDir'."
 }
 
+# Validate Candidate Lock
+$lock = Get-Content $CandidateLock -Raw | ConvertFrom-Json
+if (-not $lock.sdk -or -not $lock.sdk.version) {
+    throw "FATAL: Candidate lock has missing or null sdk.version. Manifest generation blocked."
+}
+if (-not $lock.sdk.abi_fingerprint -or $lock.sdk.abi_fingerprint.Length -ne 64) {
+    throw "FATAL: Candidate lock has invalid sdk.abi_fingerprint."
+}
+
+# If ValidatePublishable is set, enforce non-empty signature on Contract 1
+if ($ValidatePublishable -and [string]::IsNullOrWhiteSpace($ManagerSignature)) {
+    throw "FATAL: Cannot package publishable release: ManagerSignature is required but empty. Tauri updater manifest cannot be published without signature."
+}
+
 New-Item -ItemType Directory -Force -Path $OutputDir, "$OutputDir/server", "$OutputDir/sdk", "$OutputDir/plugins" | Out-Null
 
+function Safe-CopyFile {
+    param([string]$SourceFile, [string]$DestDir)
+    $srcFull = [System.IO.Path]::GetFullPath($SourceFile)
+    $destFull = [System.IO.Path]::GetFullPath((Join-Path $DestDir ([System.IO.Path]::GetFileName($SourceFile))))
+    if ($srcFull -ne $destFull) {
+        Copy-Item -Path $srcFull -Destination $destFull -Force
+    }
+}
+
+function Safe-CopyTree {
+    param([string]$SourceDir, [string]$DestDir)
+    $srcFull = [System.IO.Path]::GetFullPath($SourceDir)
+    $destFull = [System.IO.Path]::GetFullPath($DestDir)
+    if ($srcFull -ne $destFull) {
+        Copy-Item -Path "$srcFull/*" -Destination "$destFull/" -Recurse -Force
+    }
+}
+
 # 1. Package Server Executables & Runtime
-Copy-Item "$ServerDir/worldserver.exe" "$OutputDir/server/" -Force
+Safe-CopyFile "$ServerDir/worldserver.exe" "$OutputDir/server"
 if (Test-Path "$ServerDir/authserver.exe") {
-    Copy-Item "$ServerDir/authserver.exe" "$OutputDir/server/" -Force
+    Safe-CopyFile "$ServerDir/authserver.exe" "$OutputDir/server"
 }
 
 # 2. Package Plugin SDK
-Copy-Item "$SdkDir/*" "$OutputDir/sdk/" -Recurse -Force
+Safe-CopyTree $SdkDir "$OutputDir/sdk"
 
 # 3. Package Official Dynamic Plugins
 $mandatoryPlugins = @("companions.dll", "content_scaling.dll", "squid_playerbots.dll")
 if ($PluginsDir -and (Test-Path $PluginsDir)) {
-    Get-ChildItem -Path $PluginsDir -Filter "*.dll" | Copy-Item -Destination "$OutputDir/plugins/" -Force
+    Get-ChildItem -Path $PluginsDir -Filter "*.dll" | ForEach-Object {
+        Safe-CopyFile $_.FullName "$OutputDir/plugins"
+    }
 }
 
 if ($RequireAllOfficialModules) {
@@ -127,27 +161,27 @@ if ($RequireAllOfficialModules) {
 
 # Optional TimeIsTime
 if ($TimeIsTimeDll -and (Test-Path $TimeIsTimeDll)) {
-    Copy-Item $TimeIsTimeDll "$OutputDir/plugins/" -Force
+    Safe-CopyFile $TimeIsTimeDll "$OutputDir/plugins"
 } elseif (Test-Path "$PluginsDir/time-is-time.dll") {
-    Copy-Item "$PluginsDir/time-is-time.dll" "$OutputDir/plugins/" -Force
-} elseif (Test-Path "C:/games/coa-work/plugin-spike/plugins/timeistime/build-v03/time-is-time.dll") {
-    Copy-Item "C:/games/coa-work/plugin-spike/plugins/timeistime/build-v03/time-is-time.dll" "$OutputDir/plugins/" -Force
+    Safe-CopyFile "$PluginsDir/time-is-time.dll" "$OutputDir/plugins"
+} elseif (Test-Path "$PSScriptRoot/../dist/plugins/time-is-time.dll") {
+    Safe-CopyFile "$PSScriptRoot/../dist/plugins/time-is-time.dll" "$OutputDir/plugins"
 }
 
 # Optional Manager Installer/App
 if ($ManagerPackageDir -and (Test-Path $ManagerPackageDir)) {
     New-Item -ItemType Directory -Force -Path "$OutputDir/manager" | Out-Null
-    Copy-Item "$ManagerPackageDir/*" "$OutputDir/manager/" -Recurse -Force
+    Safe-CopyTree $ManagerPackageDir "$OutputDir/manager"
 }
 
 # 4. Copy Candidate Lock
-Copy-Item $CandidateLock "$OutputDir/candidate-lock.json" -Force
+Safe-CopyFile $CandidateLock $OutputDir
 
-# 5. Generate SHA-256 Checksums for all deployable binaries
+# 5. Generate SHA-256 Checksums for all deployable binaries (Normalized portable forward slashes)
 $checksums = @()
 $targets = @(
-    "$OutputDir/server/worldserver.exe",
-    "$OutputDir/candidate-lock.json"
+    "$OutputDir/candidate-lock.json",
+    "$OutputDir/server/worldserver.exe"
 )
 if (Test-Path "$OutputDir/server/authserver.exe") {
     $targets += "$OutputDir/server/authserver.exe"
@@ -161,7 +195,7 @@ if (Test-Path "$OutputDir/manager") {
 foreach ($f in $targets) {
     if (Test-Path $f) {
         $hash = (Get-FileHash -Path $f -Algorithm SHA256).Hash.ToLowerInvariant()
-        $relName = $f.Substring($OutputDir.Length).TrimStart('\', '/')
+        $relName = ($f.Substring($OutputDir.Length).TrimStart('\', '/')) -replace '\\', '/'
         $checksums += "$hash  $relName"
     }
 }
@@ -169,15 +203,14 @@ $checksums | Set-Content "$OutputDir/sha256sums.txt" -Encoding utf8
 
 # 6. Generate Channel Indexes (Contracts 1 & 2)
 New-Item -ItemType Directory -Force -Path $ChannelDir | Out-Null
-$lock = Get-Content $CandidateLock -Raw | ConvertFrom-Json
 
 # Contract 1: Preview Manager Updater Manifest (Tauri v2 format)
-$tauriManifest = @{
+$tauriManifest = [ordered]@{
     version = $ManagerVersion
     notes = "CSM Modules Preview $ManagerVersion"
     pub_date = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
-    platforms = @{
-        "windows-x86_64" = @{
+    platforms = [ordered]@{
+        "windows-x86_64" = [ordered]@{
             signature = if ($ManagerSignature) { $ManagerSignature } else { "" }
             url = "https://github.com/Corfirean/coa-server-manager/releases/download/preview-v$ManagerVersion/csm-modules-preview_${ManagerVersion}_x64_en-US.msi.zip"
         }
@@ -186,28 +219,29 @@ $tauriManifest = @{
 $tauriManifest | ConvertTo-Json -Depth 5 | Set-Content "$ChannelDir/csm-preview-app-latest.json" -Encoding utf8
 
 # Contract 2: Modular Server & Plugin Component Channel Manifest
-$componentManifest = @{
+$componentManifest = [ordered]@{
     channel = "preview"
     version = $lock.version
     release_timestamp = $lock.build_timestamp
     min_manager_version = "0.7.1"
-    core = @{
+    core = [ordered]@{
         commit = $lock.core.commit
         abi_fingerprint = $lock.sdk.abi_fingerprint
         download_url = "https://github.com/Corfirean/coa-server-build/releases/download/preview-v$($lock.version)/csm-server-preview-win64.zip"
         sha256 = (Get-FileHash -Path "$OutputDir/server/worldserver.exe" -Algorithm SHA256).Hash.ToLowerInvariant()
-        binaries = @{
+        size = (Get-Item "$OutputDir/server/worldserver.exe").Length
+        binaries = [ordered]@{
             worldserver = "worldserver.exe"
             authserver = if (Test-Path "$OutputDir/server/authserver.exe") { "authserver.exe" } else { $null }
         }
     }
-    sdk = @{
+    sdk = [ordered]@{
         version = $lock.sdk.version
         abi_fingerprint = $lock.sdk.abi_fingerprint
         download_url = "https://github.com/Corfirean/coa-server-build/releases/download/preview-v$($lock.version)/coa-plugin-sdk-v$($lock.sdk.version).zip"
     }
     modules = $lock.official_modules
-    compatibility = @{
+    compatibility = [ordered]@{
         db_schema = $lock.db_schema_requirements
         client = $lock.client_compatibility
     }
@@ -218,6 +252,6 @@ $componentManifestJson | Set-Content "$ChannelDir/csm-preview-components.json" -
 $componentManifestJson | Set-Content "$ChannelDir/csm-preview-channel.json" -Encoding utf8
 $componentManifestJson | Set-Content "$ChannelDir/csm-preview-latest.json" -Encoding utf8
 
-Write-Host "Preview package assembled successfully in $OutputDir"
+Write-Host "Preview package assembled successfully in $OutputDir" -ForegroundColor Green
 Write-Host "Contract 1 (App Updater) written to:     $ChannelDir/csm-preview-app-latest.json"
 Write-Host "Contract 2 (Components) written to:      $ChannelDir/csm-preview-components.json"

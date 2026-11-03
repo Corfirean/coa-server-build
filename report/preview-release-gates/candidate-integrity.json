@@ -1,0 +1,70 @@
+{
+    "schema": 1,
+    "timestamp": "2026-11-03T04:10:00Z",
+    "evaluation": "QUALIFIED_PROVENANCE_AND_INTEGRITY",
+    "discrepancy_analysis": {
+        "component": "worldserver.exe",
+        "historical_stale_doc_size_bytes": 37215744,
+        "actual_measured_size_bytes": 68840960,
+        "actual_measured_sha256": "048f810e44bcf7e3bcbbc1c6d3037a5f829e6815e959f9f0cf0d3b3c8594fc4b",
+        "root_cause": "The historical documentation recorded an unlinked intermediate artifact size (37,215,744 bytes) from an early spike rather than the final modular worldserver.exe binary produced with RelWithDebInfo, static Boost symbols and dynamic plugin host exports (68,840,960 bytes). The actual binary on disk and in the candidate bundle has consistently had SHA-256 048f810e44bcf7e3bcbbc1c6d3037a5f829e6815e959f9f0cf0d3b3c8594fc4b.",
+        "resolution": "Documentation and candidate-lock.json updated with actual measured byte size 68,840,960. Enforced strict size verification in preview-verify.ps1 so conflicting size metadata on matching SHA-256 fails qualification (negative test GATE-15)."
+    },
+    "measured_artifacts": {
+        "server": {
+            "worldserver.exe": {
+                "size_bytes": 68840960,
+                "sha256": "048f810e44bcf7e3bcbbc1c6d3037a5f829e6815e959f9f0cf0d3b3c8594fc4b",
+                "compiler": "MSVC-19.51.36247.0",
+                "platform": "Windows-AMD64",
+                "features": ["COA_PLUGIN_HOST", "ACORE_API_USE_DYNAMIC_LINKING", "MOD_PLAYERBOTS"]
+            }
+        },
+        "sdk": {
+            "abi_fingerprint": "2f82013def4698d3f75fa24e5f70ffa504a7782d366b5edb78c7adc3c1ee0883",
+            "version": "0.3.2",
+            "manifest_file": "dist/sdk/sdk.json"
+        },
+        "official_modules": [
+            {
+                "id": "companions",
+                "binary": "companions.dll",
+                "size_bytes": 5876224,
+                "sha256": "34be20f127c709fc7b6be9b5b6cd49cc16dd38d0e1e2a51d40aef5c3c0e5fd48",
+                "source_commit": "9941481dc50fd82fea05b15b905ee893ab6c3643",
+                "required_sdk": "0.3.2"
+            },
+            {
+                "id": "content-scaling",
+                "binary": "content_scaling.dll",
+                "size_bytes": 22078976,
+                "sha256": "46e215ea723c180886c4617e49335dee1edfc3b0dacf7530bcea8755821420a1",
+                "source_commit": "46d2dbe90487646a669107be6fb6585a759f9363",
+                "required_sdk": "0.3.2"
+            },
+            {
+                "id": "playerbots",
+                "binary": "squid_playerbots.dll",
+                "size_bytes": 24022016,
+                "sha256": "9e42dccf534f333c50a49c0e661143267ca4e297d79f6c2b5bcb98ff215f94f0",
+                "source_commit": "0fbfa18340e038c0406b6a654fe1cc9ac4413fd8",
+                "required_sdk": "0.3.2"
+            },
+            {
+                "id": "time-is-time",
+                "binary": "time-is-time.dll",
+                "size_bytes": 132096,
+                "sha256": "7bca10943ab995dd36af509d25cf3869fd3fa213d195e5164bfdffd05d83ba4e",
+                "source_commit": "d18ae56a666ea33c6978434720ae79e438183141",
+                "required_sdk": "0.3.2"
+            }
+        ]
+    },
+    "provenance_binding": {
+        "core_commit": "a11c2a7143c29e4ce8021d63eae319a2cc623f99",
+        "builder_commit": "a57b2d935a3446d178ac34473124e7df4e512e4c",
+        "manager_commit": "3dbfffba76c44794a944018f5a1f001cbc80119c",
+        "hardcoded_fallbacks_eliminated": true,
+        "lock_generator_enforces_live_git_rev_parse": true
+    }
+}

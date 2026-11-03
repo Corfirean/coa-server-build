@@ -42,25 +42,19 @@ jobs:
           name: preview-server-bundle
           path: dist/
 
-      - name: Download Verification Report
+      - name: Download Verification Report and Verdict
         uses: actions/download-artifact@v4
         with:
           name: preview-verification-report
           path: verification/
 
-      - name: Verify Bundle Integrity Before Publish
+      - name: Enforce Pre-Publish Qualification Gate
         shell: pwsh
         run: |
-          if (-not (Test-Path "dist/candidate-lock.json")) {
-            throw "dist/candidate-lock.json missing from downloaded bundle!"
-          }
-          if (-not (Test-Path "dist/server/worldserver.exe")) {
-            throw "dist/server/worldserver.exe missing from downloaded bundle!"
-          }
-          if (-not (Test-Path "dist/sha256sums.txt")) {
-            throw "dist/sha256sums.txt missing from downloaded bundle!"
-          }
-          Write-Host "Candidate bundle verified successfully before publishing."
+          powershell -ExecutionPolicy Bypass -File scripts/test-publish-gate.ps1 `
+            -BundleDir "dist" `
+            -VerificationDir "verification" `
+            -UpdatesDir "updates"
 
       - name: Publish to GitHub Releases (Preview Channel Only)
         env:

@@ -26,15 +26,19 @@ jobs:
           name: ${{ inputs.bundle_artifact || 'preview-server-bundle' }}
           path: bundle/
 
-      - name: Run Qualification Script
+      - name: Run Qualification Script (Fail-Closed)
         shell: pwsh
         run: |
           powershell -ExecutionPolicy Bypass -File scripts/preview-verify.ps1 `
             -BundleDir "$PWD/bundle" `
-            -ReportOut "PREVIEW_BUILDER_QUALIFICATION.md"
+            -ReportOut "PREVIEW_BUILDER_QUALIFICATION.md" `
+            -VerdictOut "preview-qualification-verdict.json"
 
-      - name: Upload Verification Report
+      - name: Upload Verification Report and Verdict
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: preview-verification-report
-          path: PREVIEW_BUILDER_QUALIFICATION.md
+          path: |
+            PREVIEW_BUILDER_QUALIFICATION.md
+            preview-qualification-verdict.json

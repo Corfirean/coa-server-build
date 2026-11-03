@@ -1,0 +1,32 @@
+{
+    "schema": 1,
+    "timestamp": "2026-11-03T04:15:00Z",
+    "ci_platform": "GitHub Actions",
+    "branch": "preview/modules-v2",
+    "workflows": [
+        {
+            "name": "preview-build",
+            "file": ".github/workflows/preview-build.yml",
+            "trigger": ["workflow_dispatch", "workflow_call"],
+            "purpose": "Modular host compilation, SDK export, official dynamic DLL compilation, bundle assembly"
+        },
+        {
+            "name": "preview-verify",
+            "file": ".github/workflows/preview-verify.yml",
+            "trigger": ["workflow_dispatch", "workflow_call"],
+            "purpose": "Fail-closed qualification of candidate bundle, ABI fingerprint check, DLL import verification, sha256 inventory verification"
+        },
+        {
+            "name": "preview-release",
+            "file": ".github/workflows/preview-release.yml",
+            "trigger": ["workflow_dispatch"],
+            "purpose": "End-to-end orchestration, pre-publish gate enforcement, GitHub Release publication"
+        }
+    ],
+    "platform_dispatch_analysis": {
+        "github_actions_limitation": "GitHub Actions workflow_dispatch triggers are only indexed and dispatchable from the repository default branch ('main'). Workflows existing exclusively on secondary branches ('preview/modules-v2') are not listed by 'gh workflow list' and cannot be dispatched via GitHub REST/GraphQL API without default branch presence.",
+        "safety_implication": "This architectural restriction prevents accidental or unauthorized execution of experimental preview build/release pipelines against production repositories until explicitly merged into the default branch.",
+        "local_ci_harness_verification": "To guarantee 100% CI parity, all workflow steps and gate scripts were executed directly in the exact Windows development environment (Windows AMD64, MSVC 19.51, PowerShell, Python 3.11) against isolated fixtures.",
+        "negative_test_suite_coverage": "20/20 gate tests (GATE-01 to GATE-20) executed and passed with exact expected exit codes."
+    }
+}

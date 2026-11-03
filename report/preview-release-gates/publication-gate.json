@@ -1,0 +1,34 @@
+{
+    "schema": 1,
+    "timestamp": "2026-11-03T04:18:00Z",
+    "gate_status": "BLOCKED",
+    "ready_for_owner_release_review": true,
+    "public_release_allowed": false,
+    "checklist": {
+        "candidate_lock_valid": { "status": "PASS", "required": true },
+        "worldserver_present": { "status": "PASS", "required": true },
+        "worldserver_hash_match": { "status": "PASS", "required": true },
+        "worldserver_size_match": { "status": "PASS", "required": true },
+        "sdk_present": { "status": "PASS", "required": true },
+        "sdk_abi_match": { "status": "PASS", "required": true },
+        "official_dynamic_dlls_present": { "status": "PASS", "required": true },
+        "official_dll_hashes_match": { "status": "PASS", "required": true },
+        "duplication_guard_verified": { "status": "PASS", "required": true },
+        "checksum_inventory_valid": { "status": "PASS", "required": true },
+        "checksum_no_duplicates": { "status": "PASS", "required": true },
+        "checksum_no_traversal": { "status": "PASS", "required": true },
+        "checksum_coverage_complete": { "status": "PASS", "required": true },
+        "contract_1_tauri_signature_present": { "status": "BLOCKED", "required": true, "note": "Unsigned draft template. Requires owner minisign key." },
+        "contract_2_component_manifest_valid": { "status": "PASS", "required": true },
+        "owner_authorization_granted": { "status": "BLOCKED", "required": true, "note": "External release requires explicit human owner approval." }
+    },
+    "blocking_reasons": [
+        "Manager app updater manifest (Contract 1) does not have a cryptographic minisign signature. Publication is strictly blocked by scripts/test-publish-gate.ps1 and scripts/preview-package.ps1 (-ValidatePublishable).",
+        "Public release publication to external testers requires explicit authorization from the repository owner."
+    ],
+    "unblock_procedure": [
+        "1. Owner signs the Tauri v2 application bundle using private minisign key.",
+        "2. Owner passes -ManagerSignature '<valid_signature>' to preview-package.ps1.",
+        "3. Owner approves release publication in GitHub Actions preview-release workflow."
+    ]
+}

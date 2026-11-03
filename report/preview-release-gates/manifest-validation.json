@@ -1,0 +1,46 @@
+{
+    "schema": 1,
+    "timestamp": "2026-11-03T04:12:00Z",
+    "contract_separation_enforced": true,
+    "contract_1_app_updater": {
+        "file": "updates/csm-preview-app-latest.json",
+        "format": "Tauri v2 Updater Manifest",
+        "version": "0.7.1",
+        "platform": "windows-x86_64",
+        "download_url": "https://github.com/Corfirean/coa-server-manager/releases/download/preview-v0.7.1/csm-modules-preview_0.7.1_x64_en-US.msi.zip",
+        "signature_status": "UNSIGNED_TEMPLATE",
+        "signature_length": 0,
+        "publishable": false,
+        "blocking_reason": "Tauri app updater manifest strictly requires a valid minisign cryptographic signature from the release owner before public release. Preview packager (-ValidatePublishable) and pre-publish gate abort with fatal error when signature is empty (verified by GATE-16 and GATE-17).",
+        "validation_verdict": "STRUCTURALLY_VALID_UNSIGNED"
+    },
+    "contract_2_component_channel": {
+        "file": "updates/csm-preview-components.json",
+        "format": "CoA Modules Preview Component Manifest",
+        "channel": "preview",
+        "version": "0.7.1-preview",
+        "min_manager_version": "0.7.1",
+        "core": {
+            "commit": "a11c2a7143c29e4ce8021d63eae319a2cc623f99",
+            "abi_fingerprint": "2f82013def4698d3f75fa24e5f70ffa504a7782d366b5edb78c7adc3c1ee0883",
+            "download_url": "https://github.com/Corfirean/coa-server-build/releases/download/preview-v0.7.1-preview/csm-server-preview-win64.zip",
+            "sha256": "048f810e44bcf7e3bcbbc1c6d3037a5f829e6815e959f9f0cf0d3b3c8594fc4b",
+            "size_bytes": 68840960
+        },
+        "sdk": {
+            "version": "0.3.2",
+            "abi_fingerprint": "2f82013def4698d3f75fa24e5f70ffa504a7782d366b5edb78c7adc3c1ee0883",
+            "download_url": "https://github.com/Corfirean/coa-server-build/releases/download/preview-v0.7.1-preview/coa-plugin-sdk-v0.3.2.zip",
+            "null_version_defect_fixed": true,
+            "url_formatting_verified": true
+        },
+        "modules_count": 4,
+        "modules_verified": [
+            { "id": "companions", "binary": "companions.dll", "required_sdk": "0.3.2", "sha256": "34be20f127c709fc7b6be9b5b6cd49cc16dd38d0e1e2a51d40aef5c3c0e5fd48", "size": 5876224 },
+            { "id": "content-scaling", "binary": "content_scaling.dll", "required_sdk": "0.3.2", "sha256": "46e215ea723c180886c4617e49335dee1edfc3b0dacf7530bcea8755821420a1", "size": 22078976 },
+            { "id": "playerbots", "binary": "squid_playerbots.dll", "required_sdk": "0.3.2", "sha256": "9e42dccf534f333c50a49c0e661143267ca4e297d79f6c2b5bcb98ff215f94f0", "size": 24022016 },
+            { "id": "time-is-time", "binary": "time-is-time.dll", "required_sdk": "0.3.2", "sha256": "7bca10943ab995dd36af509d25cf3869fd3fa213d195e5164bfdffd05d83ba4e", "size": 132096 }
+        ],
+        "validation_verdict": "FULLY_QUALIFIED_VALID"
+    }
+}

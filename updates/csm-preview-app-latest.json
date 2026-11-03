@@ -1,11 +1,11 @@
 ﻿{
+    "version":  "0.7.1",
+    "notes":  "CSM Modules Preview 0.7.1",
+    "pub_date":  "2026-11-03T04:04:05Z",
     "platforms":  {
                       "windows-x86_64":  {
                                              "signature":  "",
                                              "url":  "https://github.com/Corfirean/coa-server-manager/releases/download/preview-v0.7.1/csm-modules-preview_0.7.1_x64_en-US.msi.zip"
                                          }
-                  },
-    "pub_date":  "2026-11-03T02:52:41Z",
-    "version":  "0.7.1",
-    "notes":  "CSM Modules Preview 0.7.1"
+                  }
 }

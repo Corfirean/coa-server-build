@@ -1,83 +1,88 @@
 ﻿{
-    "official_modules":  [
-                             {
-                                 "id":  "companions",
-                                 "name":  "CoA Companions",
-                                 "required_sdk":  null,
-                                 "binary":  "companions.dll",
-                                 "type":  "DYNAMIC_DLL",
-                                 "sha256":  "34be20f127c709fc7b6be9b5b6cd49cc16dd38d0e1e2a51d40aef5c3c0e5fd48",
-                                 "source_commit":  "bc94a9b6d4991c0e35fae16726226068067b8a7c"
-                             },
-                             {
-                                 "id":  "content-scaling",
-                                 "name":  "Content Scaling",
-                                 "required_sdk":  null,
-                                 "binary":  "content_scaling.dll",
-                                 "type":  "DYNAMIC_DLL",
-                                 "sha256":  "46e215ea723c180886c4617e49335dee1edfc3b0dacf7530bcea8755821420a1",
-                                 "source_commit":  "f893866cb0e65c010d1f4ba40b82f0ad4cbe0642"
-                             },
-                             {
-                                 "id":  "playerbots",
-                                 "name":  "SQUID Playerbots",
-                                 "required_sdk":  null,
-                                 "binary":  "squid_playerbots.dll",
-                                 "type":  "DYNAMIC_DLL",
-                                 "sha256":  "9e42dccf534f333c50a49c0e661143267ca4e297d79f6c2b5bcb98ff215f94f0",
-                                 "source_commit":  "a105d60526e3c09e3a6a9de9b9a68e82aa2518e3"
-                             },
-                             {
-                                 "id":  "time-is-time",
-                                 "name":  "TimeIsTime",
-                                 "required_sdk":  null,
-                                 "binary":  "time-is-time.dll",
-                                 "type":  "DYNAMIC_DLL",
-                                 "sha256":  "7bca10943ab995dd36af509d25cf3869fd3fa213d195e5164bfdffd05d83ba4e",
-                                 "source_commit":  "d18ae56a666ea33c6978434720ae79e438183141"
-                             }
-                         ],
-    "db_schema_requirements":  {
-                                   "world":  "2026_10_28_00_world",
-                                   "characters":  "2026_10_28_00_characters",
-                                   "auth":  "2026_10_28_00_auth"
-                               },
-    "sdk":  {
-                "compiler":  "MSVC-19.51.36247.0",
-                "version":  null,
-                "export_def":  "src/server/apps/worldserver/Plugins/coa_plugin_exports.def",
-                "flags":  "/DWIN32 /D_WINDOWS /EHsc /Zi /O2 /Ob1 /DNDEBUG -std:c++20 -MD",
-                "abi_fingerprint":  "2f82013def4698d3f75fa24e5f70ffa504a7782d366b5edb78c7adc3c1ee0883",
-                "platform":  "Windows-AMD64"
-            },
-    "client_compatibility":  {
-                                 "ascension_support":  true,
-                                 "build":  12340,
-                                 "version":  "3.3.5a"
-                             },
+    "schema":  1,
+    "product":  "CoA Server Preview Modular Host",
     "version":  "0.7.1-preview",
-    "manager":  {
-                    "branch":  "preview/modules-v2",
-                    "commit":  "c3664b881d45699d9da9ebe58779dfeace6a26ad",
-                    "repository":  "https://github.com/Corfirean/coa-server-manager"
-                },
+    "build_timestamp":  "2026-11-03T04:01:45Z",
     "core":  {
+                 "repository":  "https://github.com/Corfirean/azerothcore-wotlk-coa",
                  "branch":  "preview/dynamic-plugin-host",
+                 "commit":  "a11c2a7143c29e4ce8021d63eae319a2cc623f99",
+                 "sha256":  "048f810e44bcf7e3bcbbc1c6d3037a5f829e6815e959f9f0cf0d3b3c8594fc4b",
+                 "size":  68840960,
                  "features":  [
                                   "COA_PLUGIN_HOST",
                                   "ACORE_API_USE_DYNAMIC_LINKING",
                                   "MOD_PLAYERBOTS"
-                              ],
-                 "sha256":  "048f810e44bcf7e3bcbbc1c6d3037a5f829e6815e959f9f0cf0d3b3c8594fc4b",
-                 "commit":  "a11c2a7143c29e4ce8021d63eae319a2cc623f99",
-                 "repository":  "https://github.com/Corfirean/azerothcore-wotlk-coa"
+                              ]
              },
-    "schema":  1,
-    "product":  "CoA Server Preview Modular Host",
-    "build_timestamp":  "2026-11-03T02:52:14Z",
     "builder":  {
+                    "repository":  "https://github.com/Corfirean/coa-server-build",
                     "branch":  "preview/modules-v2",
-                    "commit":  "a461e9031d56dd302ca9308c72535eb30f1fa774",
-                    "repository":  "https://github.com/Corfirean/coa-server-build"
-                }
+                    "commit":  "a57b2d935a3446d178ac34473124e7df4e512e4c"
+                },
+    "manager":  {
+                    "repository":  "https://github.com/Corfirean/coa-server-manager",
+                    "branch":  "preview/modules-v2",
+                    "commit":  "3dbfffba76c44794a944018f5a1f001cbc80119c"
+                },
+    "sdk":  {
+                "version":  "0.3.2",
+                "abi_fingerprint":  "2f82013def4698d3f75fa24e5f70ffa504a7782d366b5edb78c7adc3c1ee0883",
+                "compiler":  "MSVC-19.51.36247.0",
+                "platform":  "Windows-AMD64",
+                "flags":  "/DWIN32 /D_WINDOWS /EHsc /Zi /O2 /Ob1 /DNDEBUG -std:c++20 -MD",
+                "export_def":  "src/server/apps/worldserver/Plugins/coa_plugin_exports.def"
+            },
+    "official_modules":  [
+                             {
+                                 "size":  5876224,
+                                 "id":  "companions",
+                                 "required_sdk":  "0.3.2",
+                                 "name":  "CoA Companions",
+                                 "type":  "DYNAMIC_DLL",
+                                 "binary":  "companions.dll",
+                                 "source_commit":  "9941481dc50fd82fea05b15b905ee893ab6c3643",
+                                 "sha256":  "34be20f127c709fc7b6be9b5b6cd49cc16dd38d0e1e2a51d40aef5c3c0e5fd48"
+                             },
+                             {
+                                 "size":  22078976,
+                                 "id":  "content-scaling",
+                                 "required_sdk":  "0.3.2",
+                                 "name":  "Content Scaling",
+                                 "type":  "DYNAMIC_DLL",
+                                 "binary":  "content_scaling.dll",
+                                 "source_commit":  "46d2dbe90487646a669107be6fb6585a759f9363",
+                                 "sha256":  "46e215ea723c180886c4617e49335dee1edfc3b0dacf7530bcea8755821420a1"
+                             },
+                             {
+                                 "size":  24022016,
+                                 "id":  "playerbots",
+                                 "required_sdk":  "0.3.2",
+                                 "name":  "SQUID Playerbots",
+                                 "type":  "DYNAMIC_DLL",
+                                 "binary":  "squid_playerbots.dll",
+                                 "source_commit":  "0fbfa18340e038c0406b6a654fe1cc9ac4413fd8",
+                                 "sha256":  "9e42dccf534f333c50a49c0e661143267ca4e297d79f6c2b5bcb98ff215f94f0"
+                             },
+                             {
+                                 "size":  132096,
+                                 "id":  "time-is-time",
+                                 "required_sdk":  "0.3.2",
+                                 "name":  "TimeIsTime",
+                                 "type":  "DYNAMIC_DLL",
+                                 "binary":  "time-is-time.dll",
+                                 "source_commit":  "d18ae56a666ea33c6978434720ae79e438183141",
+                                 "sha256":  "7bca10943ab995dd36af509d25cf3869fd3fa213d195e5164bfdffd05d83ba4e"
+                             }
+                         ],
+    "db_schema_requirements":  {
+                                   "auth":  "2026_10_28_00_auth",
+                                   "characters":  "2026_10_28_00_characters",
+                                   "world":  "2026_10_28_00_world"
+                               },
+    "client_compatibility":  {
+                                 "version":  "3.3.5a",
+                                 "build":  12340,
+                                 "ascension_support":  true
+                             }
 }
