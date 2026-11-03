@@ -56,7 +56,7 @@ jobs:
           path: .cache/verify-all/
   build:
     needs: source
-    runs-on: ${{ fromJSON(vars.COA_WINDOWS_RUNNER || '["self-hosted","Windows","X64","coa-persistent"]') }}
+    runs-on: windows-2022
     permissions:
       actions: read
       contents: read

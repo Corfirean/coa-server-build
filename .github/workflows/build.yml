@@ -181,7 +181,7 @@ jobs:
   package:
     if: ${{ !cancelled() && (needs.binaries.result == 'success' || needs.reuse.result == 'success') }}
     needs: [resolve, binaries, reuse]
-    runs-on: ${{ fromJSON(vars.COA_WINDOWS_RUNNER || '["self-hosted","Windows","X64","coa-persistent"]') }}
+    runs-on: windows-2022
     timeout-minutes: 210
     outputs:
       manifest_sha256: ${{ steps.candidate.outputs.manifest_sha256 }}
@@ -467,7 +467,7 @@ jobs:
   qualify-upgrade:
     needs: package
     if: ${{ !cancelled() && needs.package.result == 'success' }}
-    runs-on: ${{ fromJSON(vars.COA_WINDOWS_RUNNER || '["self-hosted","Windows","X64","coa-persistent"]') }}
+    runs-on: windows-2022
     timeout-minutes: 90
     permissions:
       actions: read
@@ -550,7 +550,7 @@ jobs:
   publish:
     needs: [package, qualify-upgrade]
     if: ${{ !cancelled() && needs.package.result == 'success' && needs.qualify-upgrade.result == 'success' }}
-    runs-on: ${{ fromJSON(vars.COA_WINDOWS_RUNNER || '["self-hosted","Windows","X64","coa-persistent"]') }}
+    runs-on: windows-2022
     timeout-minutes: 45
     env:
       GH_TOKEN: ${{ github.token }}
