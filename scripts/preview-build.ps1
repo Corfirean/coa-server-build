@@ -27,13 +27,34 @@ Write-Host "Configuring CMake for dynamic plugin host..."
 $buildDir = "$CoreDir/build-preview"
 New-Item -ItemType Directory -Force -Path $buildDir | Out-Null
 
-cmake -S "$CoreDir" -B "$buildDir" `
-    -G "Visual Studio 17 2022" -A x64 `
-    -DCOA_PLUGIN_HOST=ON `
-    -DACORE_API_USE_DYNAMIC_LINKING=ON `
-    -DMOD_PLAYERBOTS=disabled `
-    -DMOD_CONTENT_SCALING=disabled `
-    -DCMAKE_BUILD_TYPE=RelWithDebInfo
+$cmakeArgs = @(
+    "-S", "$CoreDir",
+    "-B", "$buildDir",
+    "-G", "Visual Studio 17 2022",
+    "-A", "x64",
+    "-DCOA_PLUGIN_HOST=ON",
+    "-DACORE_API_USE_DYNAMIC_LINKING=ON",
+    "-DMOD_PLAYERBOTS=disabled",
+    "-DMOD_CONTENT_SCALING=disabled",
+    "-DCMAKE_BUILD_TYPE=RelWithDebInfo"
+)
+
+if ($env:BOOST_ROOT -and (Test-Path "$env:BOOST_ROOT")) {
+    $cmakeArgs += "-DBOOST_ROOT=$env:BOOST_ROOT"
+} elseif (Test-Path "C:/local/boost_1_87_0") {
+    $cmakeArgs += "-DBOOST_ROOT=C:/local/boost_1_87_0"
+}
+
+if (Test-Path "C:/tools/mysql/current/include") {
+    $cmakeArgs += "-DMYSQL_INCLUDE_DIR=C:/tools/mysql/current/include"
+    $cmakeArgs += "-DMYSQL_LIBRARY=C:/tools/mysql/current/lib/mysqlclient.lib"
+}
+
+if ($env:OPENSSL_ROOT_DIR) {
+    $cmakeArgs += "-DOPENSSL_ROOT_DIR=$env:OPENSSL_ROOT_DIR"
+}
+
+& cmake @cmakeArgs
 
 cmake --build "$buildDir" --config RelWithDebInfo --target worldserver authserver
 

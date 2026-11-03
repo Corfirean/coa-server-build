@@ -1,0 +1,49 @@
+{
+  "timestamp": "2026-11-03T09:45:00Z",
+  "run_id": 41579874423,
+  "html_url": "https://github.com/Corfirean/coa-server-build/actions/runs/41579874423",
+  "workflow": "preview-build",
+  "branch": "preview/modules-v2",
+  "commit_sha": "a8f591c968988647c234a974bc8506e98b04ea00",
+  "event": "push",
+  "runner_os": "windows-latest",
+  "runner_environment": "Microsoft Azure Hosted Compute Agent (Windows Server 2022 / 2025)",
+  "jobs": {
+    "build_modular_host": {
+      "job_id": 125731938101,
+      "name": "Build Modular Host & SDK",
+      "status": "in_progress",
+      "steps": [
+        "Set up job",
+        "Run actions/checkout@v7 (builder)",
+        "Run actions/checkout@v7 (core: preview/dynamic-plugin-host)",
+        "Cache Boost & MySQL",
+        "Bootstrap Boost & MySQL on Cache Miss",
+        "Record Core Metadata",
+        "Build Modular Host & Generate SDK",
+        "Extract SDK Fingerprint",
+        "Upload Host & SDK Artifacts"
+      ]
+    },
+    "build_official_plugins": {
+      "name": "Build Official DLL Plugins",
+      "status": "pending_dependency",
+      "depends_on": "build_modular_host"
+    },
+    "package_preview_bundle": {
+      "name": "Package Preview Distribution",
+      "status": "pending_dependency",
+      "depends_on": ["build_modular_host", "build_official_plugins"]
+    },
+    "verify_packaged_bundle": {
+      "name": "Verify Preview Qualification Matrix (Fail-Closed)",
+      "status": "pending_dependency",
+      "depends_on": "package_preview_bundle"
+    }
+  },
+  "pipeline_verification": {
+    "push_trigger_active": true,
+    "runner_provisioned": true,
+    "stable_channels_isolated": true
+  }
+}

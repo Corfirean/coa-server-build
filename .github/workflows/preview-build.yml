@@ -75,21 +75,59 @@ jobs:
       - name: Bootstrap Boost & MySQL on Cache Miss
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
+          # --- Boost 1.87.0 (msvc-14.3, 64-bit) ---
           if (-not (Test-Path 'C:\local\boost_1_87_0\boost')) {
-            Write-Host "Downloading Boost 1.87.0..."
-            $boostExe = Join-Path $env:RUNNER_TEMP 'boost.exe'
-            Invoke-WebRequest -Uri 'https://downloads.sourceforge.net/project/boost/boost-binaries/1.87.0/boost_1_87_0-msvc-14.3-64.exe' -OutFile $boostExe
-            Start-Process -FilePath $boostExe -ArgumentList '/DIR=C:\local\boost_1_87_0', '/SILENT' -Wait
+              $boostExe = Join-Path $env:RUNNER_TEMP 'boost.exe'
+              $boostUrl = 'https://downloads.sourceforge.net/project/boost/boost-binaries/1.87.0/boost_1_87_0-msvc-14.3-64.exe'
+              $boostRequest = @{
+                  Uri                      = $boostUrl
+                  OutFile                  = $boostExe
+                  UserAgent                = 'azerothcore-ci'
+                  ConnectionTimeoutSeconds = 60
+                  OperationTimeoutSeconds  = 60
+              }
+              $boostAttempts = 3
+              for ($attempt = 1; $attempt -le $boostAttempts; $attempt++) {
+                  try {
+                      Invoke-WebRequest @boostRequest
+                      $boostMB = (Get-Item $boostExe).Length / 1MB
+                      if ($boostMB -lt 50) { throw "got $([int]$boostMB) MB, likely an HTML page." }
+                      break
+                  } catch {
+                      Write-Host "Boost download attempt $attempt failed: $($_.Exception.Message)"
+                      if ($attempt -eq $boostAttempts) { throw }
+                      Start-Sleep -Seconds 15
+                  }
+              }
+              Write-Host ("Downloaded Boost installer: {0:N1} MB" -f $boostMB)
+              $boostProc = Start-Process -FilePath $boostExe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/DIR=C:\local\boost_1_87_0' -WindowStyle Hidden -Wait -PassThru
+              if ($boostProc.ExitCode -ne 0) { throw "Boost installer failed with exit code $($boostProc.ExitCode)." }
+              if (-not (Test-Path 'C:\local\boost_1_87_0\boost\version.hpp')) { throw 'Boost install missing headers.' }
+              if (-not (Test-Path 'C:\local\boost_1_87_0\lib64-msvc-14.3')) { throw 'Boost install missing prebuilt libs.' }
           }
+          # --- MySQL 8.4 client ---
           if (-not (Test-Path 'C:\tools\mysql\current\lib\mysqlclient.lib')) {
-            Write-Host "Downloading MySQL 8.4.9..."
-            $mysqlZip = Join-Path $env:RUNNER_TEMP 'mysql.zip'
-            Invoke-WebRequest -Uri 'https://cdn.mysql.com/archives/mysql-8.4/mysql-8.4.9-winx64.zip' -OutFile $mysqlZip -UserAgent 'Mozilla/5.0'
-            Expand-Archive -Path $mysqlZip -DestinationPath "$env:RUNNER_TEMP/mysql" -Force
-            New-Item -ItemType Directory -Force -Path 'C:\tools\mysql\current' | Out-Null
-            Copy-Item "$env:RUNNER_TEMP/mysql/mysql-8.4.9-winx64/*" 'C:\tools\mysql\current/' -Recurse -Force
+              $mysqlZip = Join-Path $env:RUNNER_TEMP 'mysql.zip'
+              Invoke-WebRequest -Uri 'https://cdn.mysql.com/archives/mysql-8.4/mysql-8.4.9-winx64.zip' -OutFile $mysqlZip -UserAgent 'Mozilla/5.0'
+              $mysqlMB = (Get-Item $mysqlZip).Length / 1MB
+              Write-Host ("Downloaded MySQL zip: {0:N1} MB" -f $mysqlMB)
+              if ($mysqlMB -lt 50) { throw "MySQL zip download looks wrong ($([int]$mysqlMB) MB)." }
+              New-Item -ItemType Directory -Force -Path 'C:\tools\mysql' | Out-Null
+              Expand-Archive -Path $mysqlZip -DestinationPath 'C:\tools\mysql' -Force
+              if (Test-Path 'C:\tools\mysql\current') { Remove-Item -Recurse -Force 'C:\tools\mysql\current' }
+              Rename-Item 'C:\tools\mysql\mysql-8.4.9-winx64' 'C:\tools\mysql\current'
+              if (-not (Test-Path 'C:\tools\mysql\current\lib\mysqlclient.lib')) { throw 'MySQL client import library missing.' }
           }
-          Write-Host "Dependencies verified."
+          # --- OpenSSL ---
+          $opensslRoot = @($env:OPENSSL_ROOT_DIR, 'C:\Program Files\OpenSSL', 'C:\Program Files\OpenSSL-Win64') |
+              Where-Object { $_ -and (Test-Path (Join-Path $_ 'include\openssl\opensslv.h')) } |
+              Select-Object -First 1
+          if ($opensslRoot) {
+              "OPENSSL_ROOT_DIR=$opensslRoot" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+              Write-Host "Using OpenSSL at $opensslRoot"
+          }
+          Write-Host "Dependencies successfully bootstrapped and verified."
 
       - name: Record Core Metadata
         id: core_meta
