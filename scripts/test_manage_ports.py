@@ -57,6 +57,12 @@ class PortTests(unittest.TestCase):
             check.bind(('0.0.0.0', self.port))
             check.listen()
 
+    def test_bound_socket_missing_from_listener_table(self):
+        self.ns['listeners'] = lambda: []
+        self.fast_clock()
+        with self.assertRaisesRegex(RuntimeError, 'remains unavailable'):
+            self.ns['ensure_free'](self.port)
+
     def test_pid_zero_real_listener_never_bypassed(self):
         self.s.listen()
         self.ns['listeners'] = lambda: [(self.port, 0)]
@@ -107,6 +113,7 @@ class PortTests(unittest.TestCase):
         self.assertEqual(clock[0], 0)
 
     def test_unrelated_pid_zero_port_ignored(self):
+        self.s.close()
         self.ns['listeners'] = lambda: [(self.port + 1, 0)]
         self.ns['ensure_free'](self.port)
 

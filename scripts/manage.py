@@ -125,8 +125,6 @@ def ensure_free(port):
     announced = False
     while True:
         owners = sorted({pid for p, pid in listeners() if p == port})
-        if not owners:
-            return
         if any(pid != 0 for pid in owners):
             raise RuntimeError(
                 f"Port {port} is already used (PID {', '.join(map(str, owners))}). "
@@ -141,11 +139,11 @@ def ensure_free(port):
             if time.monotonic() >= deadline:
                 raise RuntimeError(
                     f"Port {port} remains unavailable after 30 seconds "
-                    f"(Windows reports PID 0; bind error {error.winerror}). "
+                    f"(Windows bind error {error.winerror}). "
                     "No process was stopped. Retry after the previous database shutdown "
                     "has finished, or check the Windows port reservation.") from error
             if not announced:
-                print(f"Waiting for Windows to release port {port} (PID 0)...", flush=True)
+                print(f"Waiting for Windows to release port {port}...", flush=True)
                 announced = True
             time.sleep(0.25)
         else:
@@ -735,6 +733,25 @@ def _install_diagnostics():
                 if port is not None:
                     try:
                         detail["listeners"] = [list(row) for row in listeners() if row[0] == port]
+                    except (OSError, RuntimeError):
+                        pass
+                if name == "wait_ready" and args[0] == "auth":
+                    try:
+                        record = process("auth")
+                        detail["auth_pid"] = record["pid"] if record else None
+                        detail["auth_ipv4_ports"] = [p for p, pid in listeners() if pid == detail["auth_pid"]]
+                        for key, rel in (("template", "Settings/authserver.conf.template"),
+                                         ("rendered", "Core/configs/authserver.conf")):
+                            content = (ROOT / rel).read_text(encoding="utf-8-sig")
+                            detail[key + "_auth_ports"] = re.findall(
+                                r"(?m)^[ \t]*RealmServerPort[ \t]*=[ \t]*([0-9]+|@AUTH_PORT@)(?=[ \t\r\n#]|$)", content)
+                    except Exception as probe_error:
+                        detail["auth_probe_error"] = type(probe_error).__name__
+                    try:
+                        atomic_json(ROOT / "CoA-auth-error.json", {
+                            "utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                            "action": action, "error": type(error).__name__, **detail,
+                        })
                     except OSError:
                         pass
                 emit(name + ".error", duration_seconds=round(time.monotonic() - began, 6),
