@@ -174,8 +174,11 @@ if ($ManagerPackageDir -and (Test-Path $ManagerPackageDir)) {
     Safe-CopyTree $ManagerPackageDir "$OutputDir/manager"
 }
 
-# 4. Copy Candidate Lock
+# 4. Copy Candidate Lock & Source Lock
 Safe-CopyFile $CandidateLock $OutputDir
+if (Test-Path "$PSScriptRoot/../source-lock.json") {
+    Safe-CopyFile "$PSScriptRoot/../source-lock.json" $OutputDir
+}
 
 # 5. Generate SHA-256 Checksums for all deployable binaries (Normalized portable forward slashes)
 $checksums = @()
@@ -183,6 +186,9 @@ $targets = @(
     "$OutputDir/candidate-lock.json",
     "$OutputDir/server/worldserver.exe"
 )
+if (Test-Path "$OutputDir/source-lock.json") {
+    $targets += "$OutputDir/source-lock.json"
+}
 if (Test-Path "$OutputDir/server/authserver.exe") {
     $targets += "$OutputDir/server/authserver.exe"
 }

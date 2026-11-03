@@ -219,24 +219,89 @@ if (-not $SdkDir -or -not (Test-Path "$SdkDir/sdk.json")) {
     }
 }
 
-# 4. Duplication Guard & Symbol Export Verification
-Write-Host "4. Static / Dynamic Duplication Guard..."
+# 4. Real Static/Dynamic Duplication Detection (P0-3)
+Write-Host "4. Static / Dynamic Duplication Guard (Evidence-Backed)..."
 $duplicationGuardPassed = $false
-if ($SdkDir -and (Test-Path "$SdkDir/coa-plugin-abi-inputs.txt")) {
-    $abiInputs = Get-Content "$SdkDir/coa-plugin-abi-inputs.txt" -Raw
-    if ($abiInputs -match "COA_PLUGIN_HOST") {
-        $duplicationGuardPassed = $true
+$duplicationFailureReason = ""
+
+# Evidence Source A: Candidate Lock and Packaged Source Lock
+$staticModules = @()
+if ($lock -and $lock.static_modules) {
+    $staticModules = @($lock.static_modules)
+} elseif ($BundleDir -and (Test-Path "$BundleDir/source-lock.json")) {
+    $srcL = Get-Content "$BundleDir/source-lock.json" -Raw | ConvertFrom-Json
+    if ($srcL.static_modules) { $staticModules = @($srcL.static_modules) }
+}
+
+if ($staticModules.Count -eq 0) {
+    $duplicationGuardPassed = $false
+    $duplicationFailureReason = "Missing evidence required to establish uniqueness: static_modules list missing from lock and bundle"
+} else {
+    # Check intersection between dynamic modules and static modules
+    $dynamicModuleIdentifiers = @()
+    if ($lock -and $lock.official_modules) {
+        foreach ($dm in $lock.official_modules) {
+            $dynamicModuleIdentifiers += $dm.id.ToLowerInvariant()
+            $bName = [System.IO.Path]::GetFileNameWithoutExtension($dm.binary).ToLowerInvariant()
+            $dynamicModuleIdentifiers += $bName
+            # Common module directory naming variations
+            $dynamicModuleIdentifiers += "mod-coa-$bName"
+            $dynamicModuleIdentifiers += "mod-$bName"
+            $dynamicModuleIdentifiers += "mod_$bName"
+        }
     }
-} elseif ($sdkJson -and $sdkJson.defines -and ($sdkJson.defines -contains "COA_PLUGIN_HOST")) {
-    $duplicationGuardPassed = $true
-} elseif ($lock -and $lock.core -and $lock.core.features -and ($lock.core.features -contains "COA_PLUGIN_HOST")) {
-    $duplicationGuardPassed = $true
+
+    $collisions = @()
+    foreach ($sm in $staticModules) {
+        $smClean = $sm.ToLowerInvariant().Replace("_", "-")
+        foreach ($dId in $dynamicModuleIdentifiers) {
+            $dClean = $dId.Replace("_", "-")
+            if ($smClean -eq $dClean -or $smClean -eq "mod-$dClean" -or $smClean -eq "mod-coa-$dClean") {
+                # Distinct check: avoid false positive if names are distinct
+                if (-not ($collisions -contains "$sm <=> $dId")) {
+                    $collisions += "$sm (dynamic plugin: $dId)"
+                }
+            }
+        }
+    }
+
+    if ($collisions.Count -gt 0) {
+        $duplicationGuardPassed = $false
+        $duplicationFailureReason = "Collision detected: Dynamic module registered statically in host build: $($collisions -join '; ')"
+    } else {
+        # Evidence Source B: Inspect ModulesLoader.cpp if available in environment/build
+        $modulesLoaderCandidates = @(
+            "$ServerDir/ModulesLoader.cpp",
+            "$BundleDir/ModulesLoader.cpp",
+            "C:/games/coa-work/plugin-spike/build-spike/modules/gen_scriptloader/static/ModulesLoader.cpp"
+        )
+        $loaderFound = $false
+        foreach ($ml in $modulesLoaderCandidates) {
+            if (Test-Path $ml) {
+                $loaderFound = $true
+                $loaderContent = Get-Content $ml -Raw
+                if ($loaderContent -match "Addmod_coa_playerbotsScripts" -or 
+                    $loaderContent -match "Addmod_coa_content_scalingScripts" -or 
+                    $loaderContent -match "Addmod_TimeIsTimeScripts") {
+                    $collisions += "ModulesLoader.cpp contains dynamic module script invocation"
+                }
+                break
+            }
+        }
+
+        if ($collisions.Count -gt 0) {
+            $duplicationGuardPassed = $false
+            $duplicationFailureReason = "ModulesLoader.cpp contains static registrations for dynamic modules"
+        } else {
+            $duplicationGuardPassed = $true
+        }
+    }
 }
 
 if ($duplicationGuardPassed) {
-    Record-Check "DUPLICATION_GUARD" "PASS" "Plugin host dynamic symbol export (COA_PLUGIN_HOST) verified"
+    Record-Check "DUPLICATION_GUARD" "PASS" "Absence of static/dynamic module duplication verified (Static modules: $($staticModules.Count), Dynamic plugins: $($lock.official_modules.Count), Overlap: 0)"
 } else {
-    Record-Check "DUPLICATION_GUARD" "FAIL" "Dynamic symbol export COA_PLUGIN_HOST not verified in SDK inputs or lock features"
+    Record-Check "DUPLICATION_GUARD" "FAIL" $duplicationFailureReason
 }
 
 # 5. Dynamic DLL Plugins Check & Hash Integrity

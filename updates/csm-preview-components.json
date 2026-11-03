@@ -1,7 +1,7 @@
 ﻿{
     "channel":  "preview",
     "version":  "0.7.1-preview",
-    "release_timestamp":  "2026-11-03T04:01:45Z",
+    "release_timestamp":  "2026-11-03T04:34:52Z",
     "min_manager_version":  "0.7.1",
     "core":  {
                  "commit":  "a11c2a7143c29e4ce8021d63eae319a2cc623f99",
@@ -21,44 +21,48 @@
             },
     "modules":  [
                     {
-                        "size":  5876224,
-                        "id":  "companions",
-                        "required_sdk":  "0.3.2",
-                        "name":  "CoA Companions",
-                        "type":  "DYNAMIC_DLL",
                         "binary":  "companions.dll",
+                        "id":  "companions",
+                        "type":  "DYNAMIC_DLL",
+                        "size":  5876224,
                         "source_commit":  "9941481dc50fd82fea05b15b905ee893ab6c3643",
-                        "sha256":  "34be20f127c709fc7b6be9b5b6cd49cc16dd38d0e1e2a51d40aef5c3c0e5fd48"
+                        "name":  "CoA Companions",
+                        "sha256":  "34be20f127c709fc7b6be9b5b6cd49cc16dd38d0e1e2a51d40aef5c3c0e5fd48",
+                        "repository":  "https://github.com/Corfirean/mod-coa-playerbots",
+                        "required_sdk":  "0.3.2"
                     },
                     {
-                        "size":  22078976,
-                        "id":  "content-scaling",
-                        "required_sdk":  "0.3.2",
-                        "name":  "Content Scaling",
-                        "type":  "DYNAMIC_DLL",
                         "binary":  "content_scaling.dll",
+                        "id":  "content-scaling",
+                        "type":  "DYNAMIC_DLL",
+                        "size":  22078976,
                         "source_commit":  "46d2dbe90487646a669107be6fb6585a759f9363",
-                        "sha256":  "46e215ea723c180886c4617e49335dee1edfc3b0dacf7530bcea8755821420a1"
+                        "name":  "Content Scaling",
+                        "sha256":  "46e215ea723c180886c4617e49335dee1edfc3b0dacf7530bcea8755821420a1",
+                        "repository":  "https://github.com/Corfirean/mod-coa-content-scaling",
+                        "required_sdk":  "0.3.2"
                     },
                     {
-                        "size":  24022016,
-                        "id":  "playerbots",
-                        "required_sdk":  "0.3.2",
-                        "name":  "SQUID Playerbots",
-                        "type":  "DYNAMIC_DLL",
                         "binary":  "squid_playerbots.dll",
+                        "id":  "playerbots",
+                        "type":  "DYNAMIC_DLL",
+                        "size":  24022016,
                         "source_commit":  "0fbfa18340e038c0406b6a654fe1cc9ac4413fd8",
-                        "sha256":  "9e42dccf534f333c50a49c0e661143267ca4e297d79f6c2b5bcb98ff215f94f0"
+                        "name":  "SQUID Playerbots",
+                        "sha256":  "9e42dccf534f333c50a49c0e661143267ca4e297d79f6c2b5bcb98ff215f94f0",
+                        "repository":  "https://github.com/Corfirean/mod-coa-playerbots",
+                        "required_sdk":  "0.3.2"
                     },
                     {
-                        "size":  132096,
-                        "id":  "time-is-time",
-                        "required_sdk":  "0.3.2",
-                        "name":  "TimeIsTime",
-                        "type":  "DYNAMIC_DLL",
                         "binary":  "time-is-time.dll",
+                        "id":  "time-is-time",
+                        "type":  "DYNAMIC_DLL",
+                        "size":  132096,
                         "source_commit":  "d18ae56a666ea33c6978434720ae79e438183141",
-                        "sha256":  "7bca10943ab995dd36af509d25cf3869fd3fa213d195e5164bfdffd05d83ba4e"
+                        "name":  "TimeIsTime",
+                        "sha256":  "7bca10943ab995dd36af509d25cf3869fd3fa213d195e5164bfdffd05d83ba4e",
+                        "repository":  "https://github.com/Corfirean/mod-TimeIsTime",
+                        "required_sdk":  "0.3.2"
                     }
                 ],
     "compatibility":  {

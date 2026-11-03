@@ -48,13 +48,20 @@ jobs:
           name: preview-verification-report
           path: verification/
 
-      - name: Enforce Pre-Publish Qualification Gate
+      - name: Download Channel Metadata
+        uses: actions/download-artifact@v4
+        with:
+          name: preview-channel-metadata
+          path: channel_metadata/
+
+      - name: Enforce Immutable Pre-Publish Qualification Gate (P0-4 & P0-2)
         shell: pwsh
         run: |
           powershell -ExecutionPolicy Bypass -File scripts/test-publish-gate.ps1 `
             -BundleDir "dist" `
             -VerificationDir "verification" `
-            -UpdatesDir "updates"
+            -ChannelMetadataDir "channel_metadata" `
+            -RequireSignature
 
       - name: Publish to GitHub Releases (Preview Channel Only)
         env:

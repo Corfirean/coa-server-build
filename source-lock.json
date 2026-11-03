@@ -1,0 +1,100 @@
+{
+  "schema": 1,
+  "product": "CoA Server Preview Modular Host",
+  "version": "0.7.1-preview",
+  "sdk_version": "0.3.2",
+  "core": {
+    "repository": "https://github.com/Corfirean/azerothcore-wotlk-coa",
+    "branch": "preview/dynamic-plugin-host",
+    "commit": "a11c2a7143c29e4ce8021d63eae319a2cc623f99"
+  },
+  "builder": {
+    "repository": "https://github.com/Corfirean/coa-server-build",
+    "branch": "preview/modules-v2",
+    "commit": "48c184c95bfd8c928e767441d873f586774f8d05"
+  },
+  "manager": {
+    "repository": "https://github.com/Corfirean/coa-server-manager",
+    "branch": "preview/modules-v2",
+    "commit": "3dbfffba76c44794a944018f5a1f001cbc80119c"
+  },
+  "static_modules": [
+    "mod-ah-bot-plus",
+    "mod-ascension",
+    "mod-battlehorn",
+    "mod-book-of-artisans",
+    "mod-cfbg",
+    "mod-coa-challenges",
+    "mod-coa-change-potions",
+    "mod-coa-custom-races",
+    "mod-coa-legendary-items",
+    "mod-coa-lottery",
+    "mod-coa-mythic-plus",
+    "mod-coa-prestige",
+    "mod-coa-raid-difficulty",
+    "mod-coa-tbc-content",
+    "mod-coa-titan-scrolls",
+    "mod-coa-wotlk-content",
+    "mod-craftsmans-codex",
+    "mod-destiny-weaver",
+    "mod-dynamic-xp",
+    "mod-ethereal-bazaar",
+    "mod-hero-call-board",
+    "mod-item-recovery",
+    "mod-manastorm-endless",
+    "mod-npc-enchanter",
+    "mod-path-to-ascension",
+    "mod-portable-sawmill",
+    "mod-portablemail",
+    "mod-scrolls-of-retreat",
+    "mod-spellbook",
+    "mod-teleport-actionbar",
+    "mod-treasure-keeper",
+    "mod-war-games",
+    "mod-woodworking",
+    "mod-worldforged-pickups",
+    "mod-worldforged-upgrades"
+  ],
+  "modules": [
+    {
+      "id": "companions",
+      "name": "CoA Companions",
+      "type": "DYNAMIC_DLL",
+      "repository": "https://github.com/Corfirean/mod-coa-playerbots",
+      "branch": "preview/dynamic-plugin",
+      "commit": "9941481dc50fd82fea05b15b905ee893ab6c3643",
+      "binary": "companions.dll",
+      "required_sdk": "0.3.2"
+    },
+    {
+      "id": "content-scaling",
+      "name": "Content Scaling",
+      "type": "DYNAMIC_DLL",
+      "repository": "https://github.com/Corfirean/mod-coa-content-scaling",
+      "branch": "preview/dynamic-plugin",
+      "commit": "46d2dbe90487646a669107be6fb6585a759f9363",
+      "binary": "content_scaling.dll",
+      "required_sdk": "0.3.2"
+    },
+    {
+      "id": "playerbots",
+      "name": "SQUID Playerbots",
+      "type": "DYNAMIC_DLL",
+      "repository": "https://github.com/Corfirean/mod-coa-playerbots",
+      "branch": "preview/dynamic-plugin",
+      "commit": "0fbfa18340e038c0406b6a654fe1cc9ac4413fd8",
+      "binary": "squid_playerbots.dll",
+      "required_sdk": "0.3.2"
+    },
+    {
+      "id": "time-is-time",
+      "name": "TimeIsTime",
+      "type": "DYNAMIC_DLL",
+      "repository": "https://github.com/Corfirean/mod-TimeIsTime",
+      "branch": "preview/dynamic-plugin",
+      "commit": "d18ae56a666ea33c6978434720ae79e438183141",
+      "binary": "time-is-time.dll",
+      "required_sdk": "0.3.2"
+    }
+  ]
+}

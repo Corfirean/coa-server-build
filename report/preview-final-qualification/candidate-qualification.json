@@ -1,0 +1,57 @@
+{
+  "timestamp": "2026-11-03T09:43:21Z",
+  "candidate_version": "0.7.1-preview",
+  "qualification_status": "PASS",
+  "fail_closed_enforced": true,
+  "failed_checks_count": 0,
+  "candidate_lock": {
+    "version": "0.7.1-preview",
+    "core_commit": "a11c2a7143c29e4ce8021d63eae319a2cc623f99",
+    "builder_commit": "48c184c95bfd8c928e767441d873f586774f8d05",
+    "manager_commit": "3dbfffba76c44794a944018f5a1f001cbc80119c",
+    "sdk_version": "0.3.2",
+    "sdk_abi_fingerprint": "2f82013def4698d3f75fa24e5f70ffa504a7782d366b5edb78c7adc3c1ee0883"
+  },
+  "verified_binaries": {
+    "worldserver.exe": {
+      "sha256": "048f810e44bcf7e3bcbbc1c6d3037a5f829e6815e959f9f0cf0d3b3c8594fc4b",
+      "size": 68840960,
+      "status": "PASS"
+    },
+    "companions.dll": {
+      "sha256": "fc0b8ef274fe01b623cf632ec1345cefc6ab9e5c46445ea6198f828a2139b4b9",
+      "size": 178176,
+      "status": "PASS"
+    },
+    "content_scaling.dll": {
+      "sha256": "4e731b54c86807f6be3287019803d368d276b9239ba8b83594bf3c990b7eef4d",
+      "size": 158720,
+      "status": "PASS"
+    },
+    "playerbots.dll": {
+      "sha256": "b0572d17c5bba3f07a514d33a6fa46ec39d4810776b29f7cf7ea13fc34563458",
+      "size": 2420736,
+      "status": "PASS"
+    },
+    "time_is_time.dll": {
+      "sha256": "63f8bb1507f354964e1c2fe811fa1cfa97607ea72ce6663f961e6955a109a1ff",
+      "size": 139264,
+      "status": "PASS"
+    }
+  },
+  "qualification_checks": [
+    { "name": "CANDIDATE_LOCK_VALID", "status": "PASS" },
+    { "name": "WORLDSERVER_PRESENT", "status": "PASS" },
+    { "name": "WORLDSERVER_HASH_MATCH", "status": "PASS" },
+    { "name": "WORLDSERVER_SIZE_MATCH", "status": "PASS" },
+    { "name": "SDK_PRESENT", "status": "PASS" },
+    { "name": "SDK_ABI_MATCH", "status": "PASS" },
+    { "name": "DUPLICATION_GUARD", "status": "PASS" },
+    { "name": "OFFICIAL_DYNAMIC_DLLS", "status": "PASS" },
+    { "name": "OFFICIAL_DLL_HASHES", "status": "PASS" },
+    { "name": "CHECKSUM_NO_DUPLICATES", "status": "PASS" },
+    { "name": "CHECKSUM_NO_TRAVERSAL", "status": "PASS" },
+    { "name": "CHECKSUM_INVENTORY_VALID", "status": "PASS" },
+    { "name": "CHECKSUM_COVERAGE", "status": "PASS" }
+  ]
+}

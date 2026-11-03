@@ -1,0 +1,87 @@
+{
+  "timestamp": "2026-11-03T09:41:00Z",
+  "pipeline": "coa-server-build (preview/modules-v2)",
+  "verdict": "PASS",
+  "pipeline_stages": [
+    {
+      "stage": "1_SOURCE_LOCK",
+      "artifact": "source-lock.json",
+      "integrity": "Pinned commits for Core, Builder, Manager, 35 static modules, 4 dynamic plugins, and SDK 0.3.2. Checked into git root."
+    },
+    {
+      "stage": "2_BUILD",
+      "workflow": ".github/workflows/preview-build.yml",
+      "integrity": "Checks out exact locked commits; builds worldserver.exe with static modules; extracts SDK headers; builds 4 DLL plugins against exported SDK."
+    },
+    {
+      "stage": "3_PACKAGE",
+      "script": "scripts/preview-package.ps1",
+      "integrity": "Generates candidate-lock.json hashing real files and binding source commits; packages dist/ directory containing server/, sdk/, plugins/, source-lock.json, candidate-lock.json, sha256sums.txt, and updates/ channel metadata; creates preview-server-bundle.zip; uploads GitHub Actions workflow artifacts."
+    },
+    {
+      "stage": "4_VERIFY",
+      "script": "scripts/preview-verify.ps1",
+      "workflow": ".github/workflows/preview-verify.yml",
+      "integrity": "Consumes exclusively the downloaded preview-server-bundle artifact; verifies candidate-lock.json, binary hashes, ABI fingerprint, duplication guard, and sha256sums.txt; writes preview-qualification-verdict.json; uploads preview-verification-report."
+    },
+    {
+      "stage": "5_PRE_PUBLISH_GATE",
+      "script": "scripts/test-publish-gate.ps1",
+      "workflow": ".github/workflows/preview-release.yml",
+      "integrity": "Downloads preview-server-bundle, preview-verification-report, and preview-channel-metadata; verifies all candidate versions, hashes, and commits match across all three artifacts; verifies real cryptographic signature; fails closed if any mismatch occurs."
+    },
+    {
+      "stage": "6_RELEASE_PUBLISH",
+      "destination": "GitHub Release: preview-server-v0.7.1",
+      "channel": "Preview channel only (csm-preview-channel.json)",
+      "stable_channel_isolated": "Stable channel (latest.json, production releases) completely untouched and unreferenced."
+    }
+  ],
+  "checkout_leakage_mitigations": {
+    "workflow_artifact_isolation": "preview-release.yml explicitly downloads preview-channel-metadata from the candidate run rather than reading local updates/ directory.",
+    "verdict_binding": "Pre-publish gate mandates preview-qualification-verdict.json matches candidate-lock.json candidate_sha256 and version.",
+    "hash_invariance": "All release assets are validated against candidate-lock.json SHA-256 before release creation."
+  },
+  "test_results": [
+    {
+      "test_id": "REL-01",
+      "scenario": "Manifest Version Mismatch (Mixed Candidate Assets)",
+      "expected_result": "FAIL_CLOSED (Exit 1)",
+      "actual_result": "PASS",
+      "exit_code": 1,
+      "details": "Pre-publish gate detected mixed candidate: component manifest version (0.8.0-different) differs from candidate lock (0.7.1-preview). Terminated release."
+    },
+    {
+      "test_id": "REL-02",
+      "scenario": "Tampered Source Identity in Lock",
+      "expected_result": "FAIL_CLOSED (Exit 1)",
+      "actual_result": "PASS",
+      "exit_code": 1,
+      "details": "Pre-publish gate failed closed when candidate-lock was modified with mismatched source commit."
+    },
+    {
+      "test_id": "REL-03",
+      "scenario": "Qualified Bundle Mutated After Verification",
+      "expected_result": "FAIL_CLOSED (Exit 1)",
+      "actual_result": "PASS",
+      "exit_code": 1,
+      "details": "Pre-publish gate detected binary mutation occurred after qualification: companions.dll hash does not match candidate lock."
+    },
+    {
+      "test_id": "REL-04",
+      "scenario": "Missing Channel Metadata Directory",
+      "expected_result": "FAIL_CLOSED (Exit 1)",
+      "actual_result": "PASS",
+      "exit_code": 1,
+      "details": "Pre-publish gate failed closed when channel metadata directory is missing."
+    },
+    {
+      "test_id": "REL-05",
+      "scenario": "Verdict Mismatch from Different Run",
+      "expected_result": "FAIL_CLOSED (Exit 1)",
+      "actual_result": "PASS",
+      "exit_code": 1,
+      "details": "Pre-publish gate detected mixed candidate: verification verdict candidate_sha256 does not match bundle candidate-lock.json."
+    }
+  ]
+}

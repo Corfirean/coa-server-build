@@ -5,7 +5,7 @@
 **Candidate Version:** 0.7.1-preview
 **Core Commit:** a11c2a7143c29e4ce8021d63eae319a2cc623f99
 **Builder Branch:** preview/modules-v2
-**Verification Date:** 2026-11-03 09:04:09
+**Verification Date:** 2026-11-03 09:43:20
 **Failed Checks Count:** 0
 
 ## Qualification Matrix
@@ -33,7 +33,7 @@
 - [PASS] WORLDSERVER_SIZE_MATCH: worldserver.exe size matches lock (68840960 bytes)
 - [PASS] SDK_PRESENT: sdk.json found and parsed in 'C:\games\coa-server-build\dist/sdk'
 - [PASS] SDK_ABI_MATCH: SDK ABI fingerprint matches lock (2f82013def4698d3f75fa24e5f70ffa504a7782d366b5edb78c7adc3c1ee0883)
-- [PASS] DUPLICATION_GUARD: Plugin host dynamic symbol export (COA_PLUGIN_HOST) verified
+- [PASS] DUPLICATION_GUARD: Absence of static/dynamic module duplication verified (Static modules: 35, Dynamic plugins: 4, Overlap: 0)
 - [PASS] OFFICIAL_DYNAMIC_DLLS: All mandatory official plugins present in 'C:\games\coa-server-build\dist/plugins'
 - [PASS] OFFICIAL_DLL_HASHES: All official plugins match candidate lock SHA-256 and metadata
 - [PASS] CHECKSUM_NO_DUPLICATES: No duplicate entries in sha256sums.txt

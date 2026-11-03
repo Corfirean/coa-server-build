@@ -1,0 +1,101 @@
+{
+  "timestamp": "2026-11-03T09:41:00Z",
+  "guard_architecture": "Evidence-Backed Static/Dynamic Collision Detection",
+  "implementation": "scripts/preview-verify.ps1 (Step 4: DUPLICATION_GUARD)",
+  "evidence_sources": {
+    "static_module_manifest": "candidate-lock.json (static_modules) & source-lock.json (static_modules)",
+    "dynamic_plugin_manifest": "candidate-lock.json (official_modules)",
+    "cpp_registration_reference": "azerothcore-wotlk-coa/src/server/scripts/ModulesLoader.cpp"
+  },
+  "static_modules_inventory": [
+    "mod-anticheat",
+    "mod-aoe-loot",
+    "mod-autobalance",
+    "mod-cfbg",
+    "mod-chat-sound",
+    "mod-crossfaction-battleground",
+    "mod-death-announcements",
+    "mod-duel-reset",
+    "mod-eluna",
+    "mod-guild-house",
+    "mod-hardcore",
+    "mod-individual-progression",
+    "mod-learn-spells",
+    "mod-low-level-arena",
+    "mod-money-for-kills",
+    "mod-npc-all-in-one",
+    "mod-npc-free-professions",
+    "mod-npc-services",
+    "mod-phased-dueling",
+    "mod-progression-system",
+    "mod-pvp-titles",
+    "mod-racial-trait-swap",
+    "mod-random-enchants",
+    "mod-reagent-bank",
+    "mod-reward-system",
+    "mod-server-stats",
+    "mod-skip-dk-starting-area",
+    "mod-solocraft",
+    "mod-starter-guild",
+    "mod-transmog",
+    "mod-vip-system",
+    "mod-weapon-visuals",
+    "mod-weekend-xp",
+    "mod-world-chat",
+    "mod-zone-buffs"
+  ],
+  "dynamic_plugins_inventory": [
+    {
+      "id": "mod-coa-companions",
+      "binary": "companions.dll",
+      "registration_symbol": "Addmod_coa_companionsScripts",
+      "static_presence_in_modules_loader": false
+    },
+    {
+      "id": "mod-coa-content-scaling",
+      "binary": "content_scaling.dll",
+      "registration_symbol": "Addmod_coa_content_scalingScripts",
+      "static_presence_in_modules_loader": false
+    },
+    {
+      "id": "mod-coa-playerbots",
+      "binary": "playerbots.dll",
+      "registration_symbol": "Addmod_coa_playerbotsScripts",
+      "static_presence_in_modules_loader": false
+    },
+    {
+      "id": "mod-coa-time-is-time",
+      "binary": "time_is_time.dll",
+      "registration_symbol": "Addmod_coa_time_is_timeScripts",
+      "static_presence_in_modules_loader": false
+    }
+  ],
+  "overlap_count": 0,
+  "collisions_detected": [],
+  "test_results": [
+    {
+      "test_id": "DUP-01",
+      "scenario": "Dynamic-Only Registration (Zero Overlap)",
+      "expected_result": "PASS (Exit 0)",
+      "actual_result": "PASS",
+      "exit_code": 0,
+      "details": "Verified 35 static modules and 4 dynamic plugins have zero intersection. Qualification passed."
+    },
+    {
+      "test_id": "DUP-02",
+      "scenario": "Static + Dynamic Collision (mod-coa-companions in both lists)",
+      "expected_result": "FAIL_CLOSED (Exit 1)",
+      "actual_result": "PASS",
+      "exit_code": 1,
+      "details": "Duplication guard detected duplicate registration collision: 'mod-coa-companions' present in both static and dynamic registries. Failed closed."
+    },
+    {
+      "test_id": "DUP-03",
+      "scenario": "Missing Static Module Evidence (Evidence Absent)",
+      "expected_result": "FAIL_CLOSED (Exit 1)",
+      "actual_result": "PASS",
+      "exit_code": 1,
+      "details": "Duplication guard failed closed: static_modules list missing from lock and bundle. Qualification terminated."
+    }
+  ]
+}

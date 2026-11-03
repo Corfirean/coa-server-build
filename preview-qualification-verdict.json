@@ -3,10 +3,10 @@
     "verdict":  "PASS",
     "status":  "PASS",
     "qualified":  true,
-    "timestamp":  "2026-11-03T04:04:09Z",
+    "timestamp":  "2026-11-03T04:43:20Z",
     "candidate_version":  "0.7.1-preview",
     "core_commit":  "a11c2a7143c29e4ce8021d63eae319a2cc623f99",
-    "builder_commit":  "a57b2d935a3446d178ac34473124e7df4e512e4c",
+    "builder_commit":  "48c184c95bfd8c928e767441d873f586774f8d05",
     "sdk_abi_fingerprint":  "2f82013def4698d3f75fa24e5f70ffa504a7782d366b5edb78c7adc3c1ee0883",
     "failed_checks":  [
 
@@ -33,7 +33,7 @@
                         "[PASS] WORLDSERVER_SIZE_MATCH: worldserver.exe size matches lock (68840960 bytes)",
                         "[PASS] SDK_PRESENT: sdk.json found and parsed in \u0027C:\\games\\coa-server-build\\dist/sdk\u0027",
                         "[PASS] SDK_ABI_MATCH: SDK ABI fingerprint matches lock (2f82013def4698d3f75fa24e5f70ffa504a7782d366b5edb78c7adc3c1ee0883)",
-                        "[PASS] DUPLICATION_GUARD: Plugin host dynamic symbol export (COA_PLUGIN_HOST) verified",
+                        "[PASS] DUPLICATION_GUARD: Absence of static/dynamic module duplication verified (Static modules: 35, Dynamic plugins: 4, Overlap: 0)",
                         "[PASS] OFFICIAL_DYNAMIC_DLLS: All mandatory official plugins present in \u0027C:\\games\\coa-server-build\\dist/plugins\u0027",
                         "[PASS] OFFICIAL_DLL_HASHES: All official plugins match candidate lock SHA-256 and metadata",
                         "[PASS] CHECKSUM_NO_DUPLICATES: No duplicate entries in sha256sums.txt",

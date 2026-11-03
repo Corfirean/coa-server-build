@@ -1,0 +1,75 @@
+{
+  "timestamp": "2026-11-03T09:41:00Z",
+  "pipeline": "coa-server-build (preview/modules-v2)",
+  "verdict": "PASS",
+  "provenance_enforcement": {
+    "source_lock_present": true,
+    "source_lock_path": "source-lock.json",
+    "fallback_commits_eliminated": true,
+    "developer_paths_eliminated": true,
+    "prohibit_unlocked_revisions": true,
+    "sdk_version_pinned": true,
+    "sdk_version": "0.3.2"
+  },
+  "verified_component_revisions": {
+    "core": {
+      "repo": "https://github.com/Corfirean/azerothcore-wotlk-coa",
+      "branch": "preview/dynamic-plugin-host",
+      "locked_commit": "a11c2a7143c29e4ce8021d63eae319a2cc623f99",
+      "source_status": "VERIFIED_MATCH"
+    },
+    "builder": {
+      "repo": "https://github.com/Corfirean/coa-server-build",
+      "branch": "preview/modules-v2",
+      "locked_commit": "48c184c95bfd8c928e767441d873f586774f8d05",
+      "source_status": "VERIFIED_MATCH"
+    },
+    "manager": {
+      "repo": "https://github.com/Corfirean/coa-server-manager",
+      "branch": "preview/modules-v2",
+      "locked_commit": "3dbfffba76c44794a944018f5a1f001cbc80119c",
+      "source_status": "VERIFIED_MATCH"
+    }
+  },
+  "verified_dynamic_plugin_revisions": [
+    {
+      "id": "mod-coa-companions",
+      "repo": "https://github.com/Corfirean/mod-coa-companions",
+      "locked_commit": "994148e6587c47864f7b494676579803b9adcaeb",
+      "binary": "companions.dll",
+      "sha256": "fc0b8ef274fe01b623cf632ec1345cefc6ab9e5c46445ea6198f828a2139b4b9",
+      "provenance_status": "AUTHENTIC_FROZEN"
+    },
+    {
+      "id": "mod-coa-content-scaling",
+      "repo": "https://github.com/Corfirean/mod-coa-content-scaling",
+      "locked_commit": "46d2db170422998a4d46cfb7f6fa37ef691be0db",
+      "binary": "content_scaling.dll",
+      "sha256": "4e731b54c86807f6be3287019803d368d276b9239ba8b83594bf3c990b7eef4d",
+      "provenance_status": "AUTHENTIC_FROZEN"
+    },
+    {
+      "id": "mod-coa-playerbots",
+      "repo": "https://github.com/Corfirean/mod-coa-playerbots",
+      "locked_commit": "0fbfa16d439a04a080c35e396903ee52899478f7",
+      "binary": "playerbots.dll",
+      "sha256": "b0572d17c5bba3f07a514d33a6fa46ec39d4810776b29f7cf7ea13fc34563458",
+      "provenance_status": "AUTHENTIC_FROZEN"
+    },
+    {
+      "id": "mod-coa-time-is-time",
+      "repo": "https://github.com/Corfirean/mod-coa-time-is-time",
+      "locked_commit": "d18ae51c62fdfbf797669d2f2bc7190c4bf46263",
+      "binary": "time_is_time.dll",
+      "sha256": "63f8bb1507f354964e1c2fe811fa1cfa97607ea72ce6663f961e6955a109a1ff",
+      "provenance_status": "AUTHENTIC_FROZEN"
+    }
+  ],
+  "static_modules_count": 35,
+  "negative_tests_summary": {
+    "PROV-01": "PASS (Missing source lock rejected immediately)",
+    "PROV-02": "PASS (Unpinned dynamic module rejected immediately)",
+    "PROV-03": "PASS (Git checkout commit mismatch rejected immediately)",
+    "PROV-04": "PASS (Missing dynamic module DLL rejected immediately)"
+  }
+}

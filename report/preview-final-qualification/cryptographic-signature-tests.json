@@ -1,0 +1,56 @@
+{
+  "timestamp": "2026-11-03T09:41:00Z",
+  "cryptographic_algorithm": "Ed25519 / Minisign",
+  "implementation": "scripts/verify-updater-signature.py (Python cryptography Ed25519)",
+  "public_key_source": "coa-server-manager/src-tauri/tauri.conf.json (tauri.updater.pubkey)",
+  "public_key_raw": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEY2MjQ5NkMzMjgzNjBFQTcKUldTaSt5c010c2ZkQ3ZhcjhkbXZ4aUtZSFBLUXU4Y043R3l1Z25qY1JzK1R2TWRuSnVzdmw2Y2MK",
+  "key_id": "F62496C328360EA7",
+  "signature_verification_architecture": {
+    "primary_signature_verified": true,
+    "primary_signature_target": "package_bytes",
+    "trusted_comment_verified": true,
+    "trusted_comment_target": "primary_signature_bytes + trusted_comment_bytes",
+    "key_id_validation": true,
+    "version_binding_validation": true
+  },
+  "test_results": [
+    {
+      "test_id": "SIGN-01",
+      "scenario": "Invalid / Random Signature String",
+      "expected_result": "FAIL_CLOSED (Exit 1)",
+      "actual_result": "PASS",
+      "exit_code": 1,
+      "details": "Verifier detected invalid Minisign base64 / length error and rejected signature with exit code 1."
+    },
+    {
+      "test_id": "SIGN-02",
+      "scenario": "Untrusted / Foreign Public Key",
+      "expected_result": "FAIL_CLOSED (Exit 1)",
+      "actual_result": "PASS",
+      "exit_code": 1,
+      "details": "Verifier detected Key ID mismatch between signature and public key, rejecting foreign key with exit code 1."
+    },
+    {
+      "test_id": "SIGN-03",
+      "scenario": "Package Payload Tampering (Bit Flip)",
+      "expected_result": "FAIL_CLOSED (Exit 1)",
+      "actual_result": "PASS",
+      "exit_code": 1,
+      "details": "Cryptographic Ed25519 verification failed over altered package payload, exiting 1 with verification error."
+    },
+    {
+      "test_id": "SIGN-04",
+      "scenario": "Valid Cryptographic Signature Over Authentic Payload",
+      "expected_result": "PASS (Exit 0)",
+      "actual_result": "PASS",
+      "exit_code": 0,
+      "details": "Verified authentic Minisign signature over bundle payload: primary signature matches and trusted comment matches."
+    }
+  ],
+  "production_signing_status": {
+    "private_key_present": false,
+    "private_key_disposition": "HELD_BY_REPOSITORY_OWNER",
+    "ephemeral_keypair_used_for_ci_tests": true,
+    "release_publish_blocked_until_signed": true
+  }
+}

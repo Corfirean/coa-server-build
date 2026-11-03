@@ -1,10 +1,17 @@
 name: preview-build
-# Dedicated CoA Modules Preview build pipeline.
+# Dedicated CoA Modules Preview build and qualification pipeline.
 # Compiles the modular AzerothCore host (preview/dynamic-plugin-host),
-# exports the CoA Plugin SDK, and builds official dynamic DLL plugins.
+# exports the CoA Plugin SDK, builds official dynamic DLL plugins,
+# packages the preview bundle, and runs fail-closed qualification.
 # Stable release pipeline (main) is completely isolated and untouched.
 
 on:
+  push:
+    branches:
+      - 'preview/modules-v2'
+    paths-ignore:
+      - '**.md'
+      - 'report/**'
   workflow_dispatch:
     inputs:
       core_ref:
@@ -64,6 +71,25 @@ jobs:
             C:\local\boost_1_87_0
             C:\tools\mysql\current
           key: winbuild-deps:boost-1.87.0:mysql-8.4.9
+
+      - name: Bootstrap Boost & MySQL on Cache Miss
+        shell: pwsh
+        run: |
+          if (-not (Test-Path 'C:\local\boost_1_87_0\boost')) {
+            Write-Host "Downloading Boost 1.87.0..."
+            $boostExe = Join-Path $env:RUNNER_TEMP 'boost.exe'
+            Invoke-WebRequest -Uri 'https://downloads.sourceforge.net/project/boost/boost-binaries/1.87.0/boost_1_87_0-msvc-14.3-64.exe' -OutFile $boostExe
+            Start-Process -FilePath $boostExe -ArgumentList '/DIR=C:\local\boost_1_87_0', '/SILENT' -Wait
+          }
+          if (-not (Test-Path 'C:\tools\mysql\current\lib\mysqlclient.lib')) {
+            Write-Host "Downloading MySQL 8.4.9..."
+            $mysqlZip = Join-Path $env:RUNNER_TEMP 'mysql.zip'
+            Invoke-WebRequest -Uri 'https://cdn.mysql.com/archives/mysql-8.4/mysql-8.4.9-winx64.zip' -OutFile $mysqlZip -UserAgent 'Mozilla/5.0'
+            Expand-Archive -Path $mysqlZip -DestinationPath "$env:RUNNER_TEMP/mysql" -Force
+            New-Item -ItemType Directory -Force -Path 'C:\tools\mysql\current' | Out-Null
+            Copy-Item "$env:RUNNER_TEMP/mysql/mysql-8.4.9-winx64/*" 'C:\tools\mysql\current/' -Recurse -Force
+          }
+          Write-Host "Dependencies verified."
 
       - name: Record Core Metadata
         id: core_meta
@@ -151,6 +177,16 @@ jobs:
           name: preview-official-plugins
           path: artifacts/plugins/
 
+      - name: Generate Runner Candidate Lock
+        shell: pwsh
+        run: |
+          powershell -ExecutionPolicy Bypass -File builder/scripts/generate-candidate-lock.ps1 `
+            -SourceLock "builder/source-lock.json" `
+            -ServerDir "$PWD/artifacts/server" `
+            -SdkDir "$PWD/artifacts/sdk" `
+            -PluginsDir "$PWD/artifacts/plugins" `
+            -OutputFile "builder/candidate-lock.json"
+
       - name: Assemble Preview Server Package
         shell: pwsh
         run: |
@@ -175,3 +211,36 @@ jobs:
           name: preview-channel-metadata
           path: updates/
           retention-days: 14
+
+  verify_packaged_bundle:
+    name: Verify Preview Qualification Matrix (Fail-Closed)
+    needs: package_preview_bundle
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: builder
+
+      - name: Download Packaged Preview Bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: preview-server-bundle
+          path: bundle/
+
+      - name: Run Qualification Script (Fail-Closed)
+        shell: pwsh
+        run: |
+          powershell -ExecutionPolicy Bypass -File builder/scripts/preview-verify.ps1 `
+            -BundleDir "$PWD/bundle" `
+            -ReportOut "PREVIEW_BUILDER_QUALIFICATION.md" `
+            -VerdictOut "preview-qualification-verdict.json"
+
+      - name: Upload Verification Report and Verdict
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview-verification-report
+          path: |
+            PREVIEW_BUILDER_QUALIFICATION.md
+            preview-qualification-verdict.json
