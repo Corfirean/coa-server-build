@@ -25,6 +25,8 @@ jobs:
   verify_candidate:
     needs: build_candidate
     uses: ./.github/workflows/preview-verify.yml
+    with:
+      bundle_artifact: 'preview-server-bundle'
 
   publish_preview:
     name: Publish Preview Channel Candidate
@@ -34,20 +36,41 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Generate Preview Channel Index
+      - name: Download Packaged Preview Bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: preview-server-bundle
+          path: dist/
+
+      - name: Download Verification Report
+        uses: actions/download-artifact@v4
+        with:
+          name: preview-verification-report
+          path: verification/
+
+      - name: Verify Bundle Integrity Before Publish
         shell: pwsh
         run: |
-          powershell -ExecutionPolicy Bypass -File scripts/preview-package.ps1 -GenerateChannelIndex
+          if (-not (Test-Path "dist/candidate-lock.json")) {
+            throw "dist/candidate-lock.json missing from downloaded bundle!"
+          }
+          if (-not (Test-Path "dist/server/worldserver.exe")) {
+            throw "dist/server/worldserver.exe missing from downloaded bundle!"
+          }
+          if (-not (Test-Path "dist/sha256sums.txt")) {
+            throw "dist/sha256sums.txt missing from downloaded bundle!"
+          }
+          Write-Host "Candidate bundle verified successfully before publishing."
 
       - name: Publish to GitHub Releases (Preview Channel Only)
         env:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
-          $ver = (Get-Content candidate-lock.json -Raw | ConvertFrom-Json).version
+          $ver = (Get-Content dist/candidate-lock.json -Raw | ConvertFrom-Json).version
           $tag = "preview-v$ver"
           gh release create "$tag" `
             --prerelease `
             --title "CSM Modules Preview $ver" `
-            --notes-file "docs/preview-distribution.md" `
+            --notes-file "verification/PREVIEW_BUILDER_QUALIFICATION.md" `
             dist/*

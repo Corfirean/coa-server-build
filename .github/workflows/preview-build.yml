@@ -159,11 +159,19 @@ jobs:
             -SdkDir "$PWD/artifacts/sdk" `
             -PluginsDir "$PWD/artifacts/plugins" `
             -CandidateLock "builder/candidate-lock.json" `
-            -OutputDir "$PWD/dist"
+            -OutputDir "$PWD/dist" `
+            -ChannelDir "$PWD/updates"
 
       - name: Upload Preview Server Bundle
         uses: actions/upload-artifact@v4
         with:
           name: preview-server-bundle
           path: dist/
+          retention-days: 14
+
+      - name: Upload Channel Metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview-channel-metadata
+          path: updates/
           retention-days: 14

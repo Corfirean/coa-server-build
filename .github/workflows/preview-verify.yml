@@ -6,6 +6,11 @@ name: preview-verify
 on:
   workflow_dispatch:
   workflow_call:
+    inputs:
+      bundle_artifact:
+        description: 'Name of the packaged bundle artifact to download and verify'
+        type: string
+        default: 'preview-server-bundle'
 
 jobs:
   verify_modular_preview:
@@ -15,11 +20,17 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Download Packaged Preview Bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.bundle_artifact || 'preview-server-bundle' }}
+          path: bundle/
+
       - name: Run Qualification Script
         shell: pwsh
         run: |
           powershell -ExecutionPolicy Bypass -File scripts/preview-verify.ps1 `
-            -CandidateLock "candidate-lock.json" `
+            -BundleDir "$PWD/bundle" `
             -ReportOut "PREVIEW_BUILDER_QUALIFICATION.md"
 
       - name: Upload Verification Report
