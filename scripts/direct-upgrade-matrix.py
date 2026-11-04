@@ -44,6 +44,9 @@ def freeze(manager_ref, version, output, prepared=None):
     if prepared_manager is not None and manager != prepared_manager:
         raise RuntimeError('Manager differs from the prepared candidate lock')
     eligible = [s for s in sources if tuple(map(int, s['version'].split('.'))) <= tuple(map(int, target['version'].split('.')))]
+    eligible = [s for s in eligible if s['version'] == '0.261026.81']
+    if len(eligible) != 1:
+        raise RuntimeError('Expected exactly one signed .81 source')
     lock = {'upgradeSources': sources, 'manager': manager, 'targetRole': target['role'],
             'targetVersion': target['version'], 'testedRoles': [s['role'] for s in eligible]}
     output.write_text(json.dumps(lock, indent=2) + '\n', encoding='utf-8')

@@ -16,7 +16,7 @@ permissions:
   actions: read
 jobs:
   tool:
-    runs-on: windows-latest
+    runs-on: [self-hosted, Windows, X64, coa-persistent]
     timeout-minutes: 40
     env:
       GH_TOKEN: ${{ github.token }}
@@ -97,7 +97,7 @@ jobs:
           retention-days: 7
   upgrade:
     needs: tool
-    runs-on: windows-latest
+    runs-on: [self-hosted, Windows, X64, coa-persistent]
     timeout-minutes: 75
     strategy:
       fail-fast: false
