@@ -1,66 +1,71 @@
+# Builds the CoA plugin host (worldserver.exe + authserver.exe) and exports the CoA Plugin SDK from the
+# same build tree. The two form a pair with one ABI fingerprint: plugins built against this SDK load only
+# into this worldserver.exe. Runs in an MSVC developer environment (msvc-dev-cmd in CI, vcvars locally).
+#
+# Nothing is reused from earlier builds or from other machines: every run configures and compiles from the
+# given core checkout.
 param(
-    [string] $CoreDir = "C:/games/coa-work/plugin-spike/core",
-    [string] $OutputDir = "C:/games/coa-work/plugin-spike/server-v03",
-    [string] $SdkOutputDir = "C:/games/coa-work/plugin-spike/sdk-v03"
+    [Parameter(Mandatory = $true)] [string] $CoreDir,
+    [Parameter(Mandatory = $true)] [string] $BuildDir,
+    [Parameter(Mandatory = $true)] [string] $OutDir,
+    [string] $BoostRoot = $env:BOOST_ROOT,
+    [string] $MysqlRoot = 'C:/tools/mysql/current',
+    [string] $OpensslRoot = $env:OPENSSL_ROOT_DIR,
+    [int] $Jobs = 4,
+    [string] $ExpectCl = ''
 )
 
-$ErrorActionPreference = "Stop"
-Write-Host "=== CoA Modules Preview: Host & SDK Build ==="
-Write-Host "Core Directory: $CoreDir"
-Write-Host "Output Server: $OutputDir"
-Write-Host "Output SDK: $SdkOutputDir"
+$ErrorActionPreference = 'Stop'
+function Invoke-Checked([string] $what, [scriptblock] $cmd) {
+    & $cmd
+    if ($LASTEXITCODE -ne 0) { throw "$what failed with exit code $LASTEXITCODE" }
+}
 
-# Verify core ref
+$CoreDir = (Resolve-Path $CoreDir).Path
 if (-not (Test-Path "$CoreDir/src/server/apps/worldserver/Plugins/coa_plugin_exports.def")) {
-    throw "Target core does not contain dynamic plugin host exports (coa_plugin_exports.def). Ensure preview/dynamic-plugin-host is checked out."
+    throw "$CoreDir is not a plugin-host core (no coa_plugin_exports.def)."
 }
-
-# If pre-built artifacts already exist in persistent build cache, verify and copy
-if ((Test-Path "$OutputDir/worldserver.exe") -and (Test-Path "$SdkOutputDir/sdk.json")) {
-    Write-Host "Using verified pre-built modular host binaries from $OutputDir"
-    $sdk = Get-Content "$SdkOutputDir/sdk.json" -Raw | ConvertFrom-Json
-    Write-Host "Validated SDK ABI Fingerprint: $($sdk.abiFingerprint)"
-    exit 0
+foreach ($tool in 'cl', 'cmake', 'ninja', 'python') {
+    if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) { throw "$tool is not on PATH (run inside an MSVC developer environment)." }
 }
-
-Write-Host "Configuring CMake for dynamic plugin host..."
-$buildDir = "$CoreDir/build-preview"
-New-Item -ItemType Directory -Force -Path $buildDir | Out-Null
 
 $cmakeArgs = @(
-    "-S", "$CoreDir",
-    "-B", "$buildDir",
-    "-G", "Visual Studio 17 2022",
-    "-A", "x64",
-    "-DCOA_PLUGIN_HOST=ON",
-    "-DACORE_API_USE_DYNAMIC_LINKING=ON",
-    "-DMOD_PLAYERBOTS=disabled",
-    "-DMOD_CONTENT_SCALING=disabled",
-    "-DCMAKE_BUILD_TYPE=RelWithDebInfo"
+    '-S', $CoreDir, '-B', $BuildDir, '-G', 'Ninja',
+    '-DCMAKE_BUILD_TYPE=RelWithDebInfo',
+    '-DCOA_PLUGIN_HOST=ON',
+    '-DAPPS_BUILD=all', '-DTOOLS_BUILD=none', '-DBUILD_TESTING=OFF',
+    '-DSCRIPTS=static', '-DMODULES=static',
+    # PCH only speeds the build up; export_sdk.py strips its flags from the SDK.
+    '-DUSE_COREPCH=1', '-DUSE_SCRIPTPCH=1',
+    '-DWITH_WARNINGS=OFF',
+    '-DCMAKE_EXE_LINKER_FLAGS=/FORCE:MULTIPLE',
+    "-DBOOST_ROOT=$BoostRoot",
+    "-DMYSQL_INCLUDE_DIR=$MysqlRoot/include",
+    "-DMYSQL_LIBRARY=$MysqlRoot/lib/mysqlclient.lib"
 )
+if ($OpensslRoot) { $cmakeArgs += "-DOPENSSL_ROOT_DIR=$OpensslRoot" }
 
-if ($env:BOOST_ROOT -and (Test-Path "$env:BOOST_ROOT")) {
-    $cmakeArgs += "-DBOOST_ROOT=$env:BOOST_ROOT"
-} elseif (Test-Path "C:/local/boost_1_87_0") {
-    $cmakeArgs += "-DBOOST_ROOT=C:/local/boost_1_87_0"
-}
+Write-Host '=== configure ==='
+Invoke-Checked 'CMake configure' { cmake @cmakeArgs }
+Write-Host '=== build worldserver + authserver ==='
+Invoke-Checked 'build' { cmake --build $BuildDir --target worldserver authserver -j $Jobs }
 
-if (Test-Path "C:/tools/mysql/current/include") {
-    $cmakeArgs += "-DMYSQL_INCLUDE_DIR=C:/tools/mysql/current/include"
-    $cmakeArgs += "-DMYSQL_LIBRARY=C:/tools/mysql/current/lib/mysqlclient.lib"
-}
+$bin = (Get-ChildItem $BuildDir -Recurse -Filter worldserver.exe | Select-Object -First 1).DirectoryName
+if (-not $bin) { throw 'worldserver.exe was not produced.' }
+Invoke-Checked 'worldserver --version' { & "$bin/worldserver.exe" --version }
 
-if ($env:OPENSSL_ROOT_DIR) {
-    $cmakeArgs += "-DOPENSSL_ROOT_DIR=$env:OPENSSL_ROOT_DIR"
-}
+$coreOut = Join-Path $OutDir 'core'
+$sdkOut = Join-Path $OutDir 'sdk'
+New-Item -ItemType Directory -Force -Path $coreOut | Out-Null
+Copy-Item "$bin/worldserver.exe", "$bin/authserver.exe" $coreOut
+Get-ChildItem $bin -Filter *.dll | Copy-Item -Destination $coreOut
+Get-ChildItem $bin -Filter *.pdb | Where-Object { $_.BaseName -in 'worldserver', 'authserver' } | Copy-Item -Destination $coreOut
 
-& cmake @cmakeArgs
+Write-Host '=== export SDK ==='
+Invoke-Checked 'export_sdk.py' { python -I "$CoreDir/tools/plugin-sdk/export_sdk.py" $CoreDir $BuildDir $sdkOut }
 
-cmake --build "$buildDir" --config RelWithDebInfo --target worldserver authserver
-
-Write-Host "Assembling server executables and SDK..."
-New-Item -ItemType Directory -Force -Path $OutputDir, $SdkOutputDir | Out-Null
-Copy-Item "$buildDir/bin/RelWithDebInfo/worldserver.exe" "$OutputDir/" -Force
-Copy-Item "$buildDir/bin/RelWithDebInfo/authserver.exe" "$OutputDir/" -Force
-
-Write-Host "Build complete successfully."
+Write-Host '=== verify host/SDK pair ==='
+$coreSha = (git -C $CoreDir rev-parse HEAD).Trim()
+$verify = @("$CoreDir/tools/plugin-sdk/verify_pair.py", "$coreOut/worldserver.exe", $sdkOut, (Join-Path $OutDir 'pair.json'), '--core-sha', $coreSha)
+if ($ExpectCl) { $verify += @('--expect-cl', $ExpectCl) }
+Invoke-Checked 'verify_pair.py' { python -I @verify }
