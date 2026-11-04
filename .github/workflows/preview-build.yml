@@ -130,8 +130,10 @@ jobs:
           "abi_fingerprint=$($pair.abiFingerprint)" >> $env:GITHUB_OUTPUT
           Write-Host "core $($pair.coreCommit)  ABI $($pair.abiFingerprint)  $($pair.compiler)"
           $short = $pair.abiFingerprint.Substring(0, 16)
+          # The SDK travels inside the core as Core/plugin-sdk.zip, so a core update or rollback always
+          # carries its own SDK; the manager unpacks it when it first builds a module.
+          Compress-Archive -Path out/sdk/* -DestinationPath out/core/plugin-sdk.zip
           Compress-Archive -Path out/core/* -DestinationPath "out/coa-core-$short.zip"
-          Compress-Archive -Path out/sdk/* -DestinationPath "out/coa-sdk-$short.zip"
           Get-ChildItem out/*.zip | ForEach-Object { "{0}  {1:N1} MB" -f $_.Name, ($_.Length / 1MB) }
 
       - name: Upload core + SDK pair

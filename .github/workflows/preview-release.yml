@@ -49,7 +49,7 @@ jobs:
             echo
             echo "ABI fingerprint: \`${ABI}\`"
             echo
-            echo "Modules are compiled by the manager against coa-sdk-${ABI:0:16}.zip; plugins of another fingerprint are refused by this worldserver.exe."
+            echo "Modules are compiled by the manager against the SDK inside the core (Core/plugin-sdk.zip); plugins of another fingerprint are refused by this worldserver.exe."
           } > notes.md
           gh release create "$tag" --repo "$GITHUB_REPOSITORY" --prerelease \
             --title "Preview core ${CORE_SHA:0:10}" --notes-file notes.md dist/*
