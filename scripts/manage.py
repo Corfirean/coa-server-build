@@ -118,8 +118,39 @@ def listeners():
 
 
 def ensure_free(port):
-    if any(p == port for p, _ in listeners()):
-        raise RuntimeError(f"Port {port} is already used. Stop the other server or change Settings/repack.json.")
+    # A PID-zero TCP row can outlive a stopped server on Windows. It is not
+    # sufficient evidence that another application owns the port. Confirm with
+    # an exclusive bind, never SO_REUSEADDR, before allowing startup.
+    deadline = time.monotonic() + 30
+    announced = False
+    while True:
+        owners = sorted({pid for p, pid in listeners() if p == port})
+        if any(pid != 0 for pid in owners):
+            raise RuntimeError(
+                f"Port {port} is already used (PID {', '.join(map(str, owners))}). "
+                "Stop the other server or change Settings/repack.json.")
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+                probe.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+                probe.bind(('0.0.0.0', port))
+        except OSError as error:
+            if error.winerror not in (10013, 10048):
+                raise
+            if time.monotonic() >= deadline:
+                raise RuntimeError(
+                    f"Port {port} remains unavailable after 30 seconds "
+                    f"(Windows bind error {error.winerror}). "
+                    "No process was stopped. Retry after the previous database shutdown "
+                    "has finished, or check the Windows port reservation.") from error
+            if not announced:
+                print(f"Waiting for Windows to release port {port}...", flush=True)
+                announced = True
+            time.sleep(0.25)
+        else:
+            # The test socket has already closed. The normal server bind remains
+            # authoritative if another process races with startup after this check.
+            return
+
 
 
 def ready(name, port):
@@ -139,7 +170,7 @@ def wait_ready(name, port, seconds=180):
 
 
 @contextmanager
-def control_lock():
+def control_lock(seconds=30):
     STATE.mkdir(parents=True, exist_ok=True)
     with (STATE / "control.lock").open("a+b") as lock:
         lock.seek(0, 2)
@@ -147,15 +178,36 @@ def control_lock():
             lock.write(b"0")
             lock.flush()
         lock.seek(0)
+        deadline = time.monotonic() + seconds
+        owner_path = STATE / "control-owner.json"
+        announced = False
+        while True:
+            try:
+                msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
+                break
+            except OSError:
+                try:
+                    owner = read_json(owner_path)
+                    detail = f" PID {owner['pid']}, action {owner['action']}."
+                except (OSError, ValueError, KeyError, TypeError):
+                    detail = " Owner information is unavailable."
+                if time.monotonic() >= deadline:
+                    raise RuntimeError("Another start/stop action is in progress." + detail) from None
+                if not announced:
+                    print("Waiting for the current server action." + detail, flush=True)
+                    announced = True
+                time.sleep(0.25)
         try:
-            msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
-        except OSError:
-            raise RuntimeError("Another start/stop action is in progress.") from None
-        try:
+            atomic_json(owner_path, {"pid": os.getpid(),
+                                    "action": sys.argv[1] if len(sys.argv) > 1 else "unknown",
+                                    "started": time.time()})
             yield
         finally:
-            lock.seek(0)
-            msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
+            try:
+                owner_path.unlink(missing_ok=True)
+            finally:
+                lock.seek(0)
+                msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
 
 
 def native_root():
@@ -259,9 +311,11 @@ def prepare(config):
         text = (ROOT / "Settings" / (name + ".template")).read_text(encoding="utf-8")
         for key, value in values.items():
             text = text.replace("@" + key + "@", value)
-        if any(re.search(r"@[A-Z_a-z]+@", line) for line in text.splitlines()
-               if line.strip() and not line.lstrip().startswith("#")):
-            raise ValueError("An unresolved placeholder remains in a server configuration.")
+        unresolved = sorted({placeholder for line in text.splitlines()
+                             if line.strip() and not line.lstrip().startswith("#")
+                             for placeholder in re.findall(r"@[A-Z_a-z]+@", line)})
+        if unresolved:
+            raise ValueError(f"An unresolved placeholder remains in Settings/{name}.template: " + ", ".join(unresolved))
         (ROOT / target).write_text(text, encoding="utf-8", newline="\n")
     (ROOT / "Core/configs/modules/coa_bugreport.conf").write_text(
         '# Managed by the repack launcher. Enabled whenever worldserver starts.\n'
@@ -304,7 +358,7 @@ def mysql(sql=None, admin=None):
 def start_mysql(config):
     existing = process("mysql")
     if existing:
-        wait_ready("mysql", config["mysqlPort"], 60)
+        wait_ready("mysql", config["mysqlPort"], 300)
         mysql(admin="ping")
         print("MySQL is already running.", flush=True)
         return
@@ -314,7 +368,7 @@ def start_mysql(config):
     print("Starting MySQL...", flush=True)
     spawn("mysql", [ROOT / "mysql/bin/mysqld.exe", "--defaults-file=" + str(ROOT / "mysql/my.ini"), "--no-monitor"],
           ROOT / "mysql", ROOT / "mysql/logs/startup.log")
-    wait_ready("mysql", config["mysqlPort"], 60)
+    wait_ready("mysql", config["mysqlPort"], 300)
     mysql(admin="ping")
     mysql(f"UPDATE acore_auth.realmlist SET name='AzerothCore',address='127.0.0.1',"
           f"localAddress='127.0.0.1',port={config['worldPort']} WHERE id=1;")
@@ -330,7 +384,7 @@ def start_auth(config):
     # An interrupted world startup can leave flag 3, which authserver excludes.
     mysql("UPDATE acore_auth.realmlist SET flag=0 WHERE id=1;")
     print("Starting authserver...", flush=True)
-    spawn("auth", [ROOT / "Core/authserver.exe", "-c", ROOT / "Core/configs/authserver.conf"],
+    spawn("auth", [ROOT / "Core/authserver.exe", "-c", "configs/authserver.conf"],
           ROOT / "Core", ROOT / "Core/Logs/auth-console.log")
     wait_ready("auth", config["authPort"], 60)
 
@@ -426,7 +480,11 @@ def ra(command, config):
 def stop_all(config):
     world = process("world")
     if world:
-        print(ra("server shutdown 1s 0", config), flush=True)
+        try:
+            print(ra("server shutdown 1s 0", config), flush=True)
+        except (OSError, RuntimeError):
+            print("World console unavailable; stopping this repack's recorded world process.", flush=True)
+            terminate(world)
         if not wait_stopped(world, 90):
             raise RuntimeError("Worldserver is still stopping; its database has been left running.")
     supervisor = process("supervisor")
@@ -444,8 +502,14 @@ def stop_all(config):
             raise RuntimeError("Authserver did not stop.")
     database = process("mysql")
     if database:
-        mysql(admin="shutdown")
+        shutdown_error = None
+        try:
+            mysql(admin="shutdown")
+        except (OSError, RuntimeError, subprocess.SubprocessError) as error:
+            shutdown_error = error
         if not wait_stopped(database, 60):
+            if shutdown_error is not None:
+                raise shutdown_error
             raise RuntimeError("MySQL is still stopping; wait before copying the repack.")
     print("All services from this repack are stopped. It is safe to move or copy this folder.", flush=True)
 
@@ -453,7 +517,7 @@ def stop_all(config):
 def watch_world():
     from squid_playerbots import validate_bots
     validate_bots(ROOT)
-    world = spawn("world", [ROOT / "Core/worldserver.exe", "-c", ROOT / "Core/configs/worldserver.conf"],
+    world = spawn("world", [ROOT / "Core/worldserver.exe", "-c", "configs/worldserver.conf"],
                   ROOT / "Core", ROOT / "Core/Logs/world-console.log")
     relay = None
     try:
@@ -596,6 +660,11 @@ def main():
         if args.action == "status-json":
             status_json()
             return
+        if args.action == "stop-all":
+            # Shutdown uses the existing client/RA settings. Startup templates may
+            # be precisely what recovery needs to replace; never render them here.
+            stop_all(config)
+            return
         if args.action in ("start-all", "start-world"):
             from squid_playerbots import validate_bots
             validate_bots(ROOT)
@@ -608,10 +677,103 @@ def main():
             start_auth(config)
         if args.action in ("start-all", "start-world"):
             start_world(config, args.port_offset)
-        if args.action == "stop-all":
-            stop_all(config)
     if args.action.startswith("start-"):
         print("Use Stop_All_Server.bat to shut down this repack safely.")
+
+
+def _install_diagnostics():
+    import datetime
+    import functools
+    import hashlib
+
+    actions = {"start-all", "start-mysql", "start-auth", "start-world", "stop-all",
+               "force-stop-all", "prepare", "watch-world"}
+    action = next((arg for arg in sys.argv[1:] if arg in actions), None)
+    if action is None:
+        return
+    directory = STATE / "diagnostics"
+    timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d-%H%M%S-%f")
+    path = directory / f"manage-{timestamp}-{os.getpid()}.jsonl"
+    initialized = False
+
+    def emit(event, **fields):
+        nonlocal initialized
+        try:
+            directory.mkdir(parents=True, exist_ok=True)
+            if not initialized:
+                previous = sorted(directory.glob("manage-*.jsonl"), key=lambda p: p.stat().st_mtime, reverse=True)
+                for old in previous[19:]:
+                    old.unlink(missing_ok=True)
+                initialized = True
+            if path.exists() and path.stat().st_size >= 1024 * 1024:
+                return
+            record = {"utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                      "pid": os.getpid(), "action": action, "event": event, **fields}
+            with path.open("a", encoding="utf-8") as stream:
+                stream.write(json.dumps(record, ensure_ascii=False) + "\n")
+        except (OSError, ValueError):
+            pass
+
+    def wrap(name):
+        original = globals()[name]
+
+        @functools.wraps(original)
+        def traced(*args, **kwargs):
+            began = time.monotonic()
+            detail = {}
+            if name in ("wait_ready", "spawn") and args:
+                detail["service"] = args[0]
+            port = args[0] if name == "ensure_free" and args else args[1] if name == "wait_ready" and len(args) > 1 else None
+            if port is not None:
+                detail["port"] = port
+            emit(name + ".begin", **detail)
+            try:
+                result = original(*args, **kwargs)
+            except BaseException as error:
+                if port is not None:
+                    try:
+                        detail["listeners"] = [list(row) for row in listeners() if row[0] == port]
+                    except (OSError, RuntimeError):
+                        pass
+                if name == "wait_ready" and args[0] == "auth":
+                    try:
+                        record = process("auth")
+                        detail["auth_pid"] = record["pid"] if record else None
+                        detail["auth_ipv4_ports"] = [p for p, pid in listeners() if pid == detail["auth_pid"]]
+                        for key, rel in (("template", "Settings/authserver.conf.template"),
+                                         ("rendered", "Core/configs/authserver.conf")):
+                            content = (ROOT / rel).read_text(encoding="utf-8-sig")
+                            detail[key + "_auth_ports"] = re.findall(
+                                r"(?m)^[ \t]*RealmServerPort[ \t]*=[ \t]*([0-9]+|@AUTH_PORT@)(?=[ \t\r\n#]|$)", content)
+                    except Exception as probe_error:
+                        detail["auth_probe_error"] = type(probe_error).__name__
+                    try:
+                        atomic_json(ROOT / "CoA-auth-error.json", {
+                            "utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                            "action": action, "error": type(error).__name__, **detail,
+                        })
+                    except OSError:
+                        pass
+                emit(name + ".error", duration_seconds=round(time.monotonic() - began, 6),
+                     error_type=type(error).__name__, **detail)
+                raise
+            emit(name + ".ok", duration_seconds=round(time.monotonic() - began, 6), **detail)
+            return result
+
+        globals()[name] = traced
+
+    for name in ("main", "prepare", "ensure_free", "wait_ready", "spawn", "start_mysql",
+                 "start_auth", "start_world", "watch_world", "stop_all", "terminate", "wait_stopped"):
+        wrap(name)
+    try:
+        digest = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+    except OSError:
+        digest = None
+    emit("diagnostics.started", root=str(ROOT), parent_pid=os.getppid(),
+         source_sha256=digest, python=sys.version)
+
+
+_install_diagnostics()
 
 
 if __name__ == "__main__":

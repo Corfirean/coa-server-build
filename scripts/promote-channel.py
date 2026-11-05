@@ -1,0 +1,143 @@
+import argparse
+import base64
+import json
+import re
+import subprocess
+import importlib.util
+from pathlib import Path
+
+GATES = {'source', 'build', 'unit', 'auth-startup', 'world-startup',
+                        'schema-contract', 'upgrade-stable-1',
+                        'upgrade-stable-2', 'manager-update', 'fresh-install'}
+# Interactive and fault-injection acceptance belongs to local, change-specific
+# preparation. Keep its actual results; a recorded failure still blocks release.
+# Promotion distributes a Windows package, not a Linux package.
+
+
+def api(path, method='GET', body=None):
+    args = ['gh', 'api', path, '--method', method]
+    if body is not None:
+        args.extend(['--input', '-'])
+    result = subprocess.run(args, input=json.dumps(body) if body is not None else None,
+                            text=True, check=True, capture_output=True)
+    return json.loads(result.stdout)
+
+
+def validate_report(report, snapshot, version, source_versions=None, source_databases=None,
+                    owner_approved_snapshot=None, upgrade_policy='historical'):
+    if report.get('schema') != 1 or report.get('snapshot') != snapshot or report.get('version') != version:
+        raise RuntimeError('Qualification report does not match the candidate')
+    if owner_approved_snapshot is not None and owner_approved_snapshot != snapshot:
+        raise RuntimeError('Owner approval does not match the candidate snapshot')
+    platforms = ('windows-x86_64',)
+    for other_checks in report.get('platforms', {}).values():
+        if any(check.get('result') == 'failed' for check in other_checks.values()):
+            raise RuntimeError('Cannot promote a failed qualification')
+    for platform in platforms:
+        checks = report.get('platforms', {}).get(platform, {})
+        gates = GATES
+        for name in gates:
+            check = checks.get(name, {})
+            if check.get('result') != 'passed' or not re.fullmatch(r'https://github\.com/[^/]+/[^/]+/actions/runs/\d+(?:/.*)?', check.get('evidence', '')):
+                raise RuntimeError(f'Mandatory qualification missing or unsuccessful: {platform}/{name}')
+        if source_versions is not None:
+            if len(source_versions) < 2 or len(set(source_versions)) != len(source_versions):
+                raise RuntimeError('Every distinct upgrade source must qualify')
+            names = ([f'upgrade-stable-{i}' for i in range(1, len(source_versions) + 1)]
+                     if upgrade_policy == 'recent-stable' else
+                     ['upgrade-base'] + [f'upgrade-stable-{i}' for i in range(1, len(source_versions))])
+            for name, source in zip(names, source_versions):
+                check = checks.get(name, {})
+                if check.get('result') != 'passed' or not re.fullmatch(r'https://github\.com/[^/]+/[^/]+/actions/runs/\d+(?:/.*)?', check.get('evidence', '')):
+                    raise RuntimeError(f'Mandatory qualification missing or unsuccessful: {platform}/{name}')
+                if check.get('fromVersion') != source:
+                    raise RuntimeError(f'Upgrade qualification differs from compatibility matrix: {platform}/{name}')
+                if source_databases is not None:
+                    expected = source_databases[source]
+                    if (checks[name].get('fromManifestSha256') != expected['manifestSha256']
+                            or checks[name].get('fromSchemaSha256') != expected['schemaSha256']):
+                        raise RuntimeError(f'Upgrade tested a different signed source: {platform}/{name}')
+
+
+def publish(repo, expected, envelope, approval=None):
+    if not re.fullmatch(r'[0-9a-f]{40}', expected):
+        raise RuntimeError('An exact previous channels commit is required')
+    ref = api(f'repos/{repo}/git/ref/heads/channels')
+    if ref['object']['sha'] != expected:
+        raise RuntimeError('Channels changed during qualification; refusing stale promotion')
+    previous = api(f'repos/{repo}/git/commits/{expected}')
+    blob = api(f'repos/{repo}/git/blobs', 'POST', {
+        'encoding': 'base64', 'content': base64.b64encode(envelope).decode()})
+    entries = [{'path': 'stable.json', 'mode': '100644', 'type': 'blob', 'sha': blob['sha']}]
+    if approval is not None:
+        audit = api(f'repos/{repo}/git/blobs', 'POST', {
+            'encoding': 'base64', 'content': base64.b64encode(json.dumps(approval, indent=2).encode()).decode()})
+        entries.append({'path': 'approvals/' + approval['snapshot'] + '.json',
+                        'mode': '100644', 'type': 'blob', 'sha': audit['sha']})
+    tree = api(f'repos/{repo}/git/trees', 'POST', {'base_tree': previous['tree']['sha'], 'tree': entries})
+    commit = api(f'repos/{repo}/git/commits', 'POST', {
+        'message': 'Promote verified immutable server release', 'tree': tree['sha'], 'parents': [expected]})
+    # A competing update makes this commit a sibling, so GitHub rejects it as non-fast-forward.
+    return api(f'repos/{repo}/git/refs/heads/channels', 'PATCH', {
+        'sha': commit['sha'], 'force': False})
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--repo', required=True)
+    parser.add_argument('--version', required=True)
+    parser.add_argument('--expected', required=True)
+    parser.add_argument('--dir', required=True, type=Path)
+    parser.add_argument('--tool', required=True)
+    parser.add_argument('--owner-approved-snapshot')
+    parser.add_argument('--approval-reason')
+    parser.add_argument('--check-only', action='store_true', help='Verify locally without signing or publishing')
+    args = parser.parse_args()
+    folder = args.dir.resolve()
+    spec = importlib.util.spec_from_file_location('metadata', Path(__file__).with_name('release-metadata.py'))
+    metadata = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(metadata)
+    metadata.validate(folder)
+    manifest = json.loads((folder / 'manifest.json').read_text(encoding='utf-8-sig'))
+    lock = json.loads((folder / 'release-lock.json').read_text(encoding='utf-8-sig'))
+    if manifest['version'] != args.version or not manifest.get('compatibility'):
+        raise RuntimeError('Candidate version or compatibility matrix is missing')
+    if manifest['compatibility']['platform'] != 'windows-x86_64':
+        raise RuntimeError('Stable requires a signed Windows package')
+    if manifest['compatibility']['coreCommit'] != lock['components']['core']['sha']:
+        raise RuntimeError('Compatibility matrix differs from the source lock')
+    for name in ('bots', 'scaling', 'squid', 'races') + (('dungeon-clear',) if 'dungeon-clear' in lock['components'] else ()):
+        if manifest['compatibility']['moduleCommits'].get(name) != lock['components'][name]['sha']:
+            raise RuntimeError(f'Module compatibility differs from source lock: {name}')
+    report = json.loads((folder / 'qualification.json').read_text())
+    approval = None
+    if args.owner_approved_snapshot:
+        import os
+        actor = os.environ.get('GITHUB_ACTOR', '')
+        if actor.casefold() != args.repo.split('/')[0].casefold():
+            raise RuntimeError('Only the repository owner may approve incomplete qualification')
+        if not args.approval_reason or len(args.approval_reason.strip()) < 20:
+            raise RuntimeError('An explicit owner approval reason is required')
+        approval = {'schema': 1, 'version': args.version, 'snapshot': lock['snapshot'],
+                    'actor': actor, 'reason': args.approval_reason,
+                    'run': os.environ.get('GITHUB_RUN_ID'), 'qualification': report,
+                    'qualificationSha256': metadata.digest(folder / 'qualification.json')}
+    validate_report(report, lock['snapshot'], args.version,
+                    manifest['compatibility']['sourceVersions'], manifest['compatibility']['sourceDatabases'],
+                    args.owner_approved_snapshot, lock.get('upgradePolicy', 'historical'))
+    subprocess.run([args.tool, 'verify', '--dir', str(folder)], check=True)
+    subprocess.run([args.tool, 'verify-install', '--dir', str(folder)], check=True)
+    if args.check_only:
+        print('Promotion preflight passed; no channel or release was changed')
+        return
+    pointer = folder / 'stable-pointer.json'
+    subprocess.run([args.tool, 'sign-channel', '--channel', 'stable', '--version', args.version,
+                    '--snapshot', lock['snapshot'], '--out', str(pointer)], check=True)
+    publish(args.repo, args.expected, pointer.read_bytes(), approval)
+    # Keep GitHub's Latest release consistent with the signed Manager channel.
+    subprocess.run(['gh', 'release', 'edit', 'server-' + args.version, '--repo', args.repo,
+                    '--prerelease=false', '--latest'], check=True)
+
+
+if __name__ == '__main__':
+    main()

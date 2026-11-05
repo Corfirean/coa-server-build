@@ -1,0 +1,42 @@
+**Manager** (for server owners)
+- Added: Linux Docker servers follow Settings, sharing and backups (experimental). Experimental. Settings the Docker backend fixes are hidden, friends sharing and logs work, the game data folder can be changed, and the realm no longer shows offline after a start.
+- Added: Updates can follow signed channels that select a complete server release. The Manager checks the channel signature and downloads every package part from the same release. Existing installations continue using the previous download source until the new channel is published.
+- Added: Windows server updates are tested on a private copy before changing your installation. The Manager tests migrations and server startup using your databases and configurations. A failed rehearsal leaves the installed server unchanged and preserves a diagnostic report.
+- Added: Server updates can require a tested combination of platform and installed version. Signed release metadata identifies core and module revisions, supported starting versions and database contracts. Incompatible packages are rejected before shutdown; changed schema contracts and incompatible databases block installation before migration.
+- Added: Module cards show installed server revisions and the client race patch version. Module revisions come from the currently installed release metadata. The race card shows the client patch version separately; missing version metadata is reported honestly instead of showing a download version as installed.
+- Changed: Failed server startup after an update automatically restores the previous version. The Manager restores server files and databases, then checks the recovered server. If recovery cannot be confirmed, it preserves the recovery point and blocks further startup until the problem is resolved.
+
+----- next message -----
+
+**Manager** (for server owners) (cont.)
+- Fixed: Windows update recovery preserves database procedures triggers and views. A verified copy of stopped MySQL restores all databases and accounts together. Interrupted restoration can be retried, and the replaced database directory is retained.
+- Fixed: Custom races bot setting synchronizes Playerbots excluded race lists. The "Bots can be custom races" setting now configures AiPlayerbot.ExcludedBotRaces in playerbots.conf. Off excludes all added races (recommended), while on allows stable added races (experimental).
+- Fixed: Blocked updates identify database objects that prevent automatic recovery. Diagnostics include the complete list of unsupported database objects across the recovery point, helping resolve update failures without removing user data.
+- Fixed: Server updates check startup privately before allowing players to connect. Startup checks use temporary local ports. Original settings are restored before opening the server, and interrupted checks retain a recovery journal.
+- Fixed: Local hosts can connect while sharing a server online. The Manager no longer replaces the realm's local address with its public address when Friends mode is enabled.
+- Fixed: Updates repair missing database defaults from the verified release schema. Only missing literal defaults are restored when column properties match. Existing rows, custom defaults, types and nullability are preserved; unresolved incompatibilities still block the update.
+- Fixed: Server updates no longer replay module installation scripts on existing databases. Update packages contain incremental SQL only. Module table initialization and seed scripts remain available when preparing a clean installation, preventing existing content from being reset during updates.
+
+----- next message -----
+
+**Manager** (for server owners) (cont.)
+- Fixed: Failed database checks keep a complete report after rollback. Schema errors show readable default values and save every detected difference for troubleshooting, including after the server is restored.
+- Fixed: Large server updates no longer repeatedly rewrite the recovery journal. Updates containing rebuilt navigation data now prepare all recovery copies before replacing files. Interrupted updates remain recoverable without rewriting the full journal for every file.
+- Fixed: Normalize rehearsal server roots to prevent Windows path prefix errors. Server update rehearsals now canonicalize the installation root before collecting files, resolving a "prefix not found" error during rehearsal preparation on Windows.
+- Fixed: SQUID imports character tables first and reports slow database imports. SQUID prepares character tables before its large travel data. Startup shows each base import and identifies a failed import without starting the world server or replaying an incomplete migration.
+- Fixed: Docker friend mode requests a restart when remote client support changes. Enabling remote CoA clients now requests a world restart even when the game ports were already open. Repeating the same unchanged setting does not request another restart.
+- Fixed: Server updates accept long Windows paths inside the private test server. Long SQL file paths no longer fail the folder safety check during update rehearsals. Files outside the server folder remain blocked.
+- Fixed: Diagnostics record blocked startup requests and maintenance owner information. A start refused before the launcher runs is now logged with its reason. Exported diagnostics include the last recorded maintenance owner, while clearly distinguishing old metadata from a currently held operating-system lock.
+
+----- next message -----
+
+**Update 2026-10-13-manager** (Manager 0.6.16)
+
+**Manager**
+- Added: Players can install custom race patches when connecting to a friend. Install the custom race client patch directly from the Game client section without hosting a server.
+
+**Manager** (for server owners) (cont.)
+- Fixed: Client race patches can be repaired and removed while preserving original files. Every overwritten client file gets an original backup. Switching preserves newer launcher files; checksums detect missing or replaced assets. Repair and removal are always available, with rollback if a file operation fails.
+- Fixed: Checking an already installed server update no longer reports incompatibility. The installed release can be checked again even when its compatibility list only names earlier releases. Platform checks and protection against downgrades still apply.
+- Fixed: Failed server startup shows service errors even when the launcher reported ready. Update rehearsal and startup failures include recent world, authentication and database error lines. Missing tables and late startup failures are visible directly in the error details, with secrets redacted.
+- Fixed: Starting the server waits for update checks and identifies ongoing maintenance. Downloading an update manifest no longer blocks startup. A start waits up to 30 seconds for a check to finish; other active maintenance still blocks it safely and shows its operation, process and start time.

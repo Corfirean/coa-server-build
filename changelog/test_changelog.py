@@ -104,6 +104,16 @@ class Flow(unittest.TestCase):
         self.assertEqual(cl.cmd_release(self.args()), 1)
         self.assertFalse((self.tmp / "releases").exists())
 
+    def test_component_releases_do_not_consume_each_others_entries(self):
+        self.frag(self.bots, "20261002-bots.md", "bots", "fixed", "players", "Bots keep their equipment")
+        self.frag(self.manager, "20261002-manager.md", "manager", "fixed", "admins", "Updates recover safely")
+        self.assertEqual(cl.cmd_release(self.args(id="manager-2026-10-03", component="manager", manager="0.6.13")), 0)
+        first = cl.load_releases()[0]
+        self.assertEqual([e["area"] for e in first["entries"]], ["manager"])
+        self.assertEqual(cl.cmd_release(self.args(id="bots-2026-10-03", component="bots", bots="1.0.0")), 0)
+        self.assertEqual(cl.cmd_release(self.args(id="server-2026-10-03", component="server", server="0.261010.40")), 0)
+        self.assertEqual(cl.cmd_release(self.args(id="manager-2026-10-04", component="manager", manager="0.6.14")), 1)
+
     def test_dry_run_writes_nothing(self):
         self.frag(self.bots, "20261002-invite.md", "bots", "added", "players", "Invite one bot by role")
         self.assertEqual(cl.cmd_release(self.args(dry_run=True)), 0)

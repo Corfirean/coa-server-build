@@ -4,6 +4,9 @@ name: server-binaries
 on:
   workflow_call:
     inputs:
+      allow_historical_sql:
+        type: boolean
+        default: false
       core_ref:
         type: string
         default: coa-bots
@@ -28,14 +31,36 @@ on:
       scaling_sha:
         value: ${{ jobs.build.outputs.scaling_sha }}
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          repository: Corfirean/azerothcore-wotlk-coa
+          ref: ${{ inputs.core_ref || 'coa-bots' }}
+          fetch-depth: 0
+      - name: Verify source and harness infrastructure on POSIX
+        env:
+          ALLOW_HISTORICAL_SQL: ${{ inputs.allow_historical_sql }}
+        run: |
+          args=()
+          if [ "$ALLOW_HISTORICAL_SQL" = "true" ]; then args+=(--allow-historical-sql); fi
+          python3 -B tools/verify_all.py --stages source --base origin/coa-bots "${args[@]}"
+      - name: Upload source verification diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-verification-diagnostics
+          path: .cache/verify-all/
   build:
-    runs-on: windows-latest
-    timeout-minutes: 240
+    needs: source
+    runs-on: ${{ fromJSON(vars.COA_WINDOWS_RUNNER || '["self-hosted","Windows","X64","coa-persistent"]') }}
+    permissions:
+      actions: read
+      contents: read
+    timeout-minutes: 330
     outputs:
       squid_tag: ${{ steps.squid.outputs.squid_tag }}
       squid_sha: ${{ steps.shas.outputs.squid_sha }}
@@ -43,18 +68,61 @@ jobs:
       bots_sha: ${{ steps.shas.outputs.bots_sha }}
       scaling_sha: ${{ steps.shas.outputs.scaling_sha }}
     env:
+      VSLANG: 1033
       BOOST_ROOT: C:\local\boost_1_87_0
+      SCCACHE_CACHE_SIZE: 8G
+      SCCACHE_IGNORE_SERVER_IO_ERROR: '1'
     steps:
+      - name: Reuse only the exact clean core checkout on the persistent runner
+        id: cached-core
+        if: runner.environment == 'self-hosted'
+        shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+        env:
+          CORE_REF: ${{ inputs.core_ref }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $reuse = $false
+          $workspace = [IO.Path]::GetFullPath($env:GITHUB_WORKSPACE).TrimEnd('\')
+          $runnerRoot = [IO.Path]::GetFullPath($env:RUNNER_WORKSPACE).TrimEnd('\') + '\'
+          if (-not $workspace.StartsWith($runnerRoot, [StringComparison]::OrdinalIgnoreCase)) { throw 'Cached checkout escaped the runner workspace.' }
+          if ($env:CORE_REF -match '^[0-9a-f]{40}$' -and (Test-Path -LiteralPath (Join-Path $workspace '.git'))) {
+            $head = & git -C $workspace rev-parse --verify HEAD 2>$null
+            if ($LASTEXITCODE -eq 0 -and $head -eq $env:CORE_REF) {
+              $origin = & git -C $workspace remote get-url origin
+              $origin = $origin.TrimEnd('/') -replace '\.git$', ''
+              if ($LASTEXITCODE -eq 0 -and $origin -eq 'https://github.com/Corfirean/azerothcore-wotlk-coa') {
+                $changes = @(& git -C $workspace status --porcelain --untracked-files=all)
+                $statusOk = $LASTEXITCODE -eq 0
+                $leftovers = @(& git -C $workspace clean -n -d -x)
+                $reuse = $statusOk -and $LASTEXITCODE -eq 0 -and $changes.Count -eq 0 -and $leftovers.Count -eq 0
+              }
+            }
+          }
+          "reuse=$($reuse.ToString().ToLowerInvariant())" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          if ($reuse) { Write-Host "Using verified clean cached core $env:CORE_REF; no network checkout is needed." }
       - uses: actions/checkout@v7
+        if: steps.cached-core.outputs.reuse != 'true'
         with:
           repository: Corfirean/azerothcore-wotlk-coa
           ref: ${{ inputs.core_ref || 'coa-bots' }}
           fetch-depth: 1
+      - name: Locate PowerShell 7 on the dedicated runner
+        if: runner.environment == 'self-hosted'
+        shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+        run: |
+          $locations = @((Join-Path $env:ProgramFiles 'PowerShell/7'), 'C:/tools/PowerShell/7')
+          $shell = Get-Command pwsh.exe -ErrorAction SilentlyContinue
+          if ($shell) { $locations = @((Split-Path $shell.Source)) + $locations }
+          $directory = $locations | Where-Object { Test-Path (Join-Path $_ 'pwsh.exe') } | Select-Object -First 1
+          if (-not $directory) { throw 'Install PowerShell 7 before using this dedicated runner.' }
+          $directory | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
       # Cache the fetched Boost + MySQL client so we don't re-download ~350 MB
       # and re-run the Boost installer on every run. The Test-Path guards in
       # "Configure OS" short-circuit the install work when these are restored.
       - name: Cache Boost & MySQL
+        if: runner.environment != 'self-hosted'
         uses: actions/cache@v6
+        continue-on-error: true
         with:
           path: |
             C:\local\boost_1_87_0
@@ -143,7 +211,7 @@ jobs:
           }
 
           # --- OpenSSL: use the copy already installed on the runner image ---
-          $opensslRoot = @($env:OPENSSL_ROOT_DIR, 'C:\Program Files\OpenSSL', 'C:\Program Files\OpenSSL-Win64') |
+          $opensslRoot = @($env:OPENSSL_ROOT_DIR, 'C:\Program Files\OpenSSL', 'C:\Program Files\OpenSSL-Win64', 'C:\vcpkg\installed\x64-windows') |
               Where-Object { $_ -and (Test-Path (Join-Path $_ 'include\openssl\opensslv.h')) } |
               Select-Object -First 1
           if (-not $opensslRoot)
@@ -181,6 +249,9 @@ jobs:
           repository: Zyth45/mod-playerbots
           ref: ${{ steps.squid.outputs.squid_sha }}
           path: modules/mod-playerbots
+      - name: Prepare pinned Dungeon Clear and reviewed validation patches
+        shell: pwsh
+        run: python -B _pipeline/scripts/prepare-external-modules.py --core .
       - name: Place the modules where the core expects them
         id: shas
         shell: pwsh
@@ -196,7 +267,7 @@ jobs:
           Copy-Item -Force '_bots/module/conf/*' "$dst/conf/"
           # Content Scaling is a module repository of its own; its TBC and WotLK content packs are modules of their own too
           # (they sit in content-packs/ and must stand next to it in modules/).
-          robocopy '_scaling' 'modules\mod-coa-content-scaling' /E /XD .git artifacts docs tools /NFL /NDL /NJH /NJS /NP | Out-Null
+          robocopy '_scaling' 'modules\mod-coa-content-scaling' /E /XD .git artifacts tools /NFL /NDL /NJH /NJS /NP | Out-Null
           if ($LASTEXITCODE -ge 8) { throw "copying mod-coa-content-scaling failed ($LASTEXITCODE)" }
           foreach ($pack in 'mod-coa-tbc-content', 'mod-coa-wotlk-content') {
             robocopy "_scaling\content-packs\$pack" "modules\$pack" /E /NFL /NDL /NJH /NJS /NP | Out-Null
@@ -210,25 +281,187 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
-      - name: Configure
+      - name: Locate CMake and Ninja on the dedicated runner
+        if: runner.environment == 'self-hosted'
         shell: pwsh
         run: |
-          cmake -S . -B build -G Ninja `
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'
+          $installation = & $vswhere -latest -prerelease -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $installation) { throw 'Visual Studio C++ tools were not found.' }
+          foreach ($relative in 'Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin', 'Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja') {
+            $directory = Join-Path $installation $relative
+            if (-not (Test-Path -LiteralPath $directory)) { throw "Missing build tools: $directory" }
+            $directory >> $env:GITHUB_PATH
+          }
+      - name: Select persistent build directory and restore unchanged input timestamps
+        if: runner.environment == 'self-hosted'
+        shell: pwsh
+        run: |
+          $compiler = (Get-Command cl.exe).Source
+          $binaries = 'cl.exe', 'c1xx.dll', 'c2.dll', 'link.exe'
+          $hashes = $binaries | ForEach-Object { (Get-FileHash (Join-Path (Split-Path $compiler) $_) -Algorithm SHA256).Hash }
+          $identity = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes(($hashes -join '-')))).Substring(0, 16).ToLowerInvariant()
+          $state = Join-Path $env:RUNNER_WORKSPACE "_coa-build-state/$identity-noPCH-Z7-deps-v3"
+          New-Item -ItemType Directory -Force -Path $state | Out-Null
+          "COA_BUILD_DIRECTORY=$state/build" >> $env:GITHUB_ENV
+          $mode = if (Test-Path (Join-Path $state 'verified.json')) { 'incremental' } else { 'cold' }
+          "COA_BUILD_MODE=$mode" >> $env:GITHUB_ENV
+          python _pipeline/scripts/persistent-build.py --root . --state "$state/inputs.json"
+          if ($LASTEXITCODE) { throw 'Persistent source identity validation failed.' }
+      - name: Set compiler cache directory before starting sccache
+        shell: pwsh
+        run: '"SCCACHE_DIR=$env:RUNNER_TEMP/sccache" | Out-File $env:GITHUB_ENV -Append -Encoding utf8'
+      - name: Install pinned sccache
+        id: sccache
+        if: runner.environment != 'self-hosted'
+        continue-on-error: true
+        uses: mozilla-actions/sccache-action@d651010b8da762cde178750d8eda7b5febfe147a # v0.0.9
+        with:
+          version: v0.10.0
+      - name: Identify compiler cache compatibility
+        id: toolchain
+        shell: pwsh
+        run: |
+          $compiler = (Get-Command cl.exe).Source
+          $identity = (Get-Item $compiler).VersionInfo.FileVersion + '-RelWithDebInfo-Z7-noPCH-sccache0100'
+          "identity=$identity" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+      - name: Restore compiler cache
+        id: compiler-cache
+        if: runner.environment != 'self-hosted'
+        uses: actions/cache/restore@v6
+        continue-on-error: true
+        with:
+          path: ${{ runner.temp }}/sccache
+          key: trusted-msvc-v2-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.identity }}-boost187-mysql849-${{ hashFiles('_pipeline/.github/workflows/server-binaries.yml') }}-${{ steps.shas.outputs.core_sha }}-${{ steps.shas.outputs.bots_sha }}-${{ steps.shas.outputs.scaling_sha }}-${{ steps.shas.outputs.squid_sha }}
+          restore-keys: |
+            trusted-msvc-v2-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.identity }}-boost187-mysql849-${{ hashFiles('_pipeline/.github/workflows/server-binaries.yml') }}-${{ steps.shas.outputs.core_sha }}-${{ steps.shas.outputs.bots_sha }}-${{ steps.shas.outputs.scaling_sha }}-${{ steps.shas.outputs.squid_sha }}-
+            trusted-msvc-v2-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.identity }}-boost187-mysql849-${{ hashFiles('_pipeline/.github/workflows/server-binaries.yml') }}-
+            trusted-msvc-v2-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.identity }}-boost187-mysql849-
+      - name: Configure
+        env:
+          SCCACHE_IGNORE_SERVER_IO_ERROR: '1'
+        shell: pwsh
+        run: |
+          "SCCACHE_DIR=$env:RUNNER_TEMP/sccache" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          $env:SCCACHE_DIR = "$env:RUNNER_TEMP/sccache"
+          $launcher = if ($env:RUNNER_ENVIRONMENT -ne 'self-hosted' -and (Get-Command sccache.exe -ErrorAction SilentlyContinue)) { 'sccache' } else { '' }
+          $build = if ($env:COA_BUILD_DIRECTORY) { $env:COA_BUILD_DIRECTORY } else { 'build' }
+          if (-not $launcher) { Write-Host 'Using MSVC directly; persistent Ninja outputs provide incremental builds on the dedicated runner.' }
+          $opensslArgs = @()
+          if ($env:RUNNER_ENVIRONMENT -eq 'self-hosted' -and $env:OPENSSL_ROOT_DIR -like '*vcpkg*') {
+            $opensslArgs += '-DOPENSSL_USE_STATIC_LIBS=OFF', '-ULIB_EAY*', '-USSL_EAY*', "-DOPENSSL_INCLUDE_DIR=$env:OPENSSL_ROOT_DIR/include", "-DOPENSSL_CRYPTO_LIBRARY=$env:OPENSSL_ROOT_DIR/lib/libcrypto.lib", "-DOPENSSL_SSL_LIBRARY=$env:OPENSSL_ROOT_DIR/lib/libssl.lib"
+          }
+          cmake -S . -B "$build" -G Ninja @opensslArgs `
             -DCMAKE_BUILD_TYPE=RelWithDebInfo `
+            -DCMAKE_NINJA_FORCE_RESPONSE_FILE=ON `
+            -DBUILD_TESTING=ON `
+            -DCMAKE_JOB_POOLS=link_pool=1 `
+            -DCMAKE_JOB_POOL_LINK=link_pool `
+            -DCMAKE_POLICY_DEFAULT_CMP0141=NEW `
+            -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded `
+            -DCMAKE_C_COMPILER_LAUNCHER="$launcher" `
+            -DCMAKE_CXX_COMPILER_LAUNCHER="$launcher" `
             -DAPPS_BUILD=all -DTOOLS_BUILD=none `
             -DSCRIPTS=static -DMODULES=static `
-            -DUSE_COREPCH=1 -DUSE_SCRIPTPCH=1 `
-            -DBOOST_ROOT=$env:BOOST_ROOT `
+            -DUSE_COREPCH=0 -DUSE_SCRIPTPCH=0 `
+            "-DBOOST_ROOT=$env:BOOST_ROOT" `
             -DMYSQL_INCLUDE_DIR=C:/tools/mysql/current/include `
             -DMYSQL_LIBRARY=C:/tools/mysql/current/lib/mysqlclient.lib `
             -DOPENSSL_ROOT_DIR="$env:OPENSSL_ROOT_DIR"
-      - name: Build worldserver and authserver
-        shell: pwsh
-        run: cmake --build build --target worldserver authserver -j 4
-      - name: Smoke test (binaries start and report their revision)
+      - name: Validate Ninja header dependency parsing for the installed MSVC language
         shell: pwsh
         run: |
-          $bin = (Get-ChildItem build -Recurse -Filter worldserver.exe | Select-Object -First 1).DirectoryName
+          $build = if ($env:COA_BUILD_DIRECTORY) { $env:COA_BUILD_DIRECTORY } else { 'build' }
+          python _pipeline/scripts/msvc-dependency-prefix.py --build "$build"
+          if ($LASTEXITCODE) { throw 'Ninja cannot safely track MSVC header dependencies.' }
+      - name: Verify generated MSVC commands can be cached
+        shell: pwsh
+        run: |
+          $build = if ($env:COA_BUILD_DIRECTORY) { $env:COA_BUILD_DIRECTORY } else { 'build' }
+          ninja -C "$build" -t compdb -x | python _pipeline/scripts/validate-msvc-cache.py
+          if ($LASTEXITCODE) { throw 'Generated compiler flags violate the cache configuration.' }
+      - name: Reset compiler cache counters
+        if: steps.sccache.outcome == 'success'
+        continue-on-error: true
+        shell: pwsh
+        run: sccache --zero-stats
+      - name: Build worldserver and authserver
+        timeout-minutes: 280
+        env:
+          SCCACHE_IGNORE_SERVER_IO_ERROR: '1'
+        shell: pwsh
+        run: |
+          $memoryGB = (Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB
+          $jobs = [Math]::Min(4, [Environment]::ProcessorCount)
+          if ($env:RUNNER_ENVIRONMENT -eq 'self-hosted') { $jobs = 0 }
+          if ($memoryGB -lt 12) { $jobs = [Math]::Min(2, $jobs) }
+          $effectiveJobs = if ($jobs) { $jobs } else { [Environment]::ProcessorCount }
+          Write-Host "Compilation: $effectiveJobs workers, $([Environment]::ProcessorCount) logical CPUs, $([Math]::Round($memoryGB, 1)) GB RAM."
+          $budget = if ($env:COA_BUILD_MODE -eq 'incremental') { 3600 } else { 16200 }
+          $watch = [Diagnostics.Stopwatch]::StartNew()
+          try {
+            & ./_pipeline/scripts/run-core-verification.ps1 -CoreRoot . -BaseRef origin/coa-bots -Jobs $jobs -MaximumSeconds $budget -BuildDirectory $env:COA_BUILD_DIRECTORY -Stages 'build,unit'
+            if ($LASTEXITCODE) {
+              $report = Get-ChildItem .cache/verify-all -Recurse -Filter build.log | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+              if ($report) { Get-Content $report.FullName -Tail 100 }
+              throw 'Source, build or unit verification failed. See windows-verification-diagnostics for the complete logs.'
+            }
+            if ($env:COA_BUILD_DIRECTORY) {
+              @{ core = (git rev-parse HEAD); verifiedAt = [DateTime]::UtcNow.ToString('o') } | ConvertTo-Json |
+                Set-Content (Join-Path (Split-Path $env:COA_BUILD_DIRECTORY) 'verified.json') -Encoding utf8
+            }
+          } finally {
+            $watch.Stop()
+            $mode = if ($env:COA_BUILD_MODE) { $env:COA_BUILD_MODE } else { 'cold' }
+            @{ mode = $mode; seconds = $watch.Elapsed.TotalSeconds; workers = $effectiveJobs; budgetSeconds = $budget } | ConvertTo-Json |
+              Set-Content .cache/compilation-timing.json -Encoding utf8
+            "Compilation and unit verification ($mode): $([Math]::Round($watch.Elapsed.TotalMinutes, 1)) minutes, $effectiveJobs workers." >> $env:GITHUB_STEP_SUMMARY
+          }
+      - name: Compiler cache statistics
+        if: always() && steps.sccache.outcome == 'success'
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          sccache --show-stats
+          sccache --show-stats --stats-format json | Set-Content cache-statistics.json -Encoding utf8NoBOM
+          python _pipeline/scripts/cache-summary.py cache-statistics.json
+      - name: Flush compiler cache before archiving
+        if: always() && steps.sccache.outcome == 'success'
+        continue-on-error: true
+        shell: pwsh
+        run: sccache --stop-server
+      - name: Preserve reusable compiler objects even when qualification fails
+        if: always() && steps.sccache.outcome == 'success' && steps.compiler-cache.outputs.cache-primary-key != '' && steps.compiler-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        continue-on-error: true
+        with:
+          path: ${{ runner.temp }}/sccache
+          key: ${{ steps.compiler-cache.outputs.cache-primary-key }}${{ job.status != 'success' && format('-partial-{0}-{1}', github.run_id, github.run_attempt) || '' }}
+      - name: Upload compiler cache statistics
+        if: always() && steps.sccache.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-compiler-cache-statistics
+          path: cache-statistics.json
+      - name: Upload source, compilation and unit diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-verification-diagnostics
+          path: |
+            .cache/verify-all/
+            .cache/compilation-timing.json
+          include-hidden-files: true
+          retention-days: 14
+      - name: Smoke test (binaries start and report their revision)
+        if: success()
+        shell: pwsh
+        run: |
+          $build = if ($env:COA_BUILD_DIRECTORY) { $env:COA_BUILD_DIRECTORY } else { 'build' }
+          $bin = (Get-ChildItem $build -Recurse -Filter worldserver.exe | Select-Object -First 1).DirectoryName
+          if ($env:OPENSSL_ROOT_DIR -like '*vcpkg*') {
+            Copy-Item "$env:OPENSSL_ROOT_DIR/bin/libcrypto*.dll", "$env:OPENSSL_ROOT_DIR/bin/libssl*.dll" -Destination $bin -Force
+          }
           Write-Host "binaries in $bin"
           Get-ChildItem $bin | Select-Object Name, Length | Format-Table -AutoSize
           & "$bin\worldserver.exe" --version
@@ -243,3 +476,12 @@ jobs:
             ${{ env.BIN_DIR }}/authserver.exe
             ${{ env.BIN_DIR }}/*.dll
           retention-days: 14
+      - name: Preserve matching native symbols for startup and shutdown diagnostics
+        uses: actions/upload-artifact@v4
+        with:
+          name: coa-server-symbols
+          path: |
+            ${{ env.BIN_DIR }}/worldserver.pdb
+            ${{ env.BIN_DIR }}/authserver.pdb
+          retention-days: 14
+          if-no-files-found: error

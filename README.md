@@ -68,10 +68,11 @@ It is only needed by the hourly `sync-fork` workflow. Without `COA_SIGNING_KEY` 
 are refused by every Manager anyway).
 
 ## Changelog
-The changelog of every CoA project lives here: [CHANGELOG.md](CHANGELOG.md). Each repository (server fork, bots, Content Scaling,
-Manager, renderer) keeps one small `changelog.d/` file per change, written in the same format by people and AIs alike;
-the **changelog-release** workflow collects them at release time and also produces the Discord text. Rules, format and
-examples: [changelog/GUIDE.md](changelog/GUIDE.md).
+[Server changelog](CHANGELOG.md) · [Manager changelog](https://github.com/Corfirean/coa-server-manager/blob/master/CHANGELOG.md).
+
+Each repository keeps a separate history of its published versions. Fragments share one format, but release notes
+are collected only from that component's immutable shipped sources. Automatic changelog workflows keep Markdown
+and GitHub release notes in sync. Rules and recovery commands: [changelog/GUIDE.md](changelog/GUIDE.md).
 
 ## Base package
 The base contains game data and a database built from the maintainer's repack, so it is produced on the maintainer's
@@ -95,8 +96,50 @@ visible failures for a separate targeted correction.
 These workflows require the release tooling from Manager PR #17. Merge that dependency before this pipeline change;
 the manual `manager_ref` input permits testing its branch without changing the production default.
 
+## Candidate metadata and compiler caches
+
+Windows release jobs separate packaging, upgrade qualification and publication. Packaging preserves the signed
+candidate, the qualified installer and the exact release-tool executable as 14-day workflow artifacts. The installer
+is stored separately so the three upgrade jobs download only the update package. Each matrix job verifies the
+candidate manifest identity, downloads only its frozen base/source fixtures, and runs the real Manager transaction
+for `base`, `stable-1` or `stable-2`. A failure does not cancel the other scenarios.
+
+Publication requires packaging and every upgrade job to succeed. Each upgrade report must match the exact packaged
+manifest SHA256 as well as the frozen source manifest, version and database schema. The final signed qualification
+records the individual scenario job links. Failed jobs can be rerun from Actions without rebuilding successful binary
+or package jobs; the preserved candidate and fixture lock are reused. Artifact expiry requires a new build. Splitting
+the jobs adds artifact transfer and fixture downloads; the full server timing must be measured on a release run.
+
+Manual and daily builds freeze all source revisions and the three signed upgrade fixtures before compilation.
+Daily Windows/Linux jobs use the same snapshot; manual runs cannot bypass integration or compatibility checks.
+Every new candidate includes `release-lock.json`, `compatibility-matrix.json`, and `qualification.json`.
+Their SHA256 hashes are included in the signed Windows manifest under `releaseMetadata`; upload/download verification
+and promotion check these hashes and the candidate identity. The compatibility matrix also remains inside the manifest
+for Manager 0.6.13. The standalone matrix is versioned and records the minimum Manager, platform, module revisions,
+client patch version and signed source database identities.
+
+Qualification is collected from successful GitHub Actions steps and the Manager's actual upgrade reports.
+Skipped gameplay, rollback or Linux startup tests are `not-run`, never assumed successful.
+Linux's configuration-only smoke test is not an auth/world database startup test. Unsigned Linux remains experimental.
+Immutable candidate publication and stable promotion are separate: the full Windows/Linux promotion gates still apply.
+The already published Windows-only 0.261011.800006 package is unchanged.
+
+MSVC uses Ninja, `/Z7` and no precompiled headers, because sccache 0.10.0 rejects `/Fp` and `/Yc`.
+Generated Ninja commands are checked before compiling. Cache keys include compiler, architecture, dependency versions
+and build configuration but not source commits. Objects survive failed package/database qualification.
+Linux retains both BuildKit `mode=max` cache and an independently restored/saved ccache directory; its base image digest
+is pinned and compiler identity is checked by content. Cargo and Boost/MySQL caches remain separate.
+Cache availability never becomes a release requirement; compilation can run without restored objects.
+
+`compiler-cache-benchmark` measures cold and warm MSVC compilation on different hosted runners with the same pinned
+sccache and flags. Its artifact records timing, compiler identity, misses and hits and checks the 2x target for that
+fixture. This is not a measurement of a full server build. Full build summaries and the
+`windows-compiler-cache-statistics` artifact report both cacheable and overall hit rates.
+
 ## License
 The scripts and workflows in this repository are under the [GNU Affero General Public License v3.0](LICENSE).
 The packages published from it contain a `Licenses` folder with the licences of everything shipped (the server fork,
 the bots module, MySQL) and a `NOTICE.txt` naming the exact source commits. The game data in the base package is not
 covered by this licence.
+
+Server integration, incremental compilation and owner-approved release workflow: [runbook](docs/server-release.md).

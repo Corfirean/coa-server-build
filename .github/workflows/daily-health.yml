@@ -1,0 +1,20 @@
+name: daily-health
+on:
+  schedule:
+    - cron: '15 * * * *'
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: read
+  issues: write
+concurrency:
+  group: daily-health
+  cancel-in-progress: false
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+      - run: python3 -B scripts/daily-health.py

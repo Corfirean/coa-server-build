@@ -4,8 +4,6 @@ name: sync-fork
 #   coa-bots  = upstream main + our small patch series (upstream merged in; a conflict opens an issue and stops)
 # Needs FORK_PUSH_TOKEN: a fine-grained token with Contents + Workflows write access to the fork.
 on:
-  schedule:
-    - cron: '17 * * * *'
   workflow_dispatch:
 
 permissions:

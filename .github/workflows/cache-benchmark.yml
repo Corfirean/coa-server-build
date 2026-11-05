@@ -1,0 +1,65 @@
+name: compiler-cache-benchmark
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  cold:
+    runs-on: windows-latest
+    env:
+      SCCACHE_CACHE_SIZE: 1G
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set benchmark cache directory
+        shell: pwsh
+        run: '"SCCACHE_DIR=$env:RUNNER_TEMP/benchmark-sccache" | Out-File $env:GITHUB_ENV -Append -Encoding utf8'
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+      - uses: mozilla-actions/sccache-action@d651010b8da762cde178750d8eda7b5febfe147a
+        with:
+          version: v0.10.0
+      - name: Measure cold MSVC compilation without PCH
+        shell: pwsh
+        run: ./scripts/cache-benchmark.ps1 -Mode cold
+      - uses: actions/cache/save@v6
+        with:
+          path: ${{ env.SCCACHE_DIR }}
+          key: benchmark-msvc-${{ github.run_id }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cold-cache-benchmark
+          path: benchmark/cold.json
+  warm:
+    needs: cold
+    runs-on: windows-latest
+    env:
+      SCCACHE_CACHE_SIZE: 1G
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set benchmark cache directory
+        shell: pwsh
+        run: '"SCCACHE_DIR=$env:RUNNER_TEMP/benchmark-sccache" | Out-File $env:GITHUB_ENV -Append -Encoding utf8'
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+      - uses: mozilla-actions/sccache-action@d651010b8da762cde178750d8eda7b5febfe147a
+        with:
+          version: v0.10.0
+      - uses: actions/cache/restore@v6
+        with:
+          path: ${{ env.SCCACHE_DIR }}
+          key: benchmark-msvc-${{ github.run_id }}
+          fail-on-cache-miss: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: cold-cache-benchmark
+          path: benchmark
+      - name: Measure reuse on a different runner
+        shell: pwsh
+        run: ./scripts/cache-benchmark.ps1 -Mode warm
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: compiler-cache-benchmark
+          path: benchmark/*.json
