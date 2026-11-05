@@ -1,0 +1,204 @@
+name: preview-package
+# Builds a signed Modules Preview update from a published stable release: the stable update package with
+# its core replaced by the plugin host built from the same core commit, plus the plugin SDK and the list
+# of modules the Manager builds on the server's PC. Signed with the preview key (COA_PREVIEW_SIGNING_KEY),
+# which stable Managers do not trust.
+# Publishing is a separate, explicit choice: a pre-release preview-server-<version> and the pointer
+# preview.json on the preview-channels branch. Stable releases and the channels branch are never touched.
+
+on:
+  workflow_dispatch:
+    inputs:
+      stable_version:
+        description: 'Stable release the preview is made from (e.g. 0.261104.94)'
+        required: true
+        type: string
+      preview_number:
+        description: 'Preview build of that stable release (1-99)'
+        default: '1'
+        type: string
+      core_ref:
+        description: 'Plugin host branch or commit (must contain the stable core commit, same SQL)'
+        default: 'preview/dynamic-plugin-host'
+        type: string
+      manager_ref:
+        description: 'Manager branch with coa-release and the preview key'
+        default: 'preview/modules-v2'
+        type: string
+      min_manager_version:
+        description: 'Oldest preview Manager that may install it'
+        default: '0.9.7'
+        type: string
+      publish:
+        description: 'Publish the pre-release and move the preview channel to it'
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: preview-package
+  cancel-in-progress: false
+
+jobs:
+  resolve:
+    name: Stable release and core
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      stable_core: ${{ steps.v.outputs.stable_core }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      STABLE: ${{ inputs.stable_version }}
+      N: ${{ inputs.preview_number }}
+      CORE_REF: ${{ inputs.core_ref }}
+    steps:
+      - name: Version and stable core commit
+        id: v
+        run: |
+          set -euo pipefail
+          [[ "$STABLE" =~ ^0\.[0-9]{6}\.[0-9]+$ ]] || { echo "bad stable version $STABLE"; exit 1; }
+          [[ "$N" =~ ^[0-9]{1,2}$ ]] && [ "$N" -ge 1 ] || { echo "preview_number must be 1-99"; exit 1; }
+          version="${STABLE}$(printf '%02d' "$N")"
+          gh release download "server-$STABLE" --repo "$GITHUB_REPOSITORY" -p release-lock.json -D lock
+          core=$(jq -r '.components.core.sha' lock/release-lock.json)
+          [[ "$core" =~ ^[0-9a-f]{40}$ ]] || { echo "no core commit in the release lock"; exit 1; }
+          if gh release view "preview-server-$version" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "preview-server-$version already exists; choose another preview_number"; exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "stable_core=$core" >> "$GITHUB_OUTPUT"
+          echo "preview $version from stable $STABLE (core $core)"
+      - name: The plugin host carries the stable core and its SQL unchanged
+        env:
+          STABLE_CORE: ${{ steps.v.outputs.stable_core }}
+        run: |
+          set -euo pipefail
+          git init -q core && cd core
+          git remote add origin https://github.com/Corfirean/azerothcore-wotlk-coa.git
+          git fetch -q --filter=blob:none origin "$CORE_REF"
+          host=$(git rev-parse FETCH_HEAD)
+          git fetch -q --filter=blob:none origin "$STABLE_CORE"
+          git merge-base --is-ancestor "$STABLE_CORE" "$host" || { echo "plugin host $host does not contain stable core $STABLE_CORE"; exit 1; }
+          if ! git diff --quiet "$STABLE_CORE" "$host" -- data/sql src/server/database; then
+            git diff --stat "$STABLE_CORE" "$host" -- data/sql src/server/database
+            echo "The plugin host changes SQL or database code relative to the stable core"; exit 1
+          fi
+          echo "plugin host $host contains stable core $STABLE_CORE with identical SQL"
+
+  build:
+    needs: resolve
+    uses: ./.github/workflows/preview-build.yml
+    with:
+      core_ref: ${{ inputs.core_ref }}
+
+  package:
+    name: Derive, sign and verify
+    needs: [resolve, build]
+    runs-on: windows-2025
+    timeout-minutes: 120
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ needs.resolve.outputs.version }}
+      STABLE: ${{ inputs.stable_version }}
+      CORE_SHA: ${{ needs.build.outputs.core_sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: builder
+      - uses: actions/checkout@v7
+        with:
+          repository: Corfirean/coa-server-manager
+          ref: ${{ inputs.manager_ref }}
+          path: _manager
+      - name: Build coa-release
+        shell: pwsh
+        run: cargo build --release -p coa-release --manifest-path _manager/Cargo.toml
+      - name: Signing key is the preview key
+        shell: pwsh
+        env:
+          COA_SIGNING_KEY: ${{ secrets.COA_PREVIEW_SIGNING_KEY }}
+        run: |
+          if (-not $env:COA_SIGNING_KEY) { throw "Add the COA_PREVIEW_SIGNING_KEY secret - unsigned previews are never produced." }
+          $pub = (& _manager/target/release/coa-release.exe public-key).Trim()
+          $expected = (Get-Content _manager/keys/preview-signing.pub -Raw).Trim()
+          if ($pub -ne $expected) { throw "COA_PREVIEW_SIGNING_KEY does not match keys/preview-signing.pub" }
+          if ($pub -eq (Get-Content _manager/keys/manifest-signing.pub -Raw).Trim()) { throw "The preview key must differ from the stable key" }
+      - name: Stable update package
+        shell: pwsh
+        run: |
+          gh release download "server-$env:STABLE" --repo $env:GITHUB_REPOSITORY -D _stable `
+            -p manifest.json -p manifest.json.sig -p 'base.tar.zst.*' -p release-lock.json
+          if ($LASTEXITCODE) { throw "cannot download server-$env:STABLE" }
+      - uses: actions/download-artifact@v4
+        with:
+          name: preview-core
+          path: _pc
+      - name: Plugin host core
+        shell: pwsh
+        run: |
+          $zip = Get-ChildItem _pc/coa-core-*.zip | Select-Object -First 1
+          Expand-Archive $zip.FullName -DestinationPath _core
+          Get-ChildItem _core | ForEach-Object { "{0}  {1:N1} MB" -f $_.Name, ($_.Length / 1MB) }
+      - name: Recommended modules from the stable release lock
+        shell: pwsh
+        run: python -I builder/scripts/preview-recommended.py _stable/release-lock.json recommended.json
+      - name: Derive, sign, verify
+        shell: pwsh
+        env:
+          COA_SIGNING_KEY: ${{ secrets.COA_PREVIEW_SIGNING_KEY }}
+        run: |
+          $tool = "_manager/target/release/coa-release.exe"
+          & $tool derive-preview --stable _stable --core _core --recommended recommended.json --version $env:VERSION `
+            --core-commit $env:CORE_SHA --min-manager-version '${{ inputs.min_manager_version }}' --out _out
+          if ($LASTEXITCODE) { throw "derive-preview failed" }
+          & $tool sign --dir _out;   if ($LASTEXITCODE) { throw "sign failed" }
+          & $tool verify --dir _out; if ($LASTEXITCODE) { throw "verify failed" }
+          $snapshot = (Get-FileHash _out/manifest.json -Algorithm SHA256).Hash.ToLower()
+          & $tool sign-channel --channel preview --version $env:VERSION --snapshot $snapshot --out preview.json
+          if ($LASTEXITCODE) { throw "sign-channel failed" }
+          Copy-Item recommended.json _out/recommended.json
+          Get-ChildItem _out | ForEach-Object { "{0}  {1:N1} MB" -f $_.Name, ($_.Length / 1MB) }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: preview-package
+          path: |
+            _out/manifest.json
+            _out/manifest.json.sig
+            _out/base.tar.zst.*
+            _out/recommended.json
+            preview.json
+          retention-days: 7
+
+  publish:
+    name: Publish pre-release and preview pointer
+    needs: [resolve, build, package]
+    if: inputs.publish == true
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ needs.resolve.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v4
+        with:
+          name: preview-package
+          path: pkg
+      - name: Pre-release preview-server-<version>
+        run: |
+          set -euo pipefail
+          tag="preview-server-$VERSION"
+          {
+            echo "Modules Preview $VERSION, made from stable ${{ inputs.stable_version }}."
+            echo
+            echo "Plugin host core ${{ needs.build.outputs.core_sha }}, ABI \`${{ needs.build.outputs.abi_fingerprint }}\`."
+            echo "Content Scaling, Companions and SQUID's Playerbots are built by the Modules Preview Manager on the server's PC."
+            echo "Signed with the preview key; stable Managers do not accept it."
+          } > notes.md
+          gh release create "$tag" --repo "$GITHUB_REPOSITORY" --prerelease --latest=false \
+            --title "Modules Preview $VERSION" --notes-file notes.md \
+            pkg/_out/manifest.json pkg/_out/manifest.json.sig pkg/_out/base.tar.zst.* pkg/_out/recommended.json
+      - name: Move the preview channel
+        run: python3 -I scripts/publish-preview-pointer.py --repo "$GITHUB_REPOSITORY" --pointer pkg/preview.json

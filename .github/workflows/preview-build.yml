@@ -130,6 +130,12 @@ jobs:
           "abi_fingerprint=$($pair.abiFingerprint)" >> $env:GITHUB_OUTPUT
           Write-Host "core $($pair.coreCommit)  ABI $($pair.abiFingerprint)  $($pair.compiler)"
           $short = $pair.abiFingerprint.Substring(0, 16)
+          # The host links OpenSSL dynamically: ship the DLLs it was built against next to it.
+          foreach ($dll in 'libssl-3-x64.dll', 'libcrypto-3-x64.dll') {
+              $src = Get-ChildItem -Path $env:OPENSSL_ROOT_DIR -Recurse -Filter $dll -ErrorAction SilentlyContinue | Select-Object -First 1
+              if (-not $src) { throw "$dll not found under $env:OPENSSL_ROOT_DIR" }
+              Copy-Item $src.FullName out/core/ -Force
+          }
           # The SDK travels inside the core as Core/plugin-sdk.zip, so a core update or rollback always
           # carries its own SDK; the manager unpacks it when it first builds a module.
           Compress-Archive -Path out/sdk/* -DestinationPath out/core/plugin-sdk.zip
