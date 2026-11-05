@@ -33,7 +33,7 @@ on:
         type: string
       min_manager_version:
         description: 'Oldest preview Manager that may install it'
-        default: '0.9.7'
+        default: '0.9.9'
         type: string
       publish:
         description: 'Publish the pre-release and move the preview channel to it'
