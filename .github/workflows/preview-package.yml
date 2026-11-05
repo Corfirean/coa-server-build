@@ -7,6 +7,12 @@ name: preview-package
 # preview.json on the preview-channels branch. Stable releases and the channels branch are never touched.
 
 on:
+  # A push of this file only registers the workflow for manual runs (every job is skipped).
+  push:
+    branches:
+      - 'preview/modules-v2'
+    paths:
+      - '.github/workflows/preview-package.yml'
   workflow_dispatch:
     inputs:
       stable_version:
@@ -45,6 +51,7 @@ concurrency:
 jobs:
   resolve:
     name: Stable release and core
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.v.outputs.version }}
@@ -90,6 +97,7 @@ jobs:
 
   build:
     needs: resolve
+    if: github.event_name == 'workflow_dispatch'
     uses: ./.github/workflows/preview-build.yml
     with:
       core_ref: ${{ inputs.core_ref }}
