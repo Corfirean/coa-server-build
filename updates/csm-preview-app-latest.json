@@ -1,11 +1,11 @@
-﻿{
-    "version":  "0.7.1",
-    "notes":  "CSM Modules Preview 0.7.1",
-    "pub_date":  "2026-11-03T04:43:13Z",
-    "platforms":  {
-                      "windows-x86_64":  {
-                                             "signature":  "",
-                                             "url":  "https://github.com/Corfirean/coa-server-manager/releases/download/preview-v0.7.1/csm-modules-preview_0.7.1_x64_en-US.msi.zip"
-                                         }
-                  }
+{
+  "version": "0.9.9",
+  "notes": "CSM Modules Preview 0.9.9",
+  "pub_date": "2026-11-06T14:07:21Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUaStqd3RUTXJkV0VFLzlqVHJkd09rckFWNDk1bkVMZjFCMHJYdmZIZ1cyTFBzcjd3dXhFaVVWTEJRcUJCVWUrR0xUY0JVNzJ1N0VReEpYRi9jTkkrMHlKT3ZWRjJOcUFjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkzOTczNzgzCWZpbGU6Q1NNIE1vZHVsZXMgUHJldmlld18wLjkuOV94NjQtc2V0dXAuZXhlCXZlcnNpb246MC45LjkKQVYra3l5ZW1KM240SjdZejNtaCtaYTVFVXZza0Z6ZTIrSCsyK1k5dU53eis1bXREdnRNOGlxVllNcHZaVXpCalJ0aDRlU3hzb3Y0SUsxVWlTUjkyQnc9PQo=",
+      "url": "https://github.com/Corfirean/coa-server-manager/releases/download/preview-v0.9.9/CSM.Modules.Preview_0.9.9_x64-setup.exe"
+    }
+  }
 }
