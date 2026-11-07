@@ -292,7 +292,9 @@ jobs:
           if (-not $installation) { throw 'No installed Visual Studio C++ toolchain was found.' }
           $vcvars = Join-Path $installation 'VC/Auxiliary/Build/vcvarsall.bat'
           if (-not (Test-Path -LiteralPath $vcvars)) { throw 'The selected C++ toolchain has no vcvarsall.bat.' }
-          $variables = & $env:ComSpec /d /s /c "`"`"$vcvars`" x64 >nul && set`""
+          $bootstrap = Join-Path $env:RUNNER_TEMP 'coa-msvc-environment.cmd'
+          @("@call `"$vcvars`" x64 >nul", '@if errorlevel 1 exit /b 1', '@set') | Set-Content -LiteralPath $bootstrap -Encoding ascii
+          $variables = & $env:ComSpec /d /c $bootstrap
           if ($LASTEXITCODE) { throw 'Initializing the installed C++ toolchain failed.' }
           $names = 'PATH', 'INCLUDE', 'LIB', 'LIBPATH', 'VCToolsInstallDir', 'VCToolsVersion', 'VSINSTALLDIR', 'WindowsSdkDir', 'WindowsSDKVersion', 'UniversalCRTSdkDir', 'UCRTVersion', 'VSCMD_ARG_TGT_ARCH', 'VSCMD_ARG_HOST_ARCH', 'VSCMD_VER', 'VCToolsRedistDir', 'DevEnvDir', 'Platform'
           foreach ($line in $variables) {
