@@ -277,10 +277,30 @@ jobs:
           "bots commit: $(git -C _bots rev-parse HEAD)"
           "scaling commit: $(git -C _scaling rev-parse HEAD)"
           "core commit: $(git rev-parse HEAD)"
-      - name: MSVC environment
+      - name: MSVC environment on hosted runners
+        if: runner.environment != 'self-hosted'
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
+      - name: Select an installed local C++ toolchain
+        if: runner.environment == 'self-hosted'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'
+          $installation = & $vswhere -latest -prerelease -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $installation) { throw 'No installed Visual Studio C++ toolchain was found.' }
+          $vcvars = Join-Path $installation 'VC/Auxiliary/Build/vcvarsall.bat'
+          if (-not (Test-Path -LiteralPath $vcvars)) { throw 'The selected C++ toolchain has no vcvarsall.bat.' }
+          $variables = & $env:ComSpec /d /s /c "`"`"$vcvars`" x64 >nul && set`""
+          if ($LASTEXITCODE) { throw 'Initializing the installed C++ toolchain failed.' }
+          $names = 'PATH', 'INCLUDE', 'LIB', 'LIBPATH', 'VCToolsInstallDir', 'VCToolsVersion', 'VSINSTALLDIR', 'WindowsSdkDir', 'WindowsSDKVersion', 'UniversalCRTSdkDir', 'UCRTVersion', 'VSCMD_ARG_TGT_ARCH', 'VSCMD_ARG_HOST_ARCH', 'VSCMD_VER', 'VCToolsRedistDir', 'DevEnvDir', 'Platform'
+          foreach ($line in $variables) {
+            if ($line -match '^([^=]+)=(.*)$' -and $Matches[1] -in $names) {
+              $line | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+            }
+          }
+          Write-Host "Initialized the C++ toolchain in $installation"
       - name: Locate CMake and Ninja on the dedicated runner
         if: runner.environment == 'self-hosted'
         shell: pwsh
