@@ -1,0 +1,59 @@
+name: manager-local
+on:
+  push:
+    branches: [release/20261108-build]
+  workflow_dispatch:
+    inputs:
+      manager_ref:
+        description: Exact reviewed Manager source SHA
+        required: true
+permissions:
+  contents: read
+jobs:
+  installer:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ${{ fromJSON('["self-hosted","Windows","X64","coa-persistent"]') }}
+    timeout-minutes: 150
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          repository: Corfirean/coa-server-manager
+          ref: ${{ inputs.manager_ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build and qualify locally
+        env:
+          CARGO_TARGET_DIR: C:/games/coa-build-runner/_work/_manager-release-target
+          MANAGER_SOURCE: ${{ inputs.manager_ref }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:MANAGER_SOURCE -notmatch '^[0-9a-f]{40}$') { throw 'An exact source SHA is required.' }
+          if ((git rev-parse HEAD) -ne $env:MANAGER_SOURCE) { throw 'Manager source differs.' }
+          npm ci
+          if ($LASTEXITCODE) { throw 'npm ci failed.' }
+          node --test tools/release-history.test.mjs
+          if ($LASTEXITCODE) { throw 'History tests failed.' }
+          node tools/check-i18n.mjs
+          if ($LASTEXITCODE) { throw 'Translations failed.' }
+          npm run build
+          if ($LASTEXITCODE) { throw 'Frontend failed.' }
+          cargo test --locked --workspace -- --test-threads=1
+          if ($LASTEXITCODE) { throw 'Workspace tests failed.' }
+          npm run tauri build -- --bundles nsis
+          if ($LASTEXITCODE) { throw 'Installer build failed.' }
+          $installers = @(Get-ChildItem "$env:CARGO_TARGET_DIR/release/bundle/nsis/*-setup.exe")
+          if ($installers.Count -ne 1) { throw 'Expected exactly one installer.' }
+          New-Item -ItemType Directory -Force _unsigned-manager | Out-Null
+          $name = $installers[0].Name.Replace(' ', '.')
+          Copy-Item -LiteralPath $installers[0].FullName -Destination "_unsigned-manager/$name"
+          @{schema=1; version=(Get-Content package.json -Raw | ConvertFrom-Json).version; source=$env:MANAGER_SOURCE; run=$env:GITHUB_RUN_ID; installer=$name; sha256=(Get-FileHash "_unsigned-manager/$name" -Algorithm SHA256).Hash.ToLowerInvariant()} | ConvertTo-Json | Set-Content _unsigned-manager/prepared-source.json -Encoding utf8NoBOM
+      - uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-manager-windows
+          path: _unsigned-manager/*
+          retention-days: 14
+          if-no-files-found: error
