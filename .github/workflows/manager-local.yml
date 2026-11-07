@@ -43,7 +43,7 @@ jobs:
           if ($LASTEXITCODE) { throw 'Frontend failed.' }
           cargo test --locked --workspace -- --test-threads=1
           if ($LASTEXITCODE) { throw 'Workspace tests failed.' }
-          npm run tauri build -- --bundles nsis
+          npm run tauri build -- --bundles nsis --config '{"bundle":{"createUpdaterArtifacts":false}}'
           if ($LASTEXITCODE) { throw 'Installer build failed.' }
           $installers = @(Get-ChildItem "$env:CARGO_TARGET_DIR/release/bundle/nsis/*-setup.exe")
           if ($installers.Count -ne 1) { throw 'Expected exactly one installer.' }
