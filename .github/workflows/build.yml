@@ -342,6 +342,20 @@ jobs:
         shell: pwsh
         run: |
           $fixture = (Resolve-Path coa-schema-fixture-build).Path
+          $settings = Join-Path $fixture 'Settings/repack.json'
+          $config = Get-Content -LiteralPath $settings -Raw | ConvertFrom-Json
+          $reservations = [System.Collections.Generic.List[System.Net.Sockets.TcpListener]]::new()
+          try {
+            foreach ($key in 'mysqlPort', 'authPort', 'worldPort', 'raPort') {
+              $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+              $listener.Start()
+              $reservations.Add($listener)
+              $config.$key = $listener.LocalEndpoint.Port
+            }
+            $config | ConvertTo-Json -Depth 16 | Set-Content -LiteralPath $settings -Encoding utf8NoBOM
+          } finally {
+            foreach ($listener in $reservations) { $listener.Stop() }
+          }
           $priorLogs = Join-Path $fixture 'Core/Logs'
           if (Test-Path -LiteralPath $priorLogs) {
             Move-Item -LiteralPath $priorLogs -Destination (Join-Path $fixture 'Core/qualification-prior-logs')
