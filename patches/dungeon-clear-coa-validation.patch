@@ -1,5 +1,5 @@
 diff --git a/conf/mod_dungeon_clear.conf.dist b/conf/mod_dungeon_clear.conf.dist
-index fb1c82f80c8f404d2243e643151a1588424a2dbe..51773bf4eaf247cc6f71832856e3943ecccda6ae 100644
+index fb1c82f..51773bf 100644
 --- a/conf/mod_dungeon_clear.conf.dist
 +++ b/conf/mod_dungeon_clear.conf.dist
 @@ -51,7 +51,7 @@
@@ -25,20 +25,10 @@ index fb1c82f80c8f404d2243e643151a1588424a2dbe..51773bf4eaf247cc6f71832856e3943e
  ########################################
  # GENERAL SETTINGS  (per-player overridable — see note above)
 diff --git a/mod-dungeon-clear.cmake b/mod-dungeon-clear.cmake
-index fe28ae6b11bcc21c197229563d140d51d08f1b7a..53d0d4c1b58322b9b7853692d3a42cbcb49b0bf1 100644
+index 5fc7f56..303724c 100644
 --- a/mod-dungeon-clear.cmake
 +++ b/mod-dungeon-clear.cmake
-@@ -192,7 +192,8 @@ if (BUILD_TESTING)
-         # test TUs include the core's Position.h too. Same empty-value spelling,
-         # same reason (see the C4005 note above).
-         if (MSVC)
--            target_compile_options(dungeon_clear_tests PRIVATE /D_USE_MATH_DEFINES=)
-+            target_compile_options(dungeon_clear_tests PRIVATE /D_USE_MATH_DEFINES= /utf-8)
-+            target_compile_definitions(dungeon_clear_tests PRIVATE NOMINMAX)
-         endif()
- 
-         # Link the necessary targets
-@@ -216,6 +217,7 @@ if (BUILD_TESTING)
+@@ -229,6 +229,7 @@ if (BUILD_TESTING)
          set_target_properties(dungeon_clear_tests PROPERTIES
              RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
          )
@@ -47,7 +37,7 @@ index fe28ae6b11bcc21c197229563d140d51d08f1b7a..53d0d4c1b58322b9b7853692d3a42cbc
  
      # Defer execution to the root directory's configuration end, after googletest has been fetched by the core
 diff --git a/src/Ai/Dungeon/DungeonClear/Settings/DcSettingsRegistry.h b/src/Ai/Dungeon/DungeonClear/Settings/DcSettingsRegistry.h
-index 424eb51f49baa5fec7e75368c27753757d0b5a49..3aeec9be7793ca450f3033d62d8e6628ef5357c1 100644
+index 424eb51..3aeec9b 100644
 --- a/src/Ai/Dungeon/DungeonClear/Settings/DcSettingsRegistry.h
 +++ b/src/Ai/Dungeon/DungeonClear/Settings/DcSettingsRegistry.h
 @@ -104,7 +104,7 @@ inline constexpr DcSettingDef kDcSettings[] =
@@ -60,7 +50,7 @@ index 424eb51f49baa5fec7e75368c27753757d0b5a49..3aeec9be7793ca450f3033d62d8e6628
      { "LootMinQuality",        DcType::UInt,   0,   0,   6,  true  },
  
 diff --git a/src/DcModuleEnable.cpp b/src/DcModuleEnable.cpp
-index 75beb50dc89d9d2bc5f19db810650ad020c9e1d9..8c7c0791d6c2b929511b625af0bf499a902df47f 100644
+index 75beb50..8c7c079 100644
 --- a/src/DcModuleEnable.cpp
 +++ b/src/DcModuleEnable.cpp
 @@ -9,6 +9,7 @@
@@ -83,7 +73,7 @@ index 75beb50dc89d9d2bc5f19db810650ad020c9e1d9..8c7c0791d6c2b929511b625af0bf499a
  }
  
 diff --git a/src/DcModuleEnable.h b/src/DcModuleEnable.h
-index cbbcafd6b87b71ee2653108f5e56cfcb982befca..d0be1d507496a06c67eb46da7415485a6f511e38 100644
+index cbbcafd..d0be1d5 100644
 --- a/src/DcModuleEnable.h
 +++ b/src/DcModuleEnable.h
 @@ -2,7 +2,7 @@
@@ -95,100 +85,8 @@ index cbbcafd6b87b71ee2653108f5e56cfcb982befca..d0be1d507496a06c67eb46da7415485a
   *
   * With it set to 0 the module is compiled and linked but completely inert:
   *
-diff --git a/t/TestBlackwingLair.cpp b/t/TestBlackwingLair.cpp
-index d818677876d90f3bd0fe8d85aa7751a89d2e45eb..c9ba545e44f4a6f750c8ab76010b857584f792be 100644
---- a/t/TestBlackwingLair.cpp
-+++ b/t/TestBlackwingLair.cpp
-@@ -785,11 +785,11 @@ TEST(DungeonEventBlackwingLairTest, TheElectionBreaksTiesOnTheWalkToTheOrb)
-     // second of a freed Razorgore, and the new runner's WALK is nearly all of it.
-     // Among candidates of equal rank the election therefore takes the one already
-     // closest to the ledge.
--    DcRazorgore::RunnerCandidate near = Bot(90);  near.isRanged = true;  near.distToOrb = 5.0f;
--    DcRazorgore::RunnerCandidate far = Bot(10);   far.isRanged = true;   far.distToOrb = 70.0f;
--    EXPECT_EQ(DcRazorgore::SelectRunner({near, far}), 0)
-+    DcRazorgore::RunnerCandidate nearCandidate = Bot(90);  nearCandidate.isRanged = true;  nearCandidate.distToOrb = 5.0f;
-+    DcRazorgore::RunnerCandidate farCandidate = Bot(10);   farCandidate.isRanged = true;   farCandidate.distToOrb = 70.0f;
-+    EXPECT_EQ(DcRazorgore::SelectRunner({nearCandidate, farCandidate}), 0)
-         << "the lower GUID is 70yd away; distance decides before GUID does";
--    EXPECT_EQ(DcRazorgore::SelectRunner({far, near}), 1);
-+    EXPECT_EQ(DcRazorgore::SelectRunner({farCandidate, nearCandidate}), 1);
- 
-     // RANK STILL WINS OUTRIGHT. A healer standing on the orb does not displace a
-     // ranged DPS across the room: losing the healer to a 90s root is how the raid
-@@ -797,7 +797,7 @@ TEST(DungeonEventBlackwingLairTest, TheElectionBreaksTiesOnTheWalkToTheOrb)
-     DcRazorgore::RunnerCandidate healerAtOrb = Bot(1);
-     healerAtOrb.isHealer = true;
-     healerAtOrb.distToOrb = 0.0f;
--    EXPECT_EQ(DcRazorgore::SelectRunner({healerAtOrb, far}), 1);
-+    EXPECT_EQ(DcRazorgore::SelectRunner({healerAtOrb, farCandidate}), 1);
- 
-     // And the bucket is coarse on purpose: two bots standing together must not
-     // trade the job back and forth as they shuffle, so inside one bucket the GUID
-diff --git a/t/TestEventRegistry.cpp b/t/TestEventRegistry.cpp
-index 0eb9eba6fe28fe86656af3158fdd9587a381e1df..7506edc896beb4e0b52f9d9986d2fb146e1e6ad1 100644
---- a/t/TestEventRegistry.cpp
-+++ b/t/TestEventRegistry.cpp
-@@ -1431,6 +1431,8 @@ TEST(DungeonEventIntegrityTest, StepsOwnMovementIsConfinedToVettedEvents)
-         // tank while they happen.) And Done has to yield: every island clear,
-         // Varos and Urom are ground fights for the objectives and the stock engine.
-         {578, 9},
-+        // Sunken Temple hook 68 walks to the altar or Sanctum centre itself.
-+        {109, 8},
-     };
- 
-     for (DungeonEvent const& ev : DungeonEventRegistry::AllEvents())
-diff --git a/t/TestPitOfSaronRouteProbe.cpp b/t/TestPitOfSaronRouteProbe.cpp
-index 5201b661686101a2b271a9d101298b940a435605..4326e9c6f6136c76736d3aba6ecd51adfeb14b0a 100644
---- a/t/TestPitOfSaronRouteProbe.cpp
-+++ b/t/TestPitOfSaronRouteProbe.cpp
-@@ -214,16 +214,18 @@ TEST(PitOfSaronRouteProbe, GateStandPointsAreInsideTheirOwnSpheresAndTheLedgeIsO
-         << "the arena stand point is outside half the boss's vertical leash band";
- }
- 
--// The staging point the ARM state holds the party on must be clear of gate 1's
--// sphere on every bearing, or the hold is not a hold at all.
--TEST(PitOfSaronRouteProbe, TheArmStagingPointIsClearOfGateOne)
-+// The southern ARM hold may overlap the trigger sphere: only the driver's
-+// deliberate forge starts it. Keep the hold away from the ambush ramp instead.
-+TEST(PitOfSaronRouteProbe, TheArmStagingPointStaysOffTheAmbushRamp)
- {
--    float const d = Dist3(STAGE_X, STAGE_Y, STAGE_Z, AT_WARN_1_X, AT_WARN_1_Y, AT_WARN_1_Z);
--    EXPECT_GT(d, AT_WARN_1_R + STAGE_LEASH + 20.0f)
--        << "the ARM staging point is only " << d << "yd from areatrigger " << AREATRIGGER_WARN_1
--        << " (radius " << AT_WARN_1_R
--        << "). The whole point of that state is to keep the party OUT of the ambush trigger for"
--           " the 85-100s the Krick outro needs to fly the orchestrator into position.";
-+    auto const* route = GauntletRoute();
-+    ASSERT_NE(route, nullptr);
-+    ASSERT_GT(route->size(), 11u);
-+    WaypointHint const& ramp = (*route)[11];
-+    float const d = Dist3(STAGE_X, STAGE_Y, STAGE_Z, ramp.x, ramp.y, ramp.z);
-+    EXPECT_GT(d, STAGE_LEASH + 40.0f)
-+        << "the ARM hold must stay clear of the first ambush ramp even at its arrival leash";
-+    EXPECT_LT(STAGE_Z, ramp.z);
- }
- 
- // Every authored anchor must be somewhere a bot can actually stand.
-diff --git a/t/TestTestRunRecord.cpp b/t/TestTestRunRecord.cpp
-index a0b5277879b9a943a6a8c9a3eff40751d44c502f..84a5ce7843452c249049f457ef4bcf945be61876 100644
---- a/t/TestTestRunRecord.cpp
-+++ b/t/TestTestRunRecord.cpp
-@@ -139,9 +139,11 @@ TEST(DcTestRunRecordTest, DeathsSerializeWhoDiedAndToWhat)
- 
-     std::string const line = ToJsonl(r);
-     EXPECT_NE(line.find("\"deaths\":[{\"t\":410,\"name\":\"Bero\",\"opponent\":\"Anzu\","
--                        "\"opponentEntry\":23035,\"onBoss\":true},"
-+                        "\"opponentEntry\":23035,\"onBoss\":true,\"role\":\"\",\"manaPct\":-1,"
-+                        "\"healerManaPct\":-1,\"healerAlive\":false},"
-                         "{\"t\":413,\"name\":\"Olanne\",\"opponent\":\"Anzu\","
--                        "\"opponentEntry\":23035,\"onBoss\":true}]"),
-+                        "\"opponentEntry\":23035,\"onBoss\":true,\"role\":\"\",\"manaPct\":-1,"
-+                        "\"healerManaPct\":-1,\"healerAlive\":false}]"),
-               std::string::npos);
-     EXPECT_EQ(Count(line, "\"name\":\"Olanne\""), 1u);
- }
 diff --git a/tools/check_config_reads.py b/tools/check_config_reads.py
-index 1eaa7beb2b8b6af83dabc23e96b8296c90456aba..f9e3a40ce0565419237180460c1d289b20e3cf76 100644
+index 1eaa7be..f9e3a40 100644
 --- a/tools/check_config_reads.py
 +++ b/tools/check_config_reads.py
 @@ -43,6 +43,7 @@ ACCESSOR = "Settings/DcSettings.cpp"
