@@ -8,6 +8,15 @@ Published releases and previews. Pre-release entries do not change the stable up
 
 Dates follow GitHub publication (UTC); legacy records retain their archived dates. Newest releases first.
 
+## 0.261108.95 (Pre-release) — 2026-11-08
+
+- Login server startup works when Windows does not list its listening port.
+- Updated SQUID's Playerbots to 2.9.4 and refreshed Dungeon Clear.
+- Updated SQUID Playerbots to 2.9.4.
+- Updated the reviewed CoA upstream snapshot.
+
+[Release](https://github.com/Corfirean/coa-server-build/releases/tag/server-0.261108.95) · [Source changes](https://github.com/Corfirean/coa-server-build/compare/server-0.261104.94...server-0.261108.95)
+
 ## 0.261104.94 — 2026-11-04
 
 - Companions avoid repeating unreachable routes in the open world.
