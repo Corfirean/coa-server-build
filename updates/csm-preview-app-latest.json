@@ -1,11 +1,11 @@
 {
-  "version": "0.9.9",
-  "notes": "CSM Modules Preview 0.9.9",
-  "pub_date": "2026-11-06T14:07:21Z",
+  "version": "0.9.10",
+  "notes": "CSM Modules Preview 0.9.10",
+  "pub_date": "2026-11-10T12:45:31Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUaStqd3RUTXJkV0VFLzlqVHJkd09rckFWNDk1bkVMZjFCMHJYdmZIZ1cyTFBzcjd3dXhFaVVWTEJRcUJCVWUrR0xUY0JVNzJ1N0VReEpYRi9jTkkrMHlKT3ZWRjJOcUFjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkzOTczNzgzCWZpbGU6Q1NNIE1vZHVsZXMgUHJldmlld18wLjkuOV94NjQtc2V0dXAuZXhlCXZlcnNpb246MC45LjkKQVYra3l5ZW1KM240SjdZejNtaCtaYTVFVXZza0Z6ZTIrSCsyK1k5dU53eis1bXREdnRNOGlxVllNcHZaVXpCalJ0aDRlU3hzb3Y0SUsxVWlTUjkyQnc9PQo=",
-      "url": "https://github.com/Corfirean/coa-server-manager/releases/download/preview-v0.9.9/CSM.Modules.Preview_0.9.9_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUaStqd3RUTXJkV0FvdXZhbnlzNzNEa0l6T2t4ZXA1bnFtWGFEWmhLNEE3YVVkeExWMTAwQnAvN2hPWTV2djcwQzVjSUVzUzZMWDJra2FXYTk4V1ZOK0JoOWk4cjB1bndnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0MzEyNDMwCWZpbGU6Q1NNIE1vZHVsZXMgUHJldmlld18wLjkuMTBfeDY0LXNldHVwLmV4ZQl2ZXJzaW9uOjAuOS4xMApmRDZiWGI2TTlTY1doS0Y0VW9CUEgvcEJkS0lVNEh6M1JzSFNSbG5xQjU5ZUtwaEtkbUdQbEVyMVlKbHBrVkhZd1IrQzEvUzBtNk1aUlRQdmlldHBEQT09Cg==",
+      "url": "https://github.com/Corfirean/coa-server-manager/releases/download/preview-v0.9.10/CSM.Modules.Preview_0.9.10_x64-setup.exe"
     }
   }
 }
