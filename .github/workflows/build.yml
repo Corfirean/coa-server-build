@@ -226,9 +226,16 @@ jobs:
             _manager/target
           key: trusted-release-cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('_manager/Cargo.lock') }}-${{ github.run_id }}
           restore-keys: trusted-release-cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('_manager/Cargo.lock') }}-
-      - name: Build coa-release
+      - name: Build coa-release and the repack launcher
         shell: pwsh
-        run: cargo build --release -p coa-release --manifest-path _manager/Cargo.toml
+        run: |
+          cargo build --release -p coa-release --manifest-path _manager/Cargo.toml
+          if ($LASTEXITCODE -ne 0) { throw 'coa-release did not build.' }
+          # The repack launcher (Scripts/coa-launcher.exe) exists from the Manager revision that ports manage.py.
+          if (Test-Path _manager/crates/coa-launcher/Cargo.toml) {
+            cargo build --release -p coa-launcher --manifest-path _manager/Cargo.toml
+            if ($LASTEXITCODE -ne 0) { throw 'coa-launcher did not build.' }
+          }
       - name: Preserve compiled release tooling before database qualification
         if: steps.release-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v6

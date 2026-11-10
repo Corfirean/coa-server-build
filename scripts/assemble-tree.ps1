@@ -34,6 +34,13 @@ $squidConfig = "$Out/Core/configs/modules/playerbots.conf.dist"
 New-Item -ItemType Directory -Force -Path "$Out/Extras/SquidPlayerbots", "$Out/Scripts" | Out-Null
 Copy-Item "$Core/modules/mod-playerbots/data/sql" "$Out/Extras/SquidPlayerbots/sql" -Recurse -Force
 Copy-Item "$PSScriptRoot/manage.py", "$PSScriptRoot/squid_playerbots.py" "$Out/Scripts/" -Force
+# The repack launcher in Rust, built from the same Manager revision as the release tools. The Manager uses it as the
+# world supervisor; manage.py stays for older Managers.
+$launcher = if ($Manager) { Join-Path $Manager 'target/release/coa-launcher.exe' } else { '' }
+if ($Manager -and (Test-Path (Join-Path $Manager 'crates/coa-launcher/Cargo.toml'))) {
+    if (-not (Test-Path $launcher)) { throw "The Manager revision has coa-launcher, but $launcher was not built." }
+    Copy-Item $launcher "$Out/Scripts/coa-launcher.exe" -Force
+}
 @{ schema = 1; tag = $SquidTag; commit = $SquidSha } | ConvertTo-Json | Set-Content "$Out/Extras/SquidPlayerbots/release.json" -Encoding utf8NoBOM
 $settingsJson = "$Core/modules/mod-playerbots/conf/playerbots.conf.settings.json"
 if (Test-Path $settingsJson) { Copy-Item $settingsJson "$Out/Core/configs/modules/playerbots.conf.settings.json" -Force }
