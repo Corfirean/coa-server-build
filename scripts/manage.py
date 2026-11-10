@@ -598,6 +598,12 @@ def ra(command, config):
         until(b"AC>")
         connection.sendall((command + "\r\n").encode())
         if command.startswith("server shutdown"):
+            # Read the reply before closing: closing at once can lose the request. Its outcome is not needed, so
+            # no error here (Managers that wrap this function stop the world themselves on an error).
+            try:
+                until(b"AC>")
+            except (OSError, RuntimeError):
+                pass
             return "Graceful world shutdown requested."
         return until(b"AC>").rsplit("AC>", 1)[0].strip()
 
