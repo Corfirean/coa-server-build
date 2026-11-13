@@ -5,6 +5,8 @@ from pathlib import Path
 import socket
 import struct
 import subprocess
+import tempfile
+import time
 import unittest
 from unittest.mock import Mock
 from ctypes import wintypes
@@ -60,20 +62,23 @@ class ReadinessTests(unittest.TestCase):
         self.server.listen()
         self.ns['listeners'] = lambda: []
         self.ns['netstat_listeners'] = lambda: []
-        self.assertTrue(self.ns['ready']('auth', self.port))
-        self.assertTrue(self.ns['ready']('world', self.port))
+        for service in ('auth', 'world', 'mysql'):
+            with self.subTest(service=service):
+                self.assertTrue(self.ns['ready'](service, self.port))
 
-    def test_blind_tables_reject_foreign_acceptor_and_mysql(self):
+    def test_blind_tables_reject_foreign_acceptor_and_reused_pid(self):
         self.server.listen()
         self.ns['listeners'] = lambda: []
         self.ns['netstat_listeners'] = lambda: []
         self.ns['process'].return_value = {'pid': 1}
-        self.assertFalse(self.ns['ready']('auth', self.port))
+        for service in ('auth', 'world', 'mysql'):
+            with self.subTest(service=service):
+                self.assertFalse(self.ns['ready'](service, self.port))
         self.ns['process'].return_value = {'pid': os.getpid()}
-        # MySQL never takes the connection path.
-        self.assertFalse(self.ns['ready']('mysql', self.port))
         self.ns['same_process'].return_value = False
-        self.assertFalse(self.ns['ready']('auth', self.port))
+        for service in ('auth', 'world', 'mysql'):
+            with self.subTest(service=service):
+                self.assertFalse(self.ns['ready'](service, self.port))
 
     def test_owner_rows_identify_accepting_process(self):
         self.server.listen()
@@ -81,6 +86,40 @@ class ReadinessTests(unittest.TestCase):
         rows = evidence['server_rows']
         self.assertEqual([(r['state'], r['local_port'], r['pid']) for r in rows], [(5, self.port, os.getpid())])
         self.assertIsNone(self.ns['accept_owner'](self._closed_port()))
+
+    @unittest.skipUnless(os.environ.get('COA_TEST_MYSQL_HOME'), 'Set COA_TEST_MYSQL_HOME for native MySQL')
+    def test_native_mysql_with_invisible_listeners(self):
+        home = Path(os.environ['COA_TEST_MYSQL_HOME']).resolve()
+        executable = home / 'bin' / 'mysqld.exe'
+        with tempfile.TemporaryDirectory(prefix='coa-mysql-readiness-') as directory:
+            data = Path(directory) / 'data'
+            subprocess.run([str(executable), '--no-defaults', '--initialize-insecure',
+                            f'--basedir={home}', f'--datadir={data}', '--console'],
+                           check=True, capture_output=True, timeout=120,
+                           creationflags=subprocess.CREATE_NO_WINDOW)
+            port = self._closed_port()
+            mysql = subprocess.Popen([str(executable), '--no-defaults', f'--basedir={home}',
+                                      f'--datadir={data}', f'--port={port}', '--bind-address=127.0.0.1',
+                                      '--mysqlx=0', '--no-monitor', '--console'], stdout=subprocess.DEVNULL,
+                                     stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW)
+            try:
+                self.ns['listeners'] = lambda: []
+                self.ns['netstat_listeners'] = lambda: []
+                self.ns['process'].return_value = {'pid': mysql.pid}
+                self.ns['same_process'].side_effect = lambda record: mysql.poll() is None
+                deadline = time.monotonic() + 60
+                while not self.ns['ready']('mysql', port):
+                    self.assertIsNone(mysql.poll(), 'isolated MySQL exited during startup')
+                    self.assertLess(time.monotonic(), deadline, 'isolated MySQL readiness timed out')
+                    time.sleep(0.1)
+                self.ns['process'].return_value = {'pid': os.getpid()}
+                self.assertFalse(self.ns['ready']('mysql', port))
+            finally:
+                if mysql.poll() is None:
+                    mysql.terminate()
+                mysql.wait(timeout=30)
+            self.ns['process'].return_value = {'pid': mysql.pid}
+            self.assertFalse(self.ns['ready']('mysql', port))
 
     def _closed_port(self):
         with socket.socket() as s:

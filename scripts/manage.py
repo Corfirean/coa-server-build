@@ -277,9 +277,6 @@ def ready(name, port):
     if found:
         # The process may exit or its PID may be reused during the external query.
         return same_process(record)
-    if name == "mysql":
-        # The database listener has always been visible on affected systems; never open MySQL sessions.
-        return False
     return owner_confirms(record, accept_owner(port)) and same_process(record)
 
 
