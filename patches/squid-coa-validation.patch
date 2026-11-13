@@ -1,10 +1,31 @@
+diff --git a/src/Ai/Coa/Economy/AuctionHouse/CoaAuctionHouseBotHooks.cpp b/src/Ai/Coa/Economy/AuctionHouse/CoaAuctionHouseBotHooks.cpp
+index 9698a03..578e70e 100644
+--- a/src/Ai/Coa/Economy/AuctionHouse/CoaAuctionHouseBotHooks.cpp
++++ b/src/Ai/Coa/Economy/AuctionHouse/CoaAuctionHouseBotHooks.cpp
+@@ -254,11 +254,9 @@ public:
+ 
+ void AddSC_coa_economy_ahbot()
+ {
+-    if (!CoaEconomy::Conf::Get<bool>(KEY_MODULE_ENABLE, true))
+-        return;
+-
+-    new CoaAhBotWorldHooks();
+-    new CoaAhBotAuctionHooks();
+-    new CoaAhBotMailHooks();
+-    new CoaAhBotCommands();
++    // CoA builds ship mod-ah-bot-plus in the core. It owns the auction house bot and the .ahbot commands; a second
++    // set of .ahbot sub-commands would stop the world server at start-up, so these hooks are never registered.
++    static_cast<void>(KEY_MODULE_ENABLE);
++    static_cast<void>(sizeof(CoaAhBotWorldHooks) + sizeof(CoaAhBotAuctionHooks) + sizeof(CoaAhBotMailHooks) + sizeof(CoaAhBotCommands));
++    LOG_INFO("server.loading", "SquidBots auction house bot: not loaded, the core's auction house bot is used");
+ }
 diff --git a/src/PlayerbotAIConfig.cpp b/src/PlayerbotAIConfig.cpp
-index 3ec5da1c..420321ca 100644
+index 36b7bb5..553c51b 100644
 --- a/src/PlayerbotAIConfig.cpp
 +++ b/src/PlayerbotAIConfig.cpp
-@@ -1031,6 +1031,16 @@ bool PlayerbotAIConfig::Initialize()
-     selfBotLevel = sConfigMgr->GetOption<int32>("AiPlayerbot.SelfBotLevel", 1);
-     botTextLocale = sConfigMgr->GetOption<int32>("AiPlayerbot.BotTextLocale", -1);
+@@ -1042,6 +1042,16 @@ bool PlayerbotAIConfig::Initialize()
+     LoadCoaEconomyConfig();
+     LoadCoaCombatConfig();
  
 +    validationMode = sConfigMgr->GetOption<bool>("CoA.ValidationMode", false, false);
 +    if (validationMode)
@@ -20,10 +41,10 @@ index 3ec5da1c..420321ca 100644
      if (World::IsStopped())
      {
 diff --git a/src/PlayerbotAIConfig.h b/src/PlayerbotAIConfig.h
-index 9ac6e4d2..51153175 100644
+index 90a1841..6f4fc9d 100644
 --- a/src/PlayerbotAIConfig.h
 +++ b/src/PlayerbotAIConfig.h
-@@ -111,6 +111,7 @@ public:
+@@ -118,6 +118,7 @@ public:
      bool IsInPvpProhibitedArea(uint32 id);
  
      bool enabled;
@@ -32,10 +53,10 @@ index 9ac6e4d2..51153175 100644
      bool EnableICCBuffs;
      bool allowAccountBots, allowGuildBots, allowTrustedAccountBots;
 diff --git a/src/Script/Playerbots.cpp b/src/Script/Playerbots.cpp
-index 4af42195..03030ecf 100644
+index fc0ed97..e5edea9 100644
 --- a/src/Script/Playerbots.cpp
 +++ b/src/Script/Playerbots.cpp
-@@ -484,6 +484,8 @@ public:
+@@ -542,6 +542,8 @@ public:
  
      void OnUpdate(uint32 diff) override
      {
@@ -44,7 +65,7 @@ index 4af42195..03030ecf 100644
          PlayerbotWorldThreadProcessor::instance().Update(diff);
          sRandomPlayerbotMgr.UpdateAI(diff);  // World thread only
          sRandomPlayerbotMgr.CoaReleaseOrphanGroups();
-@@ -563,6 +565,8 @@ public:
+@@ -621,6 +623,8 @@ public:
  
      void OnPlayerbotUpdate(uint32 /*diff*/) override
      {

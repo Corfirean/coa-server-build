@@ -5,7 +5,7 @@
       "repository": "Zyth45/mod-playerbots",
       "sha": "4ef5ed9ebe75a330de7df19639a042391e037e15",
       "patch": "patches/squid-coa-validation.patch",
-      "patchSha256": "244cd2d8b04b3158665e44f40ebb6d4088a867a052ff5c3a9553d604652fe2d1"
+      "patchSha256": "2cc45bc6555d5bb3e91728840f9de6e73c002c73b270a37732a1499956241c5f"
     },
     "dungeon-clear": {
       "repository": "Zyth45/mod-dungeon-clear",
