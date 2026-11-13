@@ -25,14 +25,20 @@ index 46a177f..9f35129 100644
  ########################################
  # GENERAL SETTINGS  (per-player overridable — see note above)
 diff --git a/mod-dungeon-clear.cmake b/mod-dungeon-clear.cmake
-index 599956a..b23d111 100644
+index 599956a..0645bf3 100644
 --- a/mod-dungeon-clear.cmake
 +++ b/mod-dungeon-clear.cmake
-@@ -231,6 +231,7 @@ if (BUILD_TESTING)
+@@ -231,6 +231,13 @@ if (BUILD_TESTING)
          set_target_properties(dungeon_clear_tests PROPERTIES
              RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
          )
 +        add_test(NAME dungeon_clear_tests COMMAND $<TARGET_FILE:dungeon_clear_tests>)
++        if (WIN32)
++            # The executable sits in the build root while the OpenSSL DLLs it links are copied
++            # to bin/; without this Windows shows a modal "DLL not found" box and ctest hangs.
++            set_tests_properties(dungeon_clear_tests PROPERTIES
++                ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${CMAKE_BINARY_DIR}/bin")
++        endif()
      endfunction()
  
      # Defer execution to the root directory's configuration end, after googletest has been fetched by the core
