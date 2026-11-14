@@ -15,6 +15,32 @@ class IntegrationTests(unittest.TestCase):
         override = patch.object(daily, 'freeze_external')
         override.start()
         self.addCleanup(override.stop)
+        # These cases cover the original fork's releases; V2's pinned source has its own tests.
+        unpinned = patch.object(daily, 'races_source', return_value=None)
+        unpinned.start()
+        self.addCleanup(unpinned.stop)
+
+    def test_pinned_v2_release_takes_its_client_and_checks_the_integrated_server_sources(self):
+        pinned = {'repository': 'ilusixn/CustomRacesCoa', 'tag': 'coa-custom-2.0',
+                  'server': [{'repository': 'stefanw1337/azerothcore-wotlk-coa', 'sha': 'server-sha'}]}
+        asset = {'name': 'CoA-Custom-V2-Client-1.zip', 'size': 1, 'digest': 'sha256:' + 'a' * 64, 'browser_download_url': 'u'}
+
+        def api(endpoint):
+            if endpoint == 'repos/ilusixn/CustomRacesCoa/releases/tags/coa-custom-2.0':
+                return {'tag_name': 'coa-custom-2.0', 'assets': [asset]}
+            if '/tags?' in endpoint:
+                return [{'name': 'v3.0', 'commit': {'sha': 'squid-sha'}}]
+            if '/compare/' in endpoint:
+                return {'status': 'ahead'}
+            raise AssertionError(endpoint)
+        with patch.object(daily, 'races_source', return_value=pinned),                 patch.object(daily, 'gh', side_effect=api) as calls,                 patch.object(daily, 'revision', side_effect=lambda repo, ref: ref):
+            lock = daily.resolve()
+            races = lock['components']['races']
+            self.assertEqual((races['repository'], races['ref']), ('ilusixn/CustomRacesCoa', 'coa-custom-2.0'))
+            self.assertEqual(races['server'], pinned['server'])
+            daily.check_integration(lock)
+            calls.assert_any_call('repos/Corfirean/azerothcore-wotlk-coa/compare/server-sha...coa-bots')
+            self.assertFalse(any('compare/refs/tags' in str(c) for c in calls.call_args_list))
 
     def test_resolve_freezes_selected_upstream_and_checks_its_ancestry(self):
         def api(endpoint):
