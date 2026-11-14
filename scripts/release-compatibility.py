@@ -85,13 +85,20 @@ def minimum_manager(requested, client_patch_version, isolated_validation=False):
     return max((requested, floor), key=lambda version: tuple(int(part) for part in version.split('.')))
 
 
+
+def executable_path(value):
+    # Python on this Windows build cannot start a bare relative path with forward slashes
+    # (WinError 2), so make any path-like tool argument absolute; bare names still use PATH.
+    return str(Path(value).resolve()) if ('/' in value or '\\' in value) else value
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--dir', required=True, type=Path)
     parser.add_argument('--lock', required=True, type=Path)
     parser.add_argument('--sources', required=True, type=Path)
     parser.add_argument('--platform', required=True)
-    parser.add_argument('--tool', required=True)
+    parser.add_argument('--tool', required=True, type=executable_path)
     parser.add_argument('--schema-base', required=True, type=Path)
     args = parser.parse_args()
     apply(args.dir, args.lock, args.sources, args.platform, args.tool, args.schema_base)

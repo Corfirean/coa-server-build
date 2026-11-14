@@ -88,7 +88,7 @@ def main():
     parser.add_argument('--version', required=True)
     parser.add_argument('--expected', required=True)
     parser.add_argument('--dir', required=True, type=Path)
-    parser.add_argument('--tool', required=True)
+    parser.add_argument('--tool', required=True, type=executable_path)
     parser.add_argument('--owner-approved-snapshot')
     parser.add_argument('--approval-reason')
     parser.add_argument('--check-only', action='store_true', help='Verify locally without signing or publishing')
@@ -137,6 +137,13 @@ def main():
     # Keep GitHub's Latest release consistent with the signed Manager channel.
     subprocess.run(['gh', 'release', 'edit', 'server-' + args.version, '--repo', args.repo,
                     '--prerelease=false', '--latest'], check=True)
+
+
+
+def executable_path(value):
+    # Python on this Windows build cannot start a bare relative path with forward slashes
+    # (WinError 2), so make any path-like tool argument absolute; bare names still use PATH.
+    return str(Path(value).resolve()) if ('/' in value or '\\' in value) else value
 
 
 if __name__ == '__main__':
