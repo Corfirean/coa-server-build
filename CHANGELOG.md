@@ -8,6 +8,19 @@ Published releases and previews. Pre-release entries do not change the stable up
 
 Dates follow GitHub publication (UTC); legacy records retain their archived dates. Newest releases first.
 
+## 0.261114.106 (Pre-release) — 2026-11-14
+
+- Optional extra strength for bots in dungeons and raids.
+- Bot performance metrics and optional scheduling controls are available for testing.
+- Database startup can recover when Windows omits its listening port.
+- Updated Dungeon Clear to 3.0.0 to match SQUID Playerbots 3.0.
+- Automatic world restarts wait for the previous supervisor to finish.
+- The server's own Auction House Bot stays in charge when SQUID Playerbots 3.0 is installed.
+- Updated SQUID Playerbots to 3.0.
+- Updated the reviewed CoA upstream snapshot.
+
+[Release](https://github.com/Corfirean/coa-server-build/releases/tag/server-0.261114.106) · [Source changes](https://github.com/Corfirean/coa-server-build/compare/server-0.261108.95...server-0.261114.106)
+
 ## 0.261108.95 — 2026-11-08
 
 - Login server startup works when Windows does not list its listening port.
