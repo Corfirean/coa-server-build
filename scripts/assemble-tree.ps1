@@ -20,8 +20,13 @@ Get-ChildItem "$Binaries/*.dll" | Copy-Item -Destination "$Out/Core/" -Force
 
 Copy-Item "$Core/src/server/apps/worldserver/worldserver.conf.dist" "$Out/Core/configs/" -Force
 Copy-Item "$Core/src/server/apps/authserver/authserver.conf.dist" "$Out/Core/configs/" -Force
+# SQUID ships its own mod_ahbot.conf.dist for its auction house bot, which the CoA build does not load (the core's
+# mod-ah-bot-plus owns that file name). Keep the core module's template.
 Get-ChildItem "$Core/modules" -Directory | ForEach-Object {
-    Get-ChildItem "$($_.FullName)/conf/*.dist" -ErrorAction SilentlyContinue | Copy-Item -Destination "$Out/Core/configs/modules/" -Force
+    $module = $_.Name
+    Get-ChildItem "$($_.FullName)/conf/*.dist" -ErrorAction SilentlyContinue |
+        Where-Object { -not ($module -eq 'mod-playerbots' -and $_.Name -eq 'mod_ahbot.conf.dist') } |
+        Copy-Item -Destination "$Out/Core/configs/modules/" -Force
 }
 Copy-Item "$Bots/module/conf/mod_coa_playerbots.conf.dist" "$Out/Core/configs/modules/" -Force
 # The CoA compatibility settings live in the core, not in a module folder. They must be active: without CoA.Enable = 1

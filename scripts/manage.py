@@ -277,9 +277,6 @@ def ready(name, port):
     if found:
         # The process may exit or its PID may be reused during the external query.
         return same_process(record)
-    if name == "mysql":
-        # The database listener has always been visible on affected systems; never open MySQL sessions.
-        return False
     return owner_confirms(record, accept_owner(port)) and same_process(record)
 
 
@@ -526,10 +523,17 @@ def start_world(config, offset):
         wait_relay()
         print("Worldserver and bug-report relay are already running.", flush=True)
         return
+    until = time.monotonic() + 45
+    announced = False
+    while process("supervisor") or process("relay"):
+        if time.monotonic() >= until:
+            raise RuntimeError("The previous world/relay shutdown did not finish within 45 seconds. Check its logs.")
+        if not announced:
+            print("Waiting for the previous world/relay shutdown to finish...", flush=True)
+            announced = True
+        time.sleep(0.25)
     ensure_free(config["worldPort"])
     ensure_free(config["raPort"])
-    if process("supervisor") or process("relay"):
-        raise RuntimeError("The previous world/relay shutdown is still finishing. Try again shortly.")
     prepare_playerbots(ROOT, config, mysql)
     print("Starting worldserver and its bug-report relay...", flush=True)
     stop = STATE / "stop-relay"

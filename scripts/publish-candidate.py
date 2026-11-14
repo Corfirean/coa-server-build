@@ -70,11 +70,18 @@ def publish(folder, repo, tool, unsigned=False):
     print(tag)
 
 
+
+def executable_path(value):
+    # Python on this Windows build cannot start a bare relative path with forward slashes
+    # (WinError 2), so make any path-like tool argument absolute; bare names still use PATH.
+    return str(Path(value).resolve()) if ('/' in value or '\\' in value) else value
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--dir", required=True, type=Path)
     parser.add_argument("--repo", required=True)
-    parser.add_argument("--tool", required=True)
+    parser.add_argument("--tool", required=True, type=executable_path)
     parser.add_argument("--unsigned", action="store_true")
     args = parser.parse_args()
     publish(args.dir, args.repo, args.tool, args.unsigned)

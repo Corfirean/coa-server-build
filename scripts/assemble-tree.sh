@@ -22,7 +22,12 @@ install -m 0755 "$binaries/worldserver" "$binaries/authserver" "$out/Core/"
 cp "$core/src/server/apps/worldserver/worldserver.conf.dist" "$out/Core/configs/"
 cp "$core/src/server/apps/authserver/authserver.conf.dist" "$out/Core/configs/"
 for d in "$core"/modules/*/; do
-  for f in "$d"conf/*.dist; do [ -e "$f" ] && cp "$f" "$out/Core/configs/modules/"; done
+  # SQUID's mod_ahbot.conf.dist belongs to its auction house bot, which the CoA build does not load.
+  for f in "$d"conf/*.dist; do
+    [ -e "$f" ] || continue
+    case "$d" in */mod-playerbots/) [ "$(basename "$f")" = mod_ahbot.conf.dist ] && continue ;; esac
+    cp "$f" "$out/Core/configs/modules/"
+  done
 done
 cp "$bots/module/conf/mod_coa_playerbots.conf.dist" "$out/Core/configs/modules/"
 # The CoA settings live in the core, not in a module folder (coa.conf.dist, wildcard.conf.dist, coa_bugreport.conf.dist).

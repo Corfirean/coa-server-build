@@ -3,15 +3,15 @@
   "modules": {
     "squid": {
       "repository": "Zyth45/mod-playerbots",
-      "sha": "75d1784f66f3c731340a96f72bfbd301974b6ab4",
+      "sha": "4ef5ed9ebe75a330de7df19639a042391e037e15",
       "patch": "patches/squid-coa-validation.patch",
-      "patchSha256": "244cd2d8b04b3158665e44f40ebb6d4088a867a052ff5c3a9553d604652fe2d1"
+      "patchSha256": "2cc45bc6555d5bb3e91728840f9de6e73c002c73b270a37732a1499956241c5f"
     },
     "dungeon-clear": {
       "repository": "Zyth45/mod-dungeon-clear",
-      "sha": "081a04f4208056dbb90717a5d10fe1e593943d5b",
+      "sha": "6efb59eae96bcc0730fc083314dd28d55970bbf4",
       "patch": "patches/dungeon-clear-coa-validation.patch",
-      "patchSha256": "4078f8284ef011142c970cb8e812055e370ba858502de82f86a831d16fe1ec66"
+      "patchSha256": "2845d389422e3a59e5c186ecf54b03f64f1dcc22cdef15729b60c354ae72cd6f"
     }
   }
 }
