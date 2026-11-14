@@ -8,7 +8,7 @@ Published releases and previews. Pre-release entries do not change the stable up
 
 Dates follow GitHub publication (UTC); legacy records retain their archived dates. Newest releases first.
 
-## 0.261114.106 (Pre-release) — 2026-11-14
+## 0.261114.106 — 2026-11-14
 
 - Optional extra strength for bots in dungeons and raids.
 - Bot performance metrics and optional scheduling controls are available for testing.
