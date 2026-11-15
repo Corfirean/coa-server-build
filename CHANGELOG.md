@@ -8,7 +8,7 @@ Published releases and previews. Pre-release entries do not change the stable up
 
 Dates follow GitHub publication (UTC); legacy records retain their archived dates. Newest releases first.
 
-## 0.261115.110 (Pre-release) — 2026-11-15
+## 0.261115.110 — 2026-11-15
 
 - Test build of the subclass module for two-headed Ogres.
 - Thin Twins can earn a subclass through their own quest, the Bravery Badge.
