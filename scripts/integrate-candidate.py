@@ -32,10 +32,12 @@ def main():
     git("fetch", "https://github.com/jealous-sound/azerothcore-wotlk-coa.git", "main")
     upstream = git("rev-parse", "FETCH_HEAD")
     git("merge", "--no-edit", upstream)
-    release = json.loads(subprocess.check_output([
-        "gh", "api", "repos/ilusixn/azerothcore-wotlk-coa/releases/latest"], text=True))
-    git("fetch", "https://github.com/ilusixn/azerothcore-wotlk-coa.git", "refs/tags/" + release["tag_name"])
-    git("merge", "--no-edit", git("rev-parse", "FETCH_HEAD"))
+    # Custom Races V2 (races-source.json) is already merged from its server sources; only the old fork is followed here.
+    if not (Path(__file__).resolve().parent.parent / "races-source.json").exists():
+        release = json.loads(subprocess.check_output([
+            "gh", "api", "repos/ilusixn/azerothcore-wotlk-coa/releases/latest"], text=True))
+        git("fetch", "https://github.com/ilusixn/azerothcore-wotlk-coa.git", "refs/tags/" + release["tag_name"])
+        git("merge", "--no-edit", git("rev-parse", "FETCH_HEAD"))
     # A new upstream module SQL path requires explicit adaptation into pending_db.
     new_paths = git("diff", "--name-only", "origin/coa-bots", "HEAD").splitlines()
     if any(p.startswith("modules/mod-coa-custom-races/data/sql/") for p in new_paths):

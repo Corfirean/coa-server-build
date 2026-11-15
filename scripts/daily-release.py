@@ -28,8 +28,13 @@ def freeze_external(components):
 
 
 def resolve(core_ref="coa-bots", manager_ref="master", bots_ref="master", scaling_ref="main", squid_ref="latest-release", upstream_ref="main", races_ref="latest-release", experimental_portable=False):
-    races_path = "latest" if races_ref == "latest-release" else "tags/" + races_ref
-    races = gh("repos/ilusixn/azerothcore-wotlk-coa/releases/" + races_path)
+    pinned = races_source()
+    if pinned and races_ref in ("latest-release", pinned["tag"]):
+        races_repository, races_path = pinned["repository"], "tags/" + pinned["tag"]
+    else:
+        races_repository = "ilusixn/azerothcore-wotlk-coa"
+        races_path = "latest" if races_ref == "latest-release" else "tags/" + races_ref
+    races = gh(f"repos/{races_repository}/releases/" + races_path)
     tags = gh("repos/Zyth45/mod-playerbots/tags?per_page=100")
     import re
     stable = [t for t in tags if re.fullmatch(r"v\d+\.\d+(?:\.\d+)?", t["name"])]
@@ -42,7 +47,7 @@ def resolve(core_ref="coa-bots", manager_ref="master", bots_ref="master", scalin
         "bots": {"repository": "Corfirean/mod-coa-playerbots", "ref": bots_ref},
         "scaling": {"repository": "Corfirean/mod-coa-content-scaling", "ref": scaling_ref},
         "manager": {"repository": "Corfirean/coa-server-manager", "ref": manager_ref},
-        "races": {"repository": "ilusixn/azerothcore-wotlk-coa", "ref": races["tag_name"]},
+        "races": {"repository": races_repository, "ref": races["tag_name"]},
         "squid": {"repository": "Zyth45/mod-playerbots", "ref": squid["name"] if squid_ref == 'latest-release' else squid_ref},
     }
     pipeline_sha = os.environ.get('GITHUB_SHA') or subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
@@ -60,6 +65,10 @@ def resolve(core_ref="coa-bots", manager_ref="master", bots_ref="master", scalin
     if any(not a["digest"] or not a["digest"].startswith("sha256:")
            for a in components["races"]["assets"]):
         raise RuntimeError("Custom race assets need SHA256 digests before release")
+    if pinned and races_repository == pinned["repository"]:
+        # V2 keeps its client in CustomRacesCoa; the server sources that went into the core are listed separately.
+        components["races"]["server"] = pinned["server"]
+        components["races"]["provenance"] = pinned.get("provenance", [])
     navigation = Path(__file__).resolve().parent.parent / 'navigation-source.json'
     if navigation.exists():
         components['navigation'] = json.loads(navigation.read_text(encoding='utf-8'))
@@ -71,6 +80,12 @@ def resolve(core_ref="coa-bots", manager_ref="master", bots_ref="master", scalin
     return lock
 
 
+def races_source():
+    """The pinned Custom Races release (races-source.json), or None for the original fork's releases."""
+    path = Path(__file__).resolve().parent.parent / 'races-source.json'
+    return json.loads(path.read_text(encoding='utf-8')) if path.exists() else None
+
+
 def snapshot(components):
     identity = {name: {k: v for k, v in component.items() if k != 'ref'}
                 for name, component in components.items()}
@@ -79,8 +94,11 @@ def snapshot(components):
 
 def check_integration(lock):
     core = lock["components"]["core"]
-    for name in ("upstream", "races"):
-        sha = lock["components"][name]["sha"]
+    races = lock["components"]["races"]
+    # A release with its own server sources (V2) is checked by those; the client repository shares no history.
+    checks = [("upstream", lock["components"]["upstream"]["sha"])]
+    checks += ([("races", server["sha"]) for server in races["server"]] if races.get("server") else [("races", races["sha"])])
+    for name, sha in checks:
         comparison = gh(f"repos/{core['repository']}/compare/{sha}...{core['sha']}")
         if comparison["status"] not in ("ahead", "identical"):
             raise RuntimeError(f"{name} {sha} has not been integrated into coa-bots")

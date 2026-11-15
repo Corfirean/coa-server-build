@@ -74,6 +74,10 @@ def apply(folder, lock_path, sources_folder, platform, tool, schema_base=None):
 
 
 def minimum_manager(requested, client_patch_version, isolated_validation=False):
+    newest = lambda *versions: max(versions, key=lambda version: tuple(int(part) for part in version.split('.')))
+    # Custom Races V2 has its own client (CoACustomRace.exe, 76 archives); earlier Managers install the 1.9.2 one.
+    if tuple(int(part) for part in client_patch_version.split('.')) >= (2, 0):
+        return newest(requested, '0.9.13')
     if isolated_validation:
         return max((requested, '0.9.8'), key=lambda version: tuple(int(part) for part in version.split('.')))
     # Earlier public Managers treated test coverage as an exclusive allowlist.

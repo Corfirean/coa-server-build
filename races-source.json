@@ -1,0 +1,29 @@
+{
+  "repository": "ilusixn/CustomRacesCoa",
+  "tag": "coa-custom-2.0",
+  "comment": "Custom Races V2: the client and server-data release, and the server sources merged into the core.",
+  "server": [
+    {
+      "repository": "stefanw1337/azerothcore-wotlk-coa",
+      "branch": "stefanw1337-subclassing-test",
+      "sha": "ccea52d17a27482784e705e9cc913b68dedd9f85"
+    }
+  ],
+  "provenance": [
+    {
+      "repository": "ilusixn/Fading-Islands-Restore",
+      "sha": "e150de1cb496314af752e98021e57ca93d5d799d",
+      "used": "server/core-patches"
+    },
+    {
+      "repository": "ilusixn/Custom-Race-3.3.5a",
+      "sha": "ac907655bd43dec2eff1b4ff509f7fb574325c58",
+      "used": "server/core racials"
+    },
+    {
+      "repository": "ilusixn/ilusixn-dev-menu",
+      "sha": "ea50a8533a3402c69c8773677db1027ec1180d2c",
+      "used": "modules/mod-ilusixn-devmenu"
+    }
+  ]
+}
