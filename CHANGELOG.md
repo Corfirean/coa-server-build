@@ -8,6 +8,17 @@ Published releases and previews. Pre-release entries do not change the stable up
 
 Dates follow GitHub publication (UTC); legacy records retain their archived dates. Newest releases first.
 
+## 0.261116.112 (Pre-release) — 2026-11-16
+
+- Custom races stay on when an update changes the race catalog.
+- Server support for companion bots on Wildcard and Warcraft Reborn.
+- Custom-race characters stay out of the world while custom races are off.
+- Companion bots play Wildcard and Warcraft Reborn.
+- Stopping the server no longer leaves the world running now and then.
+- The server includes a native launcher for the world supervisor.
+
+[Release](https://github.com/Corfirean/coa-server-build/releases/tag/server-0.261116.112) · [Source changes](https://github.com/Corfirean/coa-server-build/compare/server-0.261115.110...server-0.261116.112)
+
 ## 0.261115.110 — 2026-11-15
 
 - Test build of the subclass module for two-headed Ogres.
