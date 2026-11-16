@@ -8,7 +8,7 @@ Published releases and previews. Pre-release entries do not change the stable up
 
 Dates follow GitHub publication (UTC); legacy records retain their archived dates. Newest releases first.
 
-## 0.261116.112 (Pre-release) — 2026-11-16
+## 0.261116.112 — 2026-11-16
 
 - Custom races stay on when an update changes the race catalog.
 - Server support for companion bots on Wildcard and Warcraft Reborn.
