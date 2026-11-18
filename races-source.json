@@ -1,12 +1,12 @@
 {
   "repository": "ilusixn/CustomRacesCoa",
-  "tag": "coa-custom-2.0",
+  "tag": "coa-custom-2.0.2",
   "comment": "Custom Races V2: the client and server-data release, and the server sources merged into the core.",
   "server": [
     {
       "repository": "stefanw1337/azerothcore-wotlk-coa",
       "branch": "stefanw1337-subclassing-test",
-      "sha": "ccea52d17a27482784e705e9cc913b68dedd9f85"
+      "sha": "43ce0aa707fb371f8e532541a579ea2eb7c803c5"
     }
   ],
   "provenance": [
