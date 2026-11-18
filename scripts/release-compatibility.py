@@ -75,6 +75,10 @@ def apply(folder, lock_path, sources_folder, platform, tool, schema_base=None):
 
 def minimum_manager(requested, client_patch_version, isolated_validation=False):
     newest = lambda *versions: max(versions, key=lambda version: tuple(int(part) for part in version.split('.')))
+    # Custom Races 2.0.2 adds the retail body cache, the subclass client patches and the newer subclass addon; only
+    # Manager 0.9.15 installs that client, earlier Managers would leave 2.0 beside a 2.0.2 server.
+    if tuple(int(part) for part in client_patch_version.split('.')) >= (2, 0, 2):
+        return newest(requested, '0.9.15')
     # Custom Races V2 has its own client (CoACustomRace.exe, 76 archives); earlier Managers install the 1.9.2 one.
     if tuple(int(part) for part in client_patch_version.split('.')) >= (2, 0):
         return newest(requested, '0.9.13')

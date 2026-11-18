@@ -16,6 +16,8 @@ class CompatibilityTests(unittest.TestCase):
     def test_custom_races_v2_requires_a_manager_that_installs_its_client(self):
         self.assertEqual(compatibility.minimum_manager('0.9.12', '2.0', isolated_validation=True), '0.9.13')
         self.assertEqual(compatibility.minimum_manager('0.10.0', '2.0'), '0.10.0')
+        self.assertEqual(compatibility.minimum_manager('0.9.13', '2.0.2'), '0.9.15')
+        self.assertEqual(compatibility.minimum_manager('0.10.0', '2.0.2'), '0.10.0')
 
     def test_population_safe_validation_requires_the_new_manager_without_lowering_a_newer_floor(self):
         self.assertEqual(compatibility.minimum_manager('0.9.7', '1.9.2', isolated_validation=True), '0.9.8')
