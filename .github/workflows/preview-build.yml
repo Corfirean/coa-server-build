@@ -103,11 +103,30 @@ jobs:
           if (-not $ssl) { throw 'No OpenSSL development install on the runner image.' }
           "OPENSSL_ROOT_DIR=$ssl" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
-      - name: MSVC environment (pinned toolset)
-        uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: x64
-          toolset: ${{ steps.pin.outputs.toolset }}
+      - name: MSVC toolset of the Visual Studio 18 stable channel (what the Manager installs)
+        shell: pwsh
+        env:
+          TOOLSET: ${{ steps.pin.outputs.toolset }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $bt = Join-Path $env:RUNNER_TEMP 'vs_buildtools.exe'
+          Invoke-WebRequest -UseBasicParsing -Uri 'https://aka.ms/vs/18/stable/vs_buildtools.exe' -OutFile $bt
+          $sig = Get-AuthenticodeSignature -FilePath $bt
+          if ($sig.Status -ne 'Valid' -or $sig.SignerCertificate.Subject -notmatch 'O=Microsoft Corporation') { throw "vs_buildtools.exe is not signed by Microsoft ($($sig.Status))" }
+          $path = 'C:\BuildTools\18-ci'
+          $a = @('--installPath', ('"' + $path + '"'), '--quiet', '--wait', '--norestart', '--nocache')
+          foreach ($c in 'Microsoft.VisualStudio.Component.VC.14.44.17.14.x86.x64', 'Microsoft.VisualStudio.Component.VC.CoreBuildTools', 'Microsoft.VisualStudio.Component.Windows11SDK.26100', 'Microsoft.VisualStudio.Component.VC.CMake.Project') { $a += @('--add', $c) }
+          $p = Start-Process -FilePath $bt -ArgumentList $a -Wait -PassThru
+          if ($p.ExitCode -ne 0 -and $p.ExitCode -ne 3010) { throw "vs_buildtools.exe exited with $($p.ExitCode)" }
+          $vcvars = Join-Path $path 'VC\Auxiliary\Build\vcvars64.bat'
+          if (-not (Test-Path $vcvars)) { throw "missing $vcvars" }
+          $lines = cmd /c "`"$vcvars`" -vcvars_ver=$env:TOOLSET >nul && set"
+          if ($LASTEXITCODE) { throw "vcvars64.bat failed with exit code $LASTEXITCODE" }
+          foreach ($l in $lines) {
+              if ($l -match '^([A-Za-z_][A-Za-z0-9_()]*)=(.*)$') {
+                  "$($Matches[1])=$($Matches[2])" >> $env:GITHUB_ENV
+              }
+          }
 
       - name: Compiler
         shell: pwsh
