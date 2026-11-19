@@ -8,6 +8,65 @@ Published releases and previews. Pre-release entries do not change the stable up
 
 Dates follow GitHub publication (UTC); legacy records retain their archived dates. Newest releases first.
 
+## 0.261119.114 (Pre-release) — 2026-11-19
+
+- Bot plans can tell a bot to ignore a quest.
+- Bots keep to the first quest on their plan instead of wandering off.
+- Now in Bot plans sends a bot to a far quest, also to hand it in.
+- Bot plans list every quest and let you change their order.
+- Bot plans show each bot's own quest counts.
+- Bots walk up to a quest object they can see instead of pacing far from it.
+- Bots no longer slide through the terrain after a fall.
+- New option to keep bots off slopes too steep for players.
+- Bots on a flying mount no longer run straight through mountains on the ground.
+- Test bots of every race can carry a subclass.
+- Dead Rebel Warriors stop sparkling once you carry all five armor pieces.
+- Fading Island ferries keep moving and no longer drag fallen players along.
+- LiveMon logs fights and ranks abilities, builds and buffs.
+- Drakonid and Grummle characters are always male.
+- Two-Players boons and other one-target buffs stay on the head that cast them.
+- A Two-Players bot body mounts up for long trips, and a Ride button.
+- Stay now stops a bot that steers the Two-Players body.
+- A bot playing the other Two-Players head shows up in your party again.
+- A Two-Players body with a bot head loots every corpse.
+- A Two-Players bot body no longer mounts just before a fight, loot or a rest.
+- A Two-Players bot body opens chests and worldforged finds it passes.
+- A renewed buff on one Two-Players head now renews it on the other head too.
+- Two-Players courier bag lets you choose what the courier sells.
+- The Ranged Head's shared gear shows as frozen again after logging in.
+- Two-Players frozen gear shows its ice in the CoA character window and stays put.
+- Two-Players says when a quest item can't be shared because the bags are full.
+- Two-Players heads release together and the Ranged Head's spirit stays with the body.
+- A Two-Players courier sells both heads' junk, no vendor needed.
+- The Two-Headed Ogre's carried kart and mammoth bring their passengers along.
+- A Two-Players pair keeps one Primalist boon, and switching it sticks.
+- A fallen Two-Players body leaves one corpse, not two.
+- The seated Two-Players head can buff and heal the body again.
+- A seated head no longer gets "Target needs to be in front of you.
+- A Two-Players head can renew a buff that both heads share.
+- The Ranged Head comes back to life already inside the shared body.
+- The seated Two-Players head dies with the body again.
+- Two-Players heads join up again in combat and when the body runs off.
+- Two-Players heads share their quests.
+- The Ranged Head's camera follows the body's turns smoothly.
+- The Two-Headed Ogre keeps its other head when it carries a vehicle mount.
+- Questing bots fetch quest items and use them on friendly NPCs, such as feeding Kyle.
+- Questing bots pick up quest objects such as Ambercorn instead of pacing beside them.
+- The subclass installer says where to unpack it instead of failing with a bare path error.
+- Bonk Heads! breathes a Dragon's Breath cone instead of single spells.
+- Bonk Heads! lights up on the action bar when the heads are ready.
+- Two-Players no longer tries to call a bot head when the server's bots are switched off.
+- The courier bag now lists both heads' items and marking items works.
+- The courier can sell every white, green, blue or epic item the two heads carry.
+- The courier can sell a single item right away.
+- Sell junk on the other head's bot sheet sends the courier.
+- Two-Headed Ogres start in Mulgore and Thin Twins in Northshire again.
+- The Two-Headed Ogres and the Thin Twins start in Mulgore and Northshire, and Custom Races 2.0.2 sources are in.
+- Updated Custom Races to 2.0.2.
+- Updated the reviewed CoA upstream snapshot.
+
+[Release](https://github.com/Corfirean/coa-server-build/releases/tag/server-0.261119.114) · [Source changes](https://github.com/Corfirean/coa-server-build/compare/server-0.261116.112...server-0.261119.114)
+
 ## 0.261116.112 — 2026-11-16
 
 - Custom races stay on when an update changes the race catalog.
