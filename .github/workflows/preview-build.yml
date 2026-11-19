@@ -120,9 +120,9 @@ jobs:
           Write-Host "vs_buildtools.exe exit code $($p.ExitCode)"
           $vcvars = Join-Path $path 'VC\Auxiliary\Build\vcvars64.bat'
           if (($p.ExitCode -ne 0 -and $p.ExitCode -ne 3010) -or -not (Test-Path $vcvars)) {
-              Get-ChildItem $path -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "  $($_.FullName)" }
-              Get-ChildItem $env:TEMP -Filter 'dd_*.log' -ErrorAction SilentlyContinue | Sort-Object LastWriteTime | Select-Object -Last 3 | ForEach-Object { Write-Host "== $($_.FullName)"; Get-Content $_.FullName -Tail 40 }
-              Get-Process | Where-Object { $_.Name -match 'vs_|setup|installer' } | ForEach-Object { Write-Host "running: $($_.Name)" }
+              Get-ChildItem (Join-Path $path 'VC') -Recurse -Depth 3 -Directory -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "  $($_.FullName)" }
+              Get-ChildItem $path -Recurse -Filter 'vcvars*.bat' -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "found $($_.FullName)" }
+              Get-ChildItem $path -Recurse -Filter 'cl.exe' -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "found $($_.FullName)" }
               throw "Build Tools were not installed (exit code $($p.ExitCode); $vcvars)"
           }
           $lines = cmd /c "`"$vcvars`" -vcvars_ver=$env:TOOLSET >nul && set"
