@@ -8,7 +8,7 @@ Published releases and previews. Pre-release entries do not change the stable up
 
 Dates follow GitHub publication (UTC); legacy records retain their archived dates. Newest releases first.
 
-## 0.261119.114 (Pre-release) — 2026-11-19
+## 0.261119.114 — 2026-11-19
 
 - Bot plans can tell a bot to ignore a quest.
 - Bots keep to the first quest on their plan instead of wandering off.
