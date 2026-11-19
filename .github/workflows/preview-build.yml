@@ -117,9 +117,14 @@ jobs:
           $a = @('--installPath', ('"' + $path + '"'), '--quiet', '--wait', '--norestart', '--nocache')
           foreach ($c in 'Microsoft.VisualStudio.Component.VC.14.44.17.14.x86.x64', 'Microsoft.VisualStudio.Component.VC.CoreBuildTools', 'Microsoft.VisualStudio.Component.Windows11SDK.26100', 'Microsoft.VisualStudio.Component.VC.CMake.Project') { $a += @('--add', $c) }
           $p = Start-Process -FilePath $bt -ArgumentList $a -Wait -PassThru
-          if ($p.ExitCode -ne 0 -and $p.ExitCode -ne 3010) { throw "vs_buildtools.exe exited with $($p.ExitCode)" }
+          Write-Host "vs_buildtools.exe exit code $($p.ExitCode)"
           $vcvars = Join-Path $path 'VC\Auxiliary\Build\vcvars64.bat'
-          if (-not (Test-Path $vcvars)) { throw "missing $vcvars" }
+          if (($p.ExitCode -ne 0 -and $p.ExitCode -ne 3010) -or -not (Test-Path $vcvars)) {
+              Get-ChildItem $path -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "  $($_.FullName)" }
+              Get-ChildItem $env:TEMP -Filter 'dd_*.log' -ErrorAction SilentlyContinue | Sort-Object LastWriteTime | Select-Object -Last 3 | ForEach-Object { Write-Host "== $($_.FullName)"; Get-Content $_.FullName -Tail 40 }
+              Get-Process | Where-Object { $_.Name -match 'vs_|setup|installer' } | ForEach-Object { Write-Host "running: $($_.Name)" }
+              throw "Build Tools were not installed (exit code $($p.ExitCode); $vcvars)"
+          }
           $lines = cmd /c "`"$vcvars`" -vcvars_ver=$env:TOOLSET >nul && set"
           if ($LASTEXITCODE) { throw "vcvars64.bat failed with exit code $LASTEXITCODE" }
           foreach ($l in $lines) {
