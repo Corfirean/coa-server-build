@@ -35,6 +35,7 @@ cp "$bots/module/conf/mod_coa_playerbots.conf.dist" "$out/Core/configs/modules/"
 # drops the connection after login. Only templates are shipped; the Manager creates the active files, and it leaves the
 # bug-report one off until the owner configures it.
 for f in "$core"/src/server/coa/conf/*.conf.dist; do cp "$f" "$out/Core/configs/modules/"; done
+python3 "$(dirname "$0")/package-mod-pbc.py" --module "$core/modules/mod-pbc" --out "$out"
 # Both bot modules compile together, but SQUID starts disabled on a new installation.
 squid_conf="$out/Core/configs/modules/playerbots.conf.dist"
 sed -i -E 's/^AiPlayerbot\.Enabled[[:space:]]*=[[:space:]]*1[[:space:]]*(\r?)$/AiPlayerbot.Enabled = 0\1/' "$squid_conf"

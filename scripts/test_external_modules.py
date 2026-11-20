@@ -19,19 +19,27 @@ class ExternalModuleTests(unittest.TestCase):
             pipeline = root / "pipeline"
             (pipeline / "patches").mkdir(parents=True)
             modules = {}
-            for name, folder in (("squid", "mod-playerbots"), ("dungeon-clear", "mod-dungeon-clear")):
+            for name, folder in external.MODULE_FOLDERS.items():
                 target = root / "core/modules" / folder
                 target.mkdir(parents=True)
                 external.git(target, "init")
                 external.git(target, "config", "core.autocrlf", "false")
                 (target / "source.txt").write_bytes(b"original\n")
-                external.git(target, "add", "source.txt")
+                (target / ".gitignore").write_bytes(b"*.sql\n")
+                external.git(target, "add", "source.txt", ".gitignore")
                 external.git(target, "-c", "user.name=Test", "-c", "user.email=test@example.invalid",
                              "commit", "-m", "Fixture")
                 sha = external.git(target, "rev-parse", "HEAD").decode().strip()
-                (target / "source.txt").write_bytes(b"patched\n")
+                created = target / "new.sql"
+                if name == "mod-pbc":
+                    created.write_bytes(b"SELECT 1;\n")
+                    external.git(target, "add", "-f", "new.sql")
+                else:
+                    (target / "source.txt").write_bytes(b"patched\n")
                 patch = external.git(target, "diff", "--binary", "--full-index", "HEAD", "--")
                 external.git(target, "config", "core.abbrev", "20")
+                if created.exists():
+                    external.git(target, "rm", "-f", "new.sql")
                 (target / "source.txt").write_bytes(b"original\n")
                 filename = "patches/" + name + ".patch"
                 (pipeline / filename).write_bytes(patch)
@@ -46,6 +54,7 @@ class ExternalModuleTests(unittest.TestCase):
                 external.prepare(root / "core")
                 target = root / "core/modules/mod-playerbots/source.txt"
                 self.assertEqual(target.read_bytes(), b"patched\n")
+                self.assertEqual((root / "core/modules/mod-pbc/new.sql").read_bytes(), b"SELECT 1;\n")
                 target.write_bytes(b"unexpected\n")
                 with self.assertRaisesRegex(RuntimeError, "unexpected changes"):
                     external.prepare(root / "core")

@@ -32,6 +32,8 @@ Copy-Item "$Bots/module/conf/mod_coa_playerbots.conf.dist" "$Out/Core/configs/mo
 # The CoA compatibility settings live in the core, not in a module folder. They must be active: without CoA.Enable = 1
 # the world server rejects the Ascension client's extension packets and drops the connection after login.
 Copy-Item "$Core/src/server/coa/conf/coa.conf.dist" "$Out/Core/configs/modules/" -Force
+python "$PSScriptRoot/package-mod-pbc.py" --module "$Core/modules/mod-pbc" --out $Out
+if ($LASTEXITCODE -ne 0) { throw 'Playerbot Characters packaging failed.' }
 # Both bot modules compile together, but SQUID starts disabled on a new installation.
 $squidConfig = "$Out/Core/configs/modules/playerbots.conf.dist"
 (Get-Content $squidConfig -Raw) -replace '(?m)^AiPlayerbot.Enabled\s*=\s*1\s*$', 'AiPlayerbot.Enabled = 0' |
