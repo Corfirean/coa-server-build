@@ -28,9 +28,11 @@ def package(module, out):
     (assets / "README.txt").write_text(
         "Playerbot Characters\n\n"
         "In CoA Server Manager, open Modules and the Playerbot Characters settings. Choose a provider,\n"
-        "enter your model and API key if needed, then save the connection. Enable the module and restart.\n"
+        "enter an API key if needed, and choose a chat model. Save the connection, enable the module and restart.\n"
         "Run .chars connection-test in game with a GM account, then summon a companion and whisper it.\n\n"
-        "For manual setup, copy an example from connection-examples to my-connection.jsonc in this folder.\n\n"
+        "For manual setup, copy an example from connection-examples to my-connection.jsonc in this folder.\n"
+        "Set PBC.DefaultConnection in Core/configs/modules/playerbots_characters.conf to\n"
+        '"../Extras/PlayerbotCharacters/my-connection.jsonc".\n\n'
         "Model setup guide\nhttps://github.com/deseven/mod-pbc/blob/main/docs/CONNECTIONS.md\n",
         encoding="utf-8",
     )
@@ -40,7 +42,8 @@ def package(module, out):
     relative = "../Extras/PlayerbotCharacters"  # worldserver runs from Core/.
     defaults = {
         "PBC.Enable": "0",
-        "PBC.DefaultConnection": f'"{relative}/my-connection.jsonc"',
+        # An empty default keeps older installations' inline API settings usable.
+        "PBC.DefaultConnection": '""',
         "PBC.PromptsPath": f'"{relative}/prompts"',
         "PBC.CharacterCardsPath": f'"{relative}/cards"',
         "PBC.HttpServerFrontendPath": f'"{relative}/dashboard"',

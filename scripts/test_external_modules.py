@@ -3,6 +3,7 @@ import importlib.util
 import json
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -13,6 +14,33 @@ spec.loader.exec_module(external)
 
 
 class ExternalModuleTests(unittest.TestCase):
+    def test_pbc_package_leaves_the_default_connection_empty_for_legacy_upgrades(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            module = root / "module"
+            files = {
+                "prompts/enUS/CharacterContext.default.txt": "Default prompt",
+                "frontend/dist/index.html": "<html></html>",
+                "characters/Example.card.txt": "Example card",
+                "connections/openai.jsonc.example": "{}",
+                "conf/playerbots_characters.conf.dist": (
+                    'PBC.Enable = 1\nPBC.DefaultConnection = "connections/openai.jsonc"\n'
+                    'PBC.PromptsPath = "prompts"\nPBC.CharacterCardsPath = "characters"\n'
+                    'PBC.HttpServerFrontendPath = "frontend/dist"\n'
+                ),
+                "LICENSE": "Fixture license",
+            }
+            for path, content in files.items():
+                target = module / path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(content, encoding="utf-8")
+            out = root / "out"
+            subprocess.run([sys.executable, "-B", Path(__file__).with_name("package-mod-pbc.py"),
+                            "--module", module, "--out", out], check=True)
+            conf = (out / "Core/configs/modules/playerbots_characters.conf.dist").read_text(encoding="utf-8")
+            self.assertIn('PBC.DefaultConnection = ""', conf.splitlines())
+            self.assertIn("PBC.Enable = 0", conf.splitlines())
+
     def test_patches_are_pinned_idempotent_and_reject_unexpected_changes(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

@@ -58,6 +58,7 @@ Copy-Item "$Core/modules/mod-dungeon-clear/README.md" "$Out/Extras/DungeonClear/
 $external = Get-Content "$PSScriptRoot/../external-modules.json" -Raw | ConvertFrom-Json
 Copy-Item "$PSScriptRoot/../external-modules.json" "$Out/Extras/DungeonClear/sources.json" -Force
 $dungeonSha = $external.modules.'dungeon-clear'.sha
+$pbcSha = $external.modules.'mod-pbc'.sha
 $pipelineSha = & git -C "$PSScriptRoot/.." rev-parse HEAD
 if ($LASTEXITCODE -ne 0) { throw 'Cannot identify the pipeline source for module patches.' }
 # Every module reads configs/modules/<name>.conf. Ship an active copy of each .dist (created only when missing on
@@ -103,10 +104,12 @@ Server binaries (Core\worldserver.exe, Core\authserver.exe) were built from:
   bots  https://github.com/Corfirean/mod-coa-playerbots       commit $BotsSha
   squid https://github.com/Zyth45/mod-playerbots             commit $SquidSha (with the CoA validation patch)
   dungeon-clear https://github.com/Zyth45/mod-dungeon-clear  commit $dungeonSha (with the CoA activation guard)
+  mod-pbc https://github.com/deseven/mod-pbc                 commit $pbcSha (with the CoA database migration)
   patches https://github.com/Corfirean/coa-server-build/tree/$pipelineSha/patches
   scaling https://github.com/Corfirean/mod-coa-content-scaling commit $ScalingSha (with its TBC and WotLK content packs)
 The core keeps its upstream licences (GPL-2.0-or-later for the MaNGOS-derived parts, AGPL-3.0 for AzerothCore-original
-files); the bots module and CoA Server Manager are AGPL-3.0; the Content Scaling module is GPL-2.0. The complete corresponding source is at the links above.
+files); the bots module and CoA Server Manager are AGPL-3.0; the Content Scaling module is GPL-2.0; mod-pbc is distributed
+under the Unlicense. The complete corresponding source is at the links above.
 
 Custom races integration includes contributions from ilusixn and Kalibros / Esteria.
 
