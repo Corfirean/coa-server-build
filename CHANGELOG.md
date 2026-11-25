@@ -8,6 +8,41 @@ Published releases and previews. Pre-release entries do not change the stable up
 
 Dates follow GitHub publication (UTC); legacy records retain their archived dates. Newest releases first.
 
+## 0.261125.124 (Pre-release) — 2026-11-25
+
+- The Twins' brother sits on the back of every Ghost Wolf and Travel Form look.
+- Game masters can move the Thin Twins brother's seats live.
+- The head picked at Two-Players creation decides who leads the pair.
+- A seated Two-Players head rests with the body and can log out at once in towns.
+- Two-Players brothers of the same class share one class resource.
+- The Two-Players Twins show the right brother on the character screen.
+- The second brother of a paired Two-Players Twin picks his own outfit.
+- Paired Twins are shown as "Warken & Flarken".
+- A paired Two-Players brother walks beside the first instead of riding on his head.
+- Two-Players Twins can send a pair request from the player menu.
+- A paired Two-Players brother hops on his brother's back and rides in the saddle again.
+- The paired second brother is dressed and the brothers pair up again after a relog.
+- The Thin Twins brother no longer turns green after a shapeshift.
+- A whisper to a Two-Players pair reaches both heads.
+- Custom race characters keep their skin and hair after leaving a shapeshift form.
+- Bonk Heads! speaks of brothers for the Two-Players Twins.
+- The Twins get One Lazy Thin, a racial that turns them back into Kul Tirans.
+- Custom Races 2.0.3 adds the Snagtooth to the Alliance.
+- The Ride button shows only for the head that can use it.
+- Bots drink real drinks to recover mana and use potions in combat.
+- Scripted dungeon runs for bot groups, off by default.
+- Reborn bots spend talent points, keep pets and buffs up, and fight with more abilities.
+- CoABotInspector addon shows what each bot is doing.
+- Bots and bot accounts are created only when you ask for them.
+- Bots are no longer created with a race that cannot be played.
+- Playerbot Characters is available as an optional server module.
+- SQUID Playerbots 3.2.1 and Dungeon Clear 3.1.4.
+- Updated Custom Races to 2.0.3.
+- Updated SQUID Playerbots to 3.2.1.
+- Updated the reviewed CoA upstream snapshot.
+
+[Release](https://github.com/Corfirean/coa-server-build/releases/tag/server-0.261125.124) · [Source changes](https://github.com/Corfirean/coa-server-build/compare/server-0.261119.114...server-0.261125.124)
+
 ## 0.261119.114 — 2026-11-19
 
 - Bot plans can tell a bot to ignore a quest.
