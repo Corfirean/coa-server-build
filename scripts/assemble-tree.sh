@@ -35,6 +35,7 @@ cp "$bots/module/conf/mod_coa_playerbots.conf.dist" "$out/Core/configs/modules/"
 # drops the connection after login. Only templates are shipped; the Manager creates the active files, and it leaves the
 # bug-report one off until the owner configures it.
 for f in "$core"/src/server/coa/conf/*.conf.dist; do cp "$f" "$out/Core/configs/modules/"; done
+python3 "$(dirname "$0")/package-mod-pbc.py" --module "$core/modules/mod-pbc" --out "$out"
 # Both bot modules compile together, but SQUID starts disabled on a new installation.
 squid_conf="$out/Core/configs/modules/playerbots.conf.dist"
 sed -i -E 's/^AiPlayerbot\.Enabled[[:space:]]*=[[:space:]]*1[[:space:]]*(\r?)$/AiPlayerbot.Enabled = 0\1/' "$squid_conf"
@@ -51,6 +52,7 @@ mkdir -p "$out/Extras/DungeonClear"
 cp "$core/modules/mod-dungeon-clear/README.md" "$out/Extras/DungeonClear/UPSTREAM-README.md"
 cp "$(dirname "$0")/../external-modules.json" "$out/Extras/DungeonClear/sources.json"
 dungeon_sha=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["modules"]["dungeon-clear"]["sha"])' "$(dirname "$0")/../external-modules.json")
+pbc_sha=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["modules"]["mod-pbc"]["sha"])' "$(dirname "$0")/../external-modules.json")
 pipeline_sha=$(git -C "$(dirname "$0")/.." rev-parse HEAD)
 # Only the .dist files are shipped: coa-release leaves active .conf files out of the package, and the Manager creates
 # them from the .dist ones.
@@ -77,10 +79,12 @@ Server binaries (Core/worldserver, Core/authserver) were built from:
   bots  https://github.com/Corfirean/mod-coa-playerbots       commit $bots_sha
   squid https://github.com/Zyth45/mod-playerbots             commit $squid_sha (with the CoA validation patch)
   dungeon-clear https://github.com/Zyth45/mod-dungeon-clear  commit $dungeon_sha (with the CoA activation guard)
+  mod-pbc https://github.com/deseven/mod-pbc                 commit $pbc_sha (with the CoA database migration)
   patches https://github.com/Corfirean/coa-server-build/tree/$pipeline_sha/patches
   scaling https://github.com/Corfirean/mod-coa-content-scaling commit $scaling_sha (with its TBC and WotLK content packs)
 The core keeps its upstream licences (GPL-2.0-or-later for the MaNGOS-derived parts, AGPL-3.0 for AzerothCore-original
-files); the bots module and CoA Server Manager are AGPL-3.0; the Content Scaling module is GPL-2.0. The complete corresponding source is at the links above.
+files); the bots module and CoA Server Manager are AGPL-3.0; the Content Scaling module is GPL-2.0; mod-pbc is distributed
+under the Unlicense. The complete corresponding source is at the links above.
 
 Custom races integration includes contributions from ilusixn and Kalibros / Esteria.
 
