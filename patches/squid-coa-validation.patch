@@ -1,8 +1,8 @@
 diff --git a/src/Ai/Coa/Economy/AuctionHouse/CoaAuctionHouseBotHooks.cpp b/src/Ai/Coa/Economy/AuctionHouse/CoaAuctionHouseBotHooks.cpp
-index 9698a03..578e70e 100644
+index f13bcc1038733eb989faa05a98620001f2900c97..de707a6cdce0619a216996de6aed0a8b9fcdd378 100644
 --- a/src/Ai/Coa/Economy/AuctionHouse/CoaAuctionHouseBotHooks.cpp
 +++ b/src/Ai/Coa/Economy/AuctionHouse/CoaAuctionHouseBotHooks.cpp
-@@ -254,11 +254,9 @@ public:
+@@ -259,11 +259,9 @@ public:
  
  void AddSC_coa_economy_ahbot()
  {
@@ -19,58 +19,44 @@ index 9698a03..578e70e 100644
 +    static_cast<void>(sizeof(CoaAhBotWorldHooks) + sizeof(CoaAhBotAuctionHooks) + sizeof(CoaAhBotMailHooks) + sizeof(CoaAhBotCommands));
 +    LOG_INFO("server.loading", "SquidBots auction house bot: not loaded, the core's auction house bot is used");
  }
-diff --git a/src/PlayerbotAIConfig.cpp b/src/PlayerbotAIConfig.cpp
-index 36b7bb5..553c51b 100644
---- a/src/PlayerbotAIConfig.cpp
-+++ b/src/PlayerbotAIConfig.cpp
-@@ -1042,6 +1042,16 @@ bool PlayerbotAIConfig::Initialize()
-     LoadCoaEconomyConfig();
-     LoadCoaCombatConfig();
+diff --git a/src/Mgr/Move/FleeManager.cpp b/src/Mgr/Move/FleeManager.cpp
+index bc058c805fff685963a2f8ee3505b6bb48505fc4..5f82bde9dbdf33b1d752cb10212ed92019f1f080 100644
+--- a/src/Mgr/Move/FleeManager.cpp
++++ b/src/Mgr/Move/FleeManager.cpp
+@@ -54,6 +54,9 @@ bool intersectsOri(float angle, std::vector<float>& angles, float angleIncrement
  
-+    validationMode = sConfigMgr->GetOption<bool>("CoA.ValidationMode", false, false);
-+    if (validationMode)
-+    {
-+        randomBotAutologin = false;
-+        botAutologin = false;
-+        AiObjectContext::BuildAllSharedContexts();
-+        LOG_INFO("server.loading", "SQUID validation: bot population creation and login are suspended for this startup");
-+        return true;
-+    }
+ void FleeManager::calculatePossibleDestinations(std::vector<FleePoint*>& points)
+ {
++    if (!bot || !startPosition)
++        return;
 +
-     RandomPlayerbotFactory::CreateRandomBots();
-     if (World::IsStopped())
+     PlayerbotAI* botAI = GET_PLAYERBOT_AI(bot);
+     if (!botAI)
      {
-diff --git a/src/PlayerbotAIConfig.h b/src/PlayerbotAIConfig.h
-index 90a1841..6f4fc9d 100644
---- a/src/PlayerbotAIConfig.h
-+++ b/src/PlayerbotAIConfig.h
-@@ -118,6 +118,7 @@ public:
-     bool IsInPvpProhibitedArea(uint32 id);
+diff --git a/src/Mgr/Travel/TravelMgr.cpp b/src/Mgr/Travel/TravelMgr.cpp
+index c853dc9513ba0490fc694cd9eb325f342f1c66ef..a49e4ae54c0af30d184ccc18c25feb3c1d6dd1f2 100644
+--- a/src/Mgr/Travel/TravelMgr.cpp
++++ b/src/Mgr/Travel/TravelMgr.cpp
+@@ -228,7 +228,8 @@ void WorldPosition::setO(float o) { m_orientation = o; }
  
-     bool enabled;
-+    bool validationMode = false;
-     bool disabledWithoutRealPlayer;
-     bool EnableICCBuffs;
-     bool allowAccountBots, allowGuildBots, allowTrustedAccountBots;
-diff --git a/src/Script/Playerbots.cpp b/src/Script/Playerbots.cpp
-index fc0ed97..e5edea9 100644
---- a/src/Script/Playerbots.cpp
-+++ b/src/Script/Playerbots.cpp
-@@ -542,6 +542,8 @@ public:
+ WorldPosition::operator bool() const
+ {
+-    return GetMapId() != 0 || GetPositionX() != 0 || GetPositionY() != 0 || GetPositionZ() != 0;
++    return GetMapId() != MAPID_INVALID &&
++           (GetMapId() != 0 || GetPositionX() != 0 || GetPositionY() != 0 || GetPositionZ() != 0);
+ }
  
-     void OnUpdate(uint32 diff) override
-     {
-+        if (sPlayerbotAIConfig.validationMode)
-+            return;
-         PlayerbotWorldThreadProcessor::instance().Update(diff);
-         sRandomPlayerbotMgr.UpdateAI(diff);  // World thread only
-         sRandomPlayerbotMgr.CoaReleaseOrphanGroups();
-@@ -621,6 +623,8 @@ public:
+ bool operator==(WorldPosition const& p1, WorldPosition const& p2)
+@@ -412,7 +413,11 @@ uint32 WorldPosition::getInstanceId()
  
-     void OnPlayerbotUpdate(uint32 /*diff*/) override
-     {
-+        if (sPlayerbotAIConfig.validationMode)
-+            return;
-         sRandomPlayerbotMgr.UpdateSessions();  // Per-bot updates only
-     }
+ Map* WorldPosition::getMap()
+ {
+-    return sMapMgr->FindMap(GetMapId(), getMapEntry()->Instanceable() ? getInstanceId() : 0);
++    MapEntry const* entry = getMapEntry();
++    if (!entry)
++        return nullptr;
++
++    return sMapMgr->FindMap(GetMapId(), entry->Instanceable() ? getInstanceId() : 0);
+ }
  
+ float WorldPosition::getHeight()  // remove const - whipowill
