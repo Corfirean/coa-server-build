@@ -8,7 +8,7 @@ Published releases and previews. Pre-release entries do not change the stable up
 
 Dates follow GitHub publication (UTC); legacy records retain their archived dates. Newest releases first.
 
-## 0.261125.124 (Pre-release) — 2026-11-25
+## 0.261125.124 — 2026-11-25
 
 - The Twins' brother sits on the back of every Ghost Wolf and Travel Form look.
 - Game masters can move the Thin Twins brother's seats live.
