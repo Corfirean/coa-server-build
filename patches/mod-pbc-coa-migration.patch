@@ -1,0 +1,131 @@
+diff --git a/data/sql/db-characters/2026_11_20_00_mod_pbc.sql b/data/sql/db-characters/2026_11_20_00_mod_pbc.sql
+new file mode 100644
+index 0000000000000000000000000000000000000000..c3bf3e270fff436f65fb1ffc46fbff2bd5629269
+--- /dev/null
++++ b/data/sql/db-characters/2026_11_20_00_mod_pbc.sql
+@@ -0,0 +1,125 @@
++-- Install the current mod-pbc schema through the CoA release migration ledger.
++-- Existing normalized history keeps its IDs and ownership. Retain the old chat table
++-- so operators can still inspect the original records after importing them.
++CREATE TABLE IF NOT EXISTS `mod_pbc_memories` (
++    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
++    `bot_guid` BIGINT UNSIGNED NOT NULL,
++    `memory_text` TEXT NOT NULL,
++    `importance` TINYINT UNSIGNED NOT NULL DEFAULT 5,
++    `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    INDEX `idx_bot_guid_id` (`bot_guid`, `id`),
++    INDEX `idx_bot_importance` (`bot_guid`, `importance` DESC)
++) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
++
++CREATE TABLE IF NOT EXISTS `mod_pbc_data` (
++    `bot_guid` BIGINT UNSIGNED NOT NULL PRIMARY KEY,
++    `roll_chance_modifier` INT NOT NULL DEFAULT 0,
++    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
++) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
++
++SET @pbc_sql = IF(EXISTS (SELECT 1 FROM information_schema.COLUMNS
++    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'mod_pbc_data' AND COLUMN_NAME = 'roll_chance_modifier'),
++    'DO 0', 'ALTER TABLE `mod_pbc_data` ADD COLUMN `roll_chance_modifier` INT NOT NULL DEFAULT 0');
++PREPARE pbc_stmt FROM @pbc_sql;
++EXECUTE pbc_stmt;
++DEALLOCATE PREPARE pbc_stmt;
++
++SET @pbc_sql = IF(EXISTS (SELECT 1 FROM information_schema.COLUMNS
++    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'mod_pbc_data' AND COLUMN_NAME = 'last_location'),
++    'ALTER TABLE `mod_pbc_data` DROP COLUMN `last_location`', 'DO 0');
++PREPARE pbc_stmt FROM @pbc_sql;
++EXECUTE pbc_stmt;
++DEALLOCATE PREPARE pbc_stmt;
++
++CREATE TABLE IF NOT EXISTS `mod_pbc_relationships` (
++    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
++    `bot_guid` BIGINT UNSIGNED NOT NULL,
++    `target_name` VARCHAR(64) NOT NULL,
++    `relationship_text` MEDIUMTEXT NOT NULL,
++    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
++    UNIQUE KEY `uq_bot_target` (`bot_guid`, `target_name`),
++    INDEX `idx_bot_guid` (`bot_guid`)
++) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
++
++SET @pbc_sql = IF(EXISTS (SELECT 1 FROM information_schema.COLUMNS
++    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'mod_pbc_relationships'
++      AND COLUMN_NAME = 'mention_count_at_last_update'),
++    'ALTER TABLE `mod_pbc_relationships` DROP COLUMN `mention_count_at_last_update`', 'DO 0');
++PREPARE pbc_stmt FROM @pbc_sql;
++EXECUTE pbc_stmt;
++DEALLOCATE PREPARE pbc_stmt;
++
++CREATE TABLE IF NOT EXISTS `mod_pbc_history` (
++    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
++    `timestamp` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    `author_guid` BIGINT UNSIGNED NOT NULL DEFAULT 0,
++    `type` TINYINT UNSIGNED NOT NULL DEFAULT 2,
++    `message` MEDIUMTEXT NOT NULL,
++    INDEX `idx_author_guid` (`author_guid`),
++    INDEX `idx_timestamp` (`timestamp`)
++) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
++
++CREATE TABLE IF NOT EXISTS `mod_pbc_history_owners` (
++    `guid` BIGINT UNSIGNED NOT NULL,
++    `history_id` BIGINT UNSIGNED NOT NULL,
++    PRIMARY KEY (`guid`, `history_id`),
++    INDEX `idx_history_id` (`history_id`),
++    CONSTRAINT `fk_history_owner_message` FOREIGN KEY (`history_id`)
++        REFERENCES `mod_pbc_history` (`id`) ON DELETE RESTRICT
++) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
++
++-- Parse the upstream legacy formats and keep unrecognised lines as narrator text.
++CREATE TEMPORARY TABLE `pbc_legacy_messages` (
++    `owner_guid` BIGINT UNSIGNED NOT NULL,
++    `timestamp` DATETIME NOT NULL,
++    `author_guid` BIGINT UNSIGNED NOT NULL,
++    `type` TINYINT UNSIGNED NOT NULL,
++    `message` MEDIUMTEXT NOT NULL
++) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
++
++SET @pbc_sql = IF(EXISTS (SELECT 1 FROM information_schema.TABLES
++    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'mod_pbc_chat_history'),
++    'INSERT INTO `pbc_legacy_messages`
++     SELECT h.`bot_guid`, h.`timestamp`, COALESCE(c.`guid`, 0),
++       CASE WHEN h.`message` LIKE ''Narrator: *%'' THEN 0
++            WHEN h.`message` LIKE ''% (privately to %): %'' THEN 7
++            WHEN LOCATE('': '', h.`message`) > 0 THEN 2 ELSE 0 END,
++       CASE WHEN h.`message` LIKE ''Narrator: *%'' THEN TRIM(TRAILING ''*'' FROM SUBSTRING(h.`message`, 12))
++            WHEN h.`message` LIKE ''% (privately to %): %'' THEN
++                 SUBSTRING(h.`message`, LOCATE(''): '', h.`message`) + 3)
++            WHEN LOCATE('': '', h.`message`) > 0 THEN SUBSTRING(h.`message`, LOCATE('': '', h.`message`) + 2)
++            ELSE h.`message` END
++     FROM `mod_pbc_chat_history` h
++     LEFT JOIN `characters` c ON BINARY c.`name` = BINARY CASE
++       WHEN h.`message` LIKE ''Narrator: *%'' THEN NULL
++       WHEN h.`message` LIKE ''% (privately to %): %'' THEN SUBSTRING_INDEX(h.`message`, '' (privately to '', 1)
++       WHEN LOCATE('': '', h.`message`) > 0 THEN SUBSTRING_INDEX(h.`message`, '': '', 1) END',
++    'DO 0');
++PREPARE pbc_stmt FROM @pbc_sql;
++EXECUTE pbc_stmt;
++DEALLOCATE PREPARE pbc_stmt;
++
++-- Compare timestamp as well as content so repeated conversation lines stay distinct.
++START TRANSACTION;
++INSERT INTO `mod_pbc_history` (`timestamp`, `author_guid`, `type`, `message`)
++SELECT src.`timestamp`, src.`author_guid`, src.`type`, src.`message`
++FROM (
++    SELECT m.*, ROW_NUMBER() OVER (
++        PARTITION BY m.`timestamp`, m.`author_guid`, m.`type`, SHA2(m.`message`, 256)
++        ORDER BY m.`owner_guid`
++    ) AS `message_rank`
++    FROM `pbc_legacy_messages` m
++) src
++WHERE src.`message_rank` = 1
++  AND NOT EXISTS (SELECT 1 FROM `mod_pbc_history` h
++      WHERE h.`timestamp` = src.`timestamp` AND h.`author_guid` = src.`author_guid`
++        AND h.`type` = src.`type` AND BINARY h.`message` = BINARY src.`message`);
++
++INSERT INTO `mod_pbc_history_owners` (`guid`, `history_id`)
++SELECT m.`owner_guid`, (SELECT MIN(h.`id`) FROM `mod_pbc_history` h
++    WHERE h.`timestamp` = m.`timestamp` AND h.`author_guid` = m.`author_guid`
++      AND h.`type` = m.`type` AND BINARY h.`message` = BINARY m.`message`)
++FROM `pbc_legacy_messages` m
++ON DUPLICATE KEY UPDATE `history_id` = `mod_pbc_history_owners`.`history_id`;
++COMMIT;
++DROP TEMPORARY TABLE `pbc_legacy_messages`;

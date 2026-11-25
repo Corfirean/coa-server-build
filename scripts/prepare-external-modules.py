@@ -7,6 +7,7 @@ import subprocess
 
 
 PIPELINE = Path(__file__).resolve().parents[1]
+MODULE_FOLDERS = {"squid": "mod-playerbots", "dungeon-clear": "mod-dungeon-clear", "mod-pbc": "mod-pbc"}
 
 
 def git(root, *args):
@@ -15,7 +16,7 @@ def git(root, *args):
 
 def definition():
     value = json.loads((PIPELINE / "external-modules.json").read_text(encoding="utf-8"))
-    if value.get("schema") != 1 or set(value["modules"]) != {"squid", "dungeon-clear"}:
+    if value.get("schema") != 1 or set(value["modules"]) != MODULE_FOLDERS.keys():
         raise RuntimeError("Invalid external module source definition")
     for name, module in value["modules"].items():
         if not re.fullmatch(r"[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+", module["repository"]):
@@ -38,7 +39,7 @@ def prepare(core):
     value = definition()
     modules = core.resolve() / "modules"
     for name, module in value["modules"].items():
-        path = modules / ("mod-playerbots" if name == "squid" else "mod-dungeon-clear")
+        path = modules / MODULE_FOLDERS[name]
         if not path.exists():
             if name == "squid":
                 raise RuntimeError("Checkout the locked SQUID source before preparing external modules")
@@ -47,6 +48,8 @@ def prepare(core):
             git(path, "remote", "add", "origin", "https://github.com/" + module["repository"] + ".git")
             git(path, "fetch", "--depth=1", "origin", module["sha"])
             git(path, "checkout", "--detach", "FETCH_HEAD")
+        if Path(git(path, "rev-parse", "--show-toplevel").decode().strip()).resolve() != path.resolve():
+            raise RuntimeError("External module is not a separate checkout: " + name)
         if git(path, "rev-parse", "HEAD").decode().strip() != module["sha"]:
             raise RuntimeError("External module revision needs compatibility review: " + name)
         patch = PIPELINE / module["patch"]
@@ -55,8 +58,7 @@ def prepare(core):
             if changes != patch.read_bytes():
                 raise RuntimeError("External module contains unexpected changes: " + name)
         else:
-            git(path, "apply", "--check", str(patch))
-            git(path, "apply", str(patch))
+            git(path, "apply", "--index", str(patch))
         print(f"{name} commit: {module['sha']}; CoA patch: {module['patchSha256']}", flush=True)
     print("external modules identity: " + identity(), flush=True)
 
