@@ -3561,6 +3561,7 @@
     }
   ],
   "fragmentOverrides": {
-    "Corfirean/mod-coa-playerbots:1517b0732707617f65809a7e0f18142fad7ad755": "Bots keep the Tinker Mechsuit active during combat and use its native attacks"
+    "Corfirean/mod-coa-playerbots:1517b0732707617f65809a7e0f18142fad7ad755": "Bots keep the Tinker Mechsuit active during combat and use its native attacks",
+    "Corfirean/azerothcore-wotlk-coa:501d09b8893109f2d9b3b3857d89ccfa0db4b740": "Paired Twins are shown as \"Warken & Flarken\""
   }
 }
